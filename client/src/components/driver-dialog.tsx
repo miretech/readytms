@@ -216,14 +216,13 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assigned Truck (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-assigned-truck">
                           <SelectValue placeholder="Select truck" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
                         {trucks.map((truck) => (
                           <SelectItem key={truck.id} value={truck.id}>
                             {truck.truckNumber} - {truck.type}

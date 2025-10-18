@@ -303,14 +303,13 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assigned Driver (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-driver">
                           <SelectValue placeholder="Select driver" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
                         {drivers.map((driver) => (
                           <SelectItem key={driver.id} value={driver.id}>
                             {driver.name}
@@ -329,14 +328,13 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assigned Truck (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-truck">
                           <SelectValue placeholder="Select truck" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
                         {trucks.map((truck) => (
                           <SelectItem key={truck.id} value={truck.id}>
                             {truck.truckNumber}
