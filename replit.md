@@ -4,7 +4,7 @@
 A comprehensive Transportation Management System (TMS) built for Ready Carrier. This application provides end-to-end fleet management, load tracking, driver management, and financial accounting capabilities for trucking operations.
 
 ## Project Type
-Full-stack web application using React, TypeScript, Express.js, and in-memory storage.
+Full-stack web application using React, TypeScript, Express.js, and PostgreSQL database with Drizzle ORM.
 
 ## Core Features
 
@@ -54,8 +54,10 @@ Full-stack web application using React, TypeScript, Express.js, and in-memory st
 
 ### Backend
 - **Framework**: Express.js
+- **Database**: PostgreSQL with Drizzle ORM
+- **Authentication**: Replit Auth (OAuth with Google, GitHub, email/password support)
+- **Session Management**: Express sessions with PostgreSQL store
 - **Validation**: Zod with Drizzle-Zod
-- **Storage**: In-memory storage (MemStorage) with CRUD operations
 - **Type Safety**: TypeScript with shared schemas
 
 ### Design System
@@ -91,6 +93,12 @@ Full-stack web application using React, TypeScript, Express.js, and in-memory st
 - Type (shipper/receiver)
 - Pre-seeded with sample customers
 
+### User
+- Email, first name, last name
+- Profile image URL
+- Replit user ID for OAuth integration
+- Session management with secure authentication
+
 ## Key User Journeys
 
 1. **Create and Dispatch Load**:
@@ -112,6 +120,12 @@ Full-stack web application using React, TypeScript, Express.js, and in-memory st
    - Identify pending revenue from delivered loads
 
 ## API Endpoints
+
+### Authentication
+- `GET /api/login` - Initiate Replit Auth login flow
+- `GET /api/callback` - OAuth callback handler
+- `GET /api/logout` - Logout and destroy session
+- `GET /api/auth/user` - Get current authenticated user
 
 ### Loads
 - `GET /api/loads` - Get all loads
@@ -144,17 +158,38 @@ Full-stack web application using React, TypeScript, Express.js, and in-memory st
 - **Theme Toggle**: Light/dark mode switcher in header
 
 ## Recent Changes
-- October 18, 2025: Initial MVP implementation with all core features
-- Implemented comprehensive TMS with dashboard, loads, fleet, drivers, and accounting modules
-- Added professional UI with Shadcn components and custom design system
-- Integrated in-memory storage with full CRUD operations for all entities
-- Fixed Select.Item empty value bug in driver and load dialogs
-- Successfully tested complete user journey: truck creation → driver addition → load creation → status updates → accounting view
-- All core features verified working through end-to-end testing
+- October 18, 2025: **Database Migration & Multi-User Authentication**
+  - Migrated from in-memory storage to PostgreSQL database with Drizzle ORM
+  - All data now persists across server restarts
+  - Implemented Replit Auth for secure multi-user access
+  - Created users table with OAuth integration
+  - Added protected routes - authentication required for app access
+  - Built professional landing page for unauthenticated users
+  - Added user profile display with avatar and logout functionality
+  - Session management with PostgreSQL-backed session store
+  
+- October 18, 2025: **Initial MVP Implementation**
+  - Implemented comprehensive TMS with dashboard, loads, fleet, drivers, and accounting modules
+  - Added professional UI with Shadcn components and custom design system
+  - Fixed Select.Item empty value bug in driver and load dialogs
+  - Successfully tested complete user journey: truck creation → driver addition → load creation → status updates → accounting view
+  - All core features verified working through end-to-end testing
 
 ## Project Architecture
 - Schema-first development approach with shared TypeScript types
+- PostgreSQL database with Drizzle ORM for type-safe queries
+- Replit Auth integration for OAuth authentication
+- Session-based authentication with secure cookie storage
 - Horizontal layer implementation (all frontend components → all backend routes → integration)
 - Component-based architecture with reusable UI elements
 - Type-safe API communication with TanStack Query
 - Responsive design following mobile-first principles
+- Protected routes requiring authentication
+
+## Planned Features (Future Development)
+1. **Document Management**: Upload and manage BOL, POD, invoices for loads
+2. **Customer Management Module**: Dedicated page for customer CRUD operations
+3. **Analytics & Reporting**: Revenue trends, fleet utilization charts, performance metrics
+4. **Driver Settlements**: Payment tracking, settlement calculations, payment history
+5. **GPS Tracking**: Real-time location tracking for loads and trucks
+6. **Advanced Reporting**: Custom reports, data exports, business intelligence
