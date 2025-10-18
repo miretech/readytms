@@ -8,9 +8,15 @@ import {
   type Driver,
   type InsertDriver,
   type Customer,
-  type InsertCustomer
+  type InsertCustomer,
+  users,
+  loads,
+  trucks,
+  drivers,
+  customers
 } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -42,194 +48,160 @@ export interface IStorage {
   deleteCustomer(id: string): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private loads: Map<string, Load>;
-  private trucks: Map<string, Truck>;
-  private drivers: Map<string, Driver>;
-  private customers: Map<string, Customer>;
-
-  constructor() {
-    this.users = new Map();
-    this.loads = new Map();
-    this.trucks = new Map();
-    this.drivers = new Map();
-    this.customers = new Map();
-    this.seedData();
-  }
-
-  private seedData() {
-    const defaultCustomers: InsertCustomer[] = [
-      {
-        name: "ABC Logistics Inc.",
-        email: "contact@abclogistics.com",
-        phone: "(555) 100-2000",
-        address: "1234 Industrial Blvd, Chicago, IL 60601",
-        type: "shipper",
-      },
-      {
-        name: "Global Freight Solutions",
-        email: "info@globalfreight.com",
-        phone: "(555) 200-3000",
-        address: "5678 Commerce Dr, Atlanta, GA 30303",
-        type: "shipper",
-      },
-      {
-        name: "Midwest Distribution Co.",
-        email: "orders@midwestdist.com",
-        phone: "(555) 300-4000",
-        address: "910 Warehouse Ln, Dallas, TX 75201",
-        type: "receiver",
-      },
-    ];
-
-    defaultCustomers.forEach(customer => {
-      const id = randomUUID();
-      this.customers.set(id, { ...customer, id });
-    });
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
   async getAllLoads(): Promise<Load[]> {
-    return Array.from(this.loads.values()).sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    return await db.select().from(loads).orderBy(desc(loads.createdAt));
   }
 
   async getLoad(id: string): Promise<Load | undefined> {
-    return this.loads.get(id);
+    const [load] = await db.select().from(loads).where(eq(loads.id, id));
+    return load || undefined;
   }
 
   async createLoad(insertLoad: InsertLoad): Promise<Load> {
-    const id = randomUUID();
-    const load: Load = { 
-      ...insertLoad, 
-      id,
-      createdAt: new Date(),
-      pickupDate: new Date(insertLoad.pickupDate),
-      deliveryDate: new Date(insertLoad.deliveryDate),
-    };
-    this.loads.set(id, load);
+    const [load] = await db
+      .insert(loads)
+      .values({
+        ...insertLoad,
+        pickupDate: new Date(insertLoad.pickupDate),
+        deliveryDate: new Date(insertLoad.deliveryDate),
+      })
+      .returning();
     return load;
   }
 
   async updateLoad(id: string, updateData: Partial<InsertLoad>): Promise<Load | undefined> {
-    const load = this.loads.get(id);
-    if (!load) return undefined;
-
-    const updated: Load = { 
-      ...load, 
-      ...updateData,
-      pickupDate: updateData.pickupDate ? new Date(updateData.pickupDate) : load.pickupDate,
-      deliveryDate: updateData.deliveryDate ? new Date(updateData.deliveryDate) : load.deliveryDate,
-    };
-    this.loads.set(id, updated);
-    return updated;
+    const values: any = { ...updateData };
+    if (updateData.pickupDate) {
+      values.pickupDate = new Date(updateData.pickupDate);
+    }
+    if (updateData.deliveryDate) {
+      values.deliveryDate = new Date(updateData.deliveryDate);
+    }
+    
+    const [load] = await db
+      .update(loads)
+      .set(values)
+      .where(eq(loads.id, id))
+      .returning();
+    return load || undefined;
   }
 
   async deleteLoad(id: string): Promise<boolean> {
-    return this.loads.delete(id);
+    const result = await db.delete(loads).where(eq(loads.id, id)).returning();
+    return result.length > 0;
   }
 
   async getAllTrucks(): Promise<Truck[]> {
-    return Array.from(this.trucks.values());
+    return await db.select().from(trucks);
   }
 
   async getTruck(id: string): Promise<Truck | undefined> {
-    return this.trucks.get(id);
+    const [truck] = await db.select().from(trucks).where(eq(trucks.id, id));
+    return truck || undefined;
   }
 
   async createTruck(insertTruck: InsertTruck): Promise<Truck> {
-    const id = randomUUID();
-    const truck: Truck = { ...insertTruck, id };
-    this.trucks.set(id, truck);
+    const [truck] = await db
+      .insert(trucks)
+      .values(insertTruck)
+      .returning();
     return truck;
   }
 
   async updateTruck(id: string, updateData: Partial<InsertTruck>): Promise<Truck | undefined> {
-    const truck = this.trucks.get(id);
-    if (!truck) return undefined;
-
-    const updated: Truck = { ...truck, ...updateData };
-    this.trucks.set(id, updated);
-    return updated;
+    const [truck] = await db
+      .update(trucks)
+      .set(updateData)
+      .where(eq(trucks.id, id))
+      .returning();
+    return truck || undefined;
   }
 
   async deleteTruck(id: string): Promise<boolean> {
-    return this.trucks.delete(id);
+    const result = await db.delete(trucks).where(eq(trucks.id, id)).returning();
+    return result.length > 0;
   }
 
   async getAllDrivers(): Promise<Driver[]> {
-    return Array.from(this.drivers.values());
+    return await db.select().from(drivers);
   }
 
   async getDriver(id: string): Promise<Driver | undefined> {
-    return this.drivers.get(id);
+    const [driver] = await db.select().from(drivers).where(eq(drivers.id, id));
+    return driver || undefined;
   }
 
   async createDriver(insertDriver: InsertDriver): Promise<Driver> {
-    const id = randomUUID();
-    const driver: Driver = { ...insertDriver, id };
-    this.drivers.set(id, driver);
+    const [driver] = await db
+      .insert(drivers)
+      .values(insertDriver)
+      .returning();
     return driver;
   }
 
   async updateDriver(id: string, updateData: Partial<InsertDriver>): Promise<Driver | undefined> {
-    const driver = this.drivers.get(id);
-    if (!driver) return undefined;
-
-    const updated: Driver = { ...driver, ...updateData };
-    this.drivers.set(id, updated);
-    return updated;
+    const [driver] = await db
+      .update(drivers)
+      .set(updateData)
+      .where(eq(drivers.id, id))
+      .returning();
+    return driver || undefined;
   }
 
   async deleteDriver(id: string): Promise<boolean> {
-    return this.drivers.delete(id);
+    const result = await db.delete(drivers).where(eq(drivers.id, id)).returning();
+    return result.length > 0;
   }
 
   async getAllCustomers(): Promise<Customer[]> {
-    return Array.from(this.customers.values());
+    return await db.select().from(customers);
   }
 
   async getCustomer(id: string): Promise<Customer | undefined> {
-    return this.customers.get(id);
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer || undefined;
   }
 
   async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
-    const id = randomUUID();
-    const customer: Customer = { ...insertCustomer, id };
-    this.customers.set(id, customer);
+    const [customer] = await db
+      .insert(customers)
+      .values(insertCustomer)
+      .returning();
     return customer;
   }
 
   async updateCustomer(id: string, updateData: Partial<InsertCustomer>): Promise<Customer | undefined> {
-    const customer = this.customers.get(id);
-    if (!customer) return undefined;
-
-    const updated: Customer = { ...customer, ...updateData };
-    this.customers.set(id, updated);
-    return updated;
+    const [customer] = await db
+      .update(customers)
+      .set(updateData)
+      .where(eq(customers.id, id))
+      .returning();
+    return customer || undefined;
   }
 
   async deleteCustomer(id: string): Promise<boolean> {
-    return this.customers.delete(id);
+    const result = await db.delete(customers).where(eq(customers.id, id)).returning();
+    return result.length > 0;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
