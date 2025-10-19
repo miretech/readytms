@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertLoadSchema, insertTruckSchema, insertDriverSchema, insertCustomerSchema } from "@shared/schema";
+import { insertLoadSchema, insertTruckSchema, insertDriverSchema, insertCustomerSchema, insertDocumentSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { extractLoadFromDocument } from "./aiExtraction";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
@@ -191,6 +192,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Customer not found" });
     }
     res.status(204).send();
+  });
+
+  app.post("/api/extract-load", async (req, res) => {
+    try {
+      const { fileData, fileType } = req.body;
+      
+      if (!fileData || !fileType) {
+        return res.status(400).json({ error: "Missing file data or type" });
+      }
+
+      const extractedData = await extractLoadFromDocument(fileData, fileType);
+      res.json(extractedData);
+    } catch (error: any) {
+      console.error("Error extracting load:", error);
+      res.status(500).json({ error: error.message || "Failed to extract load data" });
+    }
+  });
+
+  app.post("/api/documents", async (req, res) => {
+    try {
+      const validatedData = insertDocumentSchema.parse(req.body);
+      const document = await storage.createDocument(validatedData);
+      res.status(201).json(document);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid document data" });
+    }
+  });
+
+  app.get("/api/documents/load/:loadId", async (req, res) => {
+    const documents = await storage.getDocumentsByLoad(req.params.loadId);
+    res.json(documents);
   });
 
   const httpServer = createServer(app);

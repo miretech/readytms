@@ -9,11 +9,14 @@ import {
   type InsertDriver,
   type Customer,
   type InsertCustomer,
+  type Document,
+  type InsertDocument,
   users,
   loads,
   trucks,
   drivers,
-  customers
+  customers,
+  documents
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -45,6 +48,9 @@ export interface IStorage {
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
   deleteCustomer(id: string): Promise<boolean>;
+  
+  createDocument(document: InsertDocument): Promise<Document>;
+  getDocumentsByLoad(loadId: string): Promise<Document[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -202,6 +208,18 @@ export class DatabaseStorage implements IStorage {
   async deleteCustomer(id: string): Promise<boolean> {
     const result = await db.delete(customers).where(eq(customers.id, id)).returning();
     return result.length > 0;
+  }
+
+  async createDocument(insertDocument: InsertDocument): Promise<Document> {
+    const [document] = await db
+      .insert(documents)
+      .values(insertDocument)
+      .returning();
+    return document;
+  }
+
+  async getDocumentsByLoad(loadId: string): Promise<Document[]> {
+    return await db.select().from(documents).where(eq(documents.loadId, loadId));
   }
 }
 
