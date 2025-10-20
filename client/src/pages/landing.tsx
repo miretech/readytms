@@ -10,7 +10,7 @@ export default function Landing() {
             <Truck className="h-7 w-7" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Ready Carrier</h1>
+            <h1 className="text-2xl font-bold text-foreground">Ready TMS</h1>
             <p className="text-sm text-muted-foreground">Transportation Management System</p>
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function Landing() {
             Ready to optimize your operations?
           </h3>
           <p className="mb-8 text-lg text-muted-foreground">
-            Join trucking companies that trust Ready Carrier for their transportation management needs.
+            Join trucking companies that trust Ready TMS for their transportation management needs.
           </p>
           <Button asChild size="lg" className="px-8" data-testid="button-login-footer">
             <a href="/api/login">Log In to Get Started</a>
@@ -114,7 +114,7 @@ export default function Landing() {
       <footer className="container mx-auto border-t border-border px-6 py-8">
         <div className="flex flex-col items-center justify-between gap-4 text-center md:flex-row md:text-left">
           <p className="text-sm text-muted-foreground">
-            © 2025 Ready Carrier TMS. All rights reserved.
+            © 2025 Ready TMS. All rights reserved.
           </p>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <Truck className="h-5 w-5 text-primary" />

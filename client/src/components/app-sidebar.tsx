@@ -59,8 +59,8 @@ export function AppSidebar() {
             <Truck className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Ready Carrier</h2>
-            <p className="text-xs text-muted-foreground">TMS</p>
+            <h2 className="text-lg font-semibold tracking-tight">Ready TMS</h2>
+            <p className="text-xs text-muted-foreground">Transportation Management</p>
           </div>
         </div>
       </SidebarHeader>
