@@ -14,7 +14,8 @@ import {
   insertAccidentSchema,
   insertViolationSchema,
   insertSettlementSchema,
-  insertMaintenanceSchema
+  insertMaintenanceSchema,
+  insertFuelTransactionSchema
 } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { extractLoadFromDocument } from "./aiExtraction";
@@ -635,6 +636,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const deleted = await storage.deleteMaintenance(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Maintenance record not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Fuel Transactions Routes
+  app.get("/api/fuel", async (_req, res) => {
+    const transactions = await storage.getAllFuelTransactions();
+    res.json(transactions);
+  });
+
+  app.get("/api/fuel/:id", async (req, res) => {
+    const transaction = await storage.getFuelTransaction(req.params.id);
+    if (!transaction) {
+      return res.status(404).json({ error: "Fuel transaction not found" });
+    }
+    res.json(transaction);
+  });
+
+  app.get("/api/fuel/truck/:truckId", async (req, res) => {
+    const transactions = await storage.getFuelTransactionsByTruck(req.params.truckId);
+    res.json(transactions);
+  });
+
+  app.get("/api/fuel/driver/:driverId", async (req, res) => {
+    const transactions = await storage.getFuelTransactionsByDriver(req.params.driverId);
+    res.json(transactions);
+  });
+
+  app.get("/api/fuel/load/:loadId", async (req, res) => {
+    const transactions = await storage.getFuelTransactionsByLoad(req.params.loadId);
+    res.json(transactions);
+  });
+
+  app.post("/api/fuel", async (req, res) => {
+    try {
+      const validatedData = insertFuelTransactionSchema.parse(req.body);
+      const transaction = await storage.createFuelTransaction(validatedData);
+      res.status(201).json(transaction);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid fuel transaction data" });
+    }
+  });
+
+  app.patch("/api/fuel/:id", async (req, res) => {
+    try {
+      const validatedData = insertFuelTransactionSchema.partial().parse(req.body);
+      const transaction = await storage.updateFuelTransaction(req.params.id, validatedData);
+      if (!transaction) {
+        return res.status(404).json({ error: "Fuel transaction not found" });
+      }
+      res.json(transaction);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid fuel transaction data" });
+    }
+  });
+
+  app.delete("/api/fuel/:id", async (req, res) => {
+    const deleted = await storage.deleteFuelTransaction(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Fuel transaction not found" });
     }
     res.status(204).send();
   });
