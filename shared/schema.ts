@@ -130,3 +130,232 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+// Expenses - Individual expense tracking
+export const expenses = pgTable("expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  loadId: varchar("load_id"),
+  category: text("category").notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  expenseDate: timestamp("expense_date").notNull(),
+  vendor: text("vendor"),
+  paymentMethod: text("payment_method"),
+  receiptUrl: text("receipt_url"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertExpenseSchema = createInsertSchema(expenses).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  expenseDate: z.string(),
+  amount: z.string(),
+});
+
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type Expense = typeof expenses.$inferSelect;
+
+// Invoices - Customer billing
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  loadId: varchar("load_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  status: text("status").notNull(),
+  invoiceDate: timestamp("invoice_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  tax: decimal("tax", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  invoiceDate: z.string(),
+  dueDate: z.string(),
+  subtotal: z.string(),
+  tax: z.string().optional(),
+  total: z.string(),
+  paidAmount: z.string().optional(),
+});
+
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+
+// Payments - Payment tracking
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id"),
+  customerId: varchar("customer_id"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentDate: timestamp("payment_date").notNull(),
+  paymentMethod: text("payment_method").notNull(),
+  referenceNumber: text("reference_number"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  paymentDate: z.string(),
+  amount: z.string(),
+});
+
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
+
+// Safety Inspections
+export const inspections = pgTable("inspections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  truckId: varchar("truck_id").notNull(),
+  driverId: varchar("driver_id").notNull(),
+  inspectionType: text("inspection_type").notNull(),
+  inspectionDate: timestamp("inspection_date").notNull(),
+  status: text("status").notNull(),
+  defects: text("defects"),
+  notes: text("notes"),
+  performedBy: text("performed_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInspectionSchema = createInsertSchema(inspections).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  inspectionDate: z.string(),
+});
+
+export type InsertInspection = z.infer<typeof insertInspectionSchema>;
+export type Inspection = typeof inspections.$inferSelect;
+
+// Accidents & Incidents
+export const accidents = pgTable("accidents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull(),
+  truckId: varchar("truck_id"),
+  loadId: varchar("load_id"),
+  accidentDate: timestamp("accident_date").notNull(),
+  location: text("location").notNull(),
+  severity: text("severity").notNull(),
+  description: text("description").notNull(),
+  injuriesReported: integer("injuries_reported").default(0),
+  policeReportNumber: text("police_report_number"),
+  insuranceClaimNumber: text("insurance_claim_number"),
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }),
+  status: text("status").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAccidentSchema = createInsertSchema(accidents).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  accidentDate: z.string(),
+  estimatedCost: z.string().optional(),
+});
+
+export type InsertAccident = z.infer<typeof insertAccidentSchema>;
+export type Accident = typeof accidents.$inferSelect;
+
+// Violations - DOT/Traffic violations
+export const violations = pgTable("violations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull(),
+  truckId: varchar("truck_id"),
+  violationType: text("violation_type").notNull(),
+  violationDate: timestamp("violation_date").notNull(),
+  location: text("location").notNull(),
+  description: text("description").notNull(),
+  citationNumber: text("citation_number"),
+  fineAmount: decimal("fine_amount", { precision: 10, scale: 2 }),
+  points: integer("points"),
+  status: text("status").notNull(),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertViolationSchema = createInsertSchema(violations).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  violationDate: z.string(),
+  dueDate: z.string().optional(),
+  fineAmount: z.string().optional(),
+});
+
+export type InsertViolation = z.infer<typeof insertViolationSchema>;
+export type Violation = typeof violations.$inferSelect;
+
+// Driver Settlements - Payroll/Payments to drivers
+export const settlements = pgTable("settlements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull(),
+  settlementNumber: text("settlement_number").notNull().unique(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  totalMiles: integer("total_miles"),
+  totalRevenue: decimal("total_revenue", { precision: 10, scale: 2 }).notNull(),
+  driverPay: decimal("driver_pay", { precision: 10, scale: 2 }).notNull(),
+  deductions: decimal("deductions", { precision: 10, scale: 2 }).default("0"),
+  netPay: decimal("net_pay", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull(),
+  paidDate: timestamp("paid_date"),
+  paymentMethod: text("payment_method"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSettlementSchema = createInsertSchema(settlements).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  totalRevenue: z.string(),
+  driverPay: z.string(),
+  deductions: z.string().optional(),
+  netPay: z.string(),
+  paidDate: z.string().optional(),
+});
+
+export type InsertSettlement = z.infer<typeof insertSettlementSchema>;
+export type Settlement = typeof settlements.$inferSelect;
+
+// Maintenance Records
+export const maintenance = pgTable("maintenance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  truckId: varchar("truck_id").notNull(),
+  maintenanceType: text("maintenance_type").notNull(),
+  serviceDate: timestamp("service_date").notNull(),
+  mileage: integer("mileage"),
+  cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+  vendor: text("vendor"),
+  description: text("description").notNull(),
+  nextServiceMileage: integer("next_service_mileage"),
+  nextServiceDate: timestamp("next_service_date"),
+  status: text("status").notNull(),
+  invoiceNumber: text("invoice_number"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMaintenanceSchema = createInsertSchema(maintenance).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  serviceDate: z.string(),
+  nextServiceDate: z.string().optional(),
+  cost: z.string(),
+});
+
+export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
+export type Maintenance = typeof maintenance.$inferSelect;

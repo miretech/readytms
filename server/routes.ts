@@ -1,7 +1,21 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertLoadSchema, insertTruckSchema, insertDriverSchema, insertCustomerSchema, insertDocumentSchema } from "@shared/schema";
+import { 
+  insertLoadSchema, 
+  insertTruckSchema, 
+  insertDriverSchema, 
+  insertCustomerSchema, 
+  insertDocumentSchema,
+  insertExpenseSchema,
+  insertInvoiceSchema,
+  insertPaymentSchema,
+  insertInspectionSchema,
+  insertAccidentSchema,
+  insertViolationSchema,
+  insertSettlementSchema,
+  insertMaintenanceSchema
+} from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { extractLoadFromDocument } from "./aiExtraction";
 
@@ -223,6 +237,406 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/documents/load/:loadId", async (req, res) => {
     const documents = await storage.getDocumentsByLoad(req.params.loadId);
     res.json(documents);
+  });
+
+  // Expenses Routes
+  app.get("/api/expenses", async (_req, res) => {
+    const expenses = await storage.getAllExpenses();
+    res.json(expenses);
+  });
+
+  app.get("/api/expenses/:id", async (req, res) => {
+    const expense = await storage.getExpense(req.params.id);
+    if (!expense) {
+      return res.status(404).json({ error: "Expense not found" });
+    }
+    res.json(expense);
+  });
+
+  app.get("/api/expenses/load/:loadId", async (req, res) => {
+    const expenses = await storage.getExpensesByLoad(req.params.loadId);
+    res.json(expenses);
+  });
+
+  app.post("/api/expenses", async (req, res) => {
+    try {
+      const validatedData = insertExpenseSchema.parse(req.body);
+      const expense = await storage.createExpense(validatedData);
+      res.status(201).json(expense);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid expense data" });
+    }
+  });
+
+  app.patch("/api/expenses/:id", async (req, res) => {
+    try {
+      const validatedData = insertExpenseSchema.partial().parse(req.body);
+      const expense = await storage.updateExpense(req.params.id, validatedData);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid expense data" });
+    }
+  });
+
+  app.delete("/api/expenses/:id", async (req, res) => {
+    const deleted = await storage.deleteExpense(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Expense not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Invoices Routes
+  app.get("/api/invoices", async (_req, res) => {
+    const invoices = await storage.getAllInvoices();
+    res.json(invoices);
+  });
+
+  app.get("/api/invoices/:id", async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    res.json(invoice);
+  });
+
+  app.post("/api/invoices", async (req, res) => {
+    try {
+      const validatedData = insertInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoice(validatedData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid invoice data" });
+    }
+  });
+
+  app.patch("/api/invoices/:id", async (req, res) => {
+    try {
+      const validatedData = insertInvoiceSchema.partial().parse(req.body);
+      const invoice = await storage.updateInvoice(req.params.id, validatedData);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid invoice data" });
+    }
+  });
+
+  app.delete("/api/invoices/:id", async (req, res) => {
+    const deleted = await storage.deleteInvoice(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Payments Routes
+  app.get("/api/payments", async (_req, res) => {
+    const payments = await storage.getAllPayments();
+    res.json(payments);
+  });
+
+  app.get("/api/payments/:id", async (req, res) => {
+    const payment = await storage.getPayment(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ error: "Payment not found" });
+    }
+    res.json(payment);
+  });
+
+  app.get("/api/payments/invoice/:invoiceId", async (req, res) => {
+    const payments = await storage.getPaymentsByInvoice(req.params.invoiceId);
+    res.json(payments);
+  });
+
+  app.post("/api/payments", async (req, res) => {
+    try {
+      const validatedData = insertPaymentSchema.parse(req.body);
+      const payment = await storage.createPayment(validatedData);
+      res.status(201).json(payment);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid payment data" });
+    }
+  });
+
+  app.patch("/api/payments/:id", async (req, res) => {
+    try {
+      const validatedData = insertPaymentSchema.partial().parse(req.body);
+      const payment = await storage.updatePayment(req.params.id, validatedData);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      res.json(payment);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid payment data" });
+    }
+  });
+
+  app.delete("/api/payments/:id", async (req, res) => {
+    const deleted = await storage.deletePayment(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Payment not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Inspections Routes
+  app.get("/api/inspections", async (_req, res) => {
+    const inspections = await storage.getAllInspections();
+    res.json(inspections);
+  });
+
+  app.get("/api/inspections/:id", async (req, res) => {
+    const inspection = await storage.getInspection(req.params.id);
+    if (!inspection) {
+      return res.status(404).json({ error: "Inspection not found" });
+    }
+    res.json(inspection);
+  });
+
+  app.get("/api/inspections/truck/:truckId", async (req, res) => {
+    const inspections = await storage.getInspectionsByTruck(req.params.truckId);
+    res.json(inspections);
+  });
+
+  app.get("/api/inspections/driver/:driverId", async (req, res) => {
+    const inspections = await storage.getInspectionsByDriver(req.params.driverId);
+    res.json(inspections);
+  });
+
+  app.post("/api/inspections", async (req, res) => {
+    try {
+      const validatedData = insertInspectionSchema.parse(req.body);
+      const inspection = await storage.createInspection(validatedData);
+      res.status(201).json(inspection);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid inspection data" });
+    }
+  });
+
+  app.patch("/api/inspections/:id", async (req, res) => {
+    try {
+      const validatedData = insertInspectionSchema.partial().parse(req.body);
+      const inspection = await storage.updateInspection(req.params.id, validatedData);
+      if (!inspection) {
+        return res.status(404).json({ error: "Inspection not found" });
+      }
+      res.json(inspection);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid inspection data" });
+    }
+  });
+
+  app.delete("/api/inspections/:id", async (req, res) => {
+    const deleted = await storage.deleteInspection(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Inspection not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Accidents Routes
+  app.get("/api/accidents", async (_req, res) => {
+    const accidents = await storage.getAllAccidents();
+    res.json(accidents);
+  });
+
+  app.get("/api/accidents/:id", async (req, res) => {
+    const accident = await storage.getAccident(req.params.id);
+    if (!accident) {
+      return res.status(404).json({ error: "Accident not found" });
+    }
+    res.json(accident);
+  });
+
+  app.get("/api/accidents/driver/:driverId", async (req, res) => {
+    const accidents = await storage.getAccidentsByDriver(req.params.driverId);
+    res.json(accidents);
+  });
+
+  app.post("/api/accidents", async (req, res) => {
+    try {
+      const validatedData = insertAccidentSchema.parse(req.body);
+      const accident = await storage.createAccident(validatedData);
+      res.status(201).json(accident);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid accident data" });
+    }
+  });
+
+  app.patch("/api/accidents/:id", async (req, res) => {
+    try {
+      const validatedData = insertAccidentSchema.partial().parse(req.body);
+      const accident = await storage.updateAccident(req.params.id, validatedData);
+      if (!accident) {
+        return res.status(404).json({ error: "Accident not found" });
+      }
+      res.json(accident);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid accident data" });
+    }
+  });
+
+  app.delete("/api/accidents/:id", async (req, res) => {
+    const deleted = await storage.deleteAccident(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Accident not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Violations Routes
+  app.get("/api/violations", async (_req, res) => {
+    const violations = await storage.getAllViolations();
+    res.json(violations);
+  });
+
+  app.get("/api/violations/:id", async (req, res) => {
+    const violation = await storage.getViolation(req.params.id);
+    if (!violation) {
+      return res.status(404).json({ error: "Violation not found" });
+    }
+    res.json(violation);
+  });
+
+  app.get("/api/violations/driver/:driverId", async (req, res) => {
+    const violations = await storage.getViolationsByDriver(req.params.driverId);
+    res.json(violations);
+  });
+
+  app.post("/api/violations", async (req, res) => {
+    try {
+      const validatedData = insertViolationSchema.parse(req.body);
+      const violation = await storage.createViolation(validatedData);
+      res.status(201).json(violation);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid violation data" });
+    }
+  });
+
+  app.patch("/api/violations/:id", async (req, res) => {
+    try {
+      const validatedData = insertViolationSchema.partial().parse(req.body);
+      const violation = await storage.updateViolation(req.params.id, validatedData);
+      if (!violation) {
+        return res.status(404).json({ error: "Violation not found" });
+      }
+      res.json(violation);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid violation data" });
+    }
+  });
+
+  app.delete("/api/violations/:id", async (req, res) => {
+    const deleted = await storage.deleteViolation(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Violation not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Settlements Routes
+  app.get("/api/settlements", async (_req, res) => {
+    const settlements = await storage.getAllSettlements();
+    res.json(settlements);
+  });
+
+  app.get("/api/settlements/:id", async (req, res) => {
+    const settlement = await storage.getSettlement(req.params.id);
+    if (!settlement) {
+      return res.status(404).json({ error: "Settlement not found" });
+    }
+    res.json(settlement);
+  });
+
+  app.get("/api/settlements/driver/:driverId", async (req, res) => {
+    const settlements = await storage.getSettlementsByDriver(req.params.driverId);
+    res.json(settlements);
+  });
+
+  app.post("/api/settlements", async (req, res) => {
+    try {
+      const validatedData = insertSettlementSchema.parse(req.body);
+      const settlement = await storage.createSettlement(validatedData);
+      res.status(201).json(settlement);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid settlement data" });
+    }
+  });
+
+  app.patch("/api/settlements/:id", async (req, res) => {
+    try {
+      const validatedData = insertSettlementSchema.partial().parse(req.body);
+      const settlement = await storage.updateSettlement(req.params.id, validatedData);
+      if (!settlement) {
+        return res.status(404).json({ error: "Settlement not found" });
+      }
+      res.json(settlement);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid settlement data" });
+    }
+  });
+
+  app.delete("/api/settlements/:id", async (req, res) => {
+    const deleted = await storage.deleteSettlement(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Settlement not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Maintenance Routes
+  app.get("/api/maintenance", async (_req, res) => {
+    const maintenance = await storage.getAllMaintenance();
+    res.json(maintenance);
+  });
+
+  app.get("/api/maintenance/:id", async (req, res) => {
+    const record = await storage.getMaintenance(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: "Maintenance record not found" });
+    }
+    res.json(record);
+  });
+
+  app.get("/api/maintenance/truck/:truckId", async (req, res) => {
+    const maintenance = await storage.getMaintenanceByTruck(req.params.truckId);
+    res.json(maintenance);
+  });
+
+  app.post("/api/maintenance", async (req, res) => {
+    try {
+      const validatedData = insertMaintenanceSchema.parse(req.body);
+      const record = await storage.createMaintenance(validatedData);
+      res.status(201).json(record);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid maintenance data" });
+    }
+  });
+
+  app.patch("/api/maintenance/:id", async (req, res) => {
+    try {
+      const validatedData = insertMaintenanceSchema.partial().parse(req.body);
+      const record = await storage.updateMaintenance(req.params.id, validatedData);
+      if (!record) {
+        return res.status(404).json({ error: "Maintenance record not found" });
+      }
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid maintenance data" });
+    }
+  });
+
+  app.delete("/api/maintenance/:id", async (req, res) => {
+    const deleted = await storage.deleteMaintenance(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Maintenance record not found" });
+    }
+    res.status(204).send();
   });
 
   const httpServer = createServer(app);

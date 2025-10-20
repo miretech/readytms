@@ -11,12 +11,36 @@ import {
   type InsertCustomer,
   type Document,
   type InsertDocument,
+  type Expense,
+  type InsertExpense,
+  type Invoice,
+  type InsertInvoice,
+  type Payment,
+  type InsertPayment,
+  type Inspection,
+  type InsertInspection,
+  type Accident,
+  type InsertAccident,
+  type Violation,
+  type InsertViolation,
+  type Settlement,
+  type InsertSettlement,
+  type Maintenance,
+  type InsertMaintenance,
   users,
   loads,
   trucks,
   drivers,
   customers,
-  documents
+  documents,
+  expenses,
+  invoices,
+  payments,
+  inspections,
+  accidents,
+  violations,
+  settlements,
+  maintenance
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -51,6 +75,70 @@ export interface IStorage {
   
   createDocument(document: InsertDocument): Promise<Document>;
   getDocumentsByLoad(loadId: string): Promise<Document[]>;
+  
+  // Expenses
+  getAllExpenses(): Promise<Expense[]>;
+  getExpense(id: string): Promise<Expense | undefined>;
+  getExpensesByLoad(loadId: string): Promise<Expense[]>;
+  createExpense(expense: InsertExpense): Promise<Expense>;
+  updateExpense(id: string, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
+  deleteExpense(id: string): Promise<boolean>;
+  
+  // Invoices
+  getAllInvoices(): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: string, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
+  deleteInvoice(id: string): Promise<boolean>;
+  
+  // Payments
+  getAllPayments(): Promise<Payment[]>;
+  getPayment(id: string): Promise<Payment | undefined>;
+  getPaymentsByInvoice(invoiceId: string): Promise<Payment[]>;
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  updatePayment(id: string, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
+  deletePayment(id: string): Promise<boolean>;
+  
+  // Inspections
+  getAllInspections(): Promise<Inspection[]>;
+  getInspection(id: string): Promise<Inspection | undefined>;
+  getInspectionsByTruck(truckId: string): Promise<Inspection[]>;
+  getInspectionsByDriver(driverId: string): Promise<Inspection[]>;
+  createInspection(inspection: InsertInspection): Promise<Inspection>;
+  updateInspection(id: string, inspection: Partial<InsertInspection>): Promise<Inspection | undefined>;
+  deleteInspection(id: string): Promise<boolean>;
+  
+  // Accidents
+  getAllAccidents(): Promise<Accident[]>;
+  getAccident(id: string): Promise<Accident | undefined>;
+  getAccidentsByDriver(driverId: string): Promise<Accident[]>;
+  createAccident(accident: InsertAccident): Promise<Accident>;
+  updateAccident(id: string, accident: Partial<InsertAccident>): Promise<Accident | undefined>;
+  deleteAccident(id: string): Promise<boolean>;
+  
+  // Violations
+  getAllViolations(): Promise<Violation[]>;
+  getViolation(id: string): Promise<Violation | undefined>;
+  getViolationsByDriver(driverId: string): Promise<Violation[]>;
+  createViolation(violation: InsertViolation): Promise<Violation>;
+  updateViolation(id: string, violation: Partial<InsertViolation>): Promise<Violation | undefined>;
+  deleteViolation(id: string): Promise<boolean>;
+  
+  // Settlements
+  getAllSettlements(): Promise<Settlement[]>;
+  getSettlement(id: string): Promise<Settlement | undefined>;
+  getSettlementsByDriver(driverId: string): Promise<Settlement[]>;
+  createSettlement(settlement: InsertSettlement): Promise<Settlement>;
+  updateSettlement(id: string, settlement: Partial<InsertSettlement>): Promise<Settlement | undefined>;
+  deleteSettlement(id: string): Promise<boolean>;
+  
+  // Maintenance
+  getAllMaintenance(): Promise<Maintenance[]>;
+  getMaintenance(id: string): Promise<Maintenance | undefined>;
+  getMaintenanceByTruck(truckId: string): Promise<Maintenance[]>;
+  createMaintenance(maintenance: InsertMaintenance): Promise<Maintenance>;
+  updateMaintenance(id: string, maintenance: Partial<InsertMaintenance>): Promise<Maintenance | undefined>;
+  deleteMaintenance(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -220,6 +308,370 @@ export class DatabaseStorage implements IStorage {
 
   async getDocumentsByLoad(loadId: string): Promise<Document[]> {
     return await db.select().from(documents).where(eq(documents.loadId, loadId));
+  }
+
+  // Expenses
+  async getAllExpenses(): Promise<Expense[]> {
+    return await db.select().from(expenses).orderBy(desc(expenses.expenseDate));
+  }
+
+  async getExpense(id: string): Promise<Expense | undefined> {
+    const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));
+    return expense || undefined;
+  }
+
+  async getExpensesByLoad(loadId: string): Promise<Expense[]> {
+    return await db.select().from(expenses).where(eq(expenses.loadId, loadId));
+  }
+
+  async createExpense(insertExpense: InsertExpense): Promise<Expense> {
+    const [expense] = await db
+      .insert(expenses)
+      .values({
+        ...insertExpense,
+        expenseDate: new Date(insertExpense.expenseDate),
+      })
+      .returning();
+    return expense;
+  }
+
+  async updateExpense(id: string, updateData: Partial<InsertExpense>): Promise<Expense | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.expenseDate) {
+      values.expenseDate = new Date(updateData.expenseDate);
+    }
+    const [expense] = await db
+      .update(expenses)
+      .set(values)
+      .where(eq(expenses.id, id))
+      .returning();
+    return expense || undefined;
+  }
+
+  async deleteExpense(id: string): Promise<boolean> {
+    const result = await db.delete(expenses).where(eq(expenses.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Invoices
+  async getAllInvoices(): Promise<Invoice[]> {
+    return await db.select().from(invoices).orderBy(desc(invoices.invoiceDate));
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice || undefined;
+  }
+
+  async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
+    const [invoice] = await db
+      .insert(invoices)
+      .values({
+        ...insertInvoice,
+        invoiceDate: new Date(insertInvoice.invoiceDate),
+        dueDate: new Date(insertInvoice.dueDate),
+      })
+      .returning();
+    return invoice;
+  }
+
+  async updateInvoice(id: string, updateData: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.invoiceDate) {
+      values.invoiceDate = new Date(updateData.invoiceDate);
+    }
+    if (updateData.dueDate) {
+      values.dueDate = new Date(updateData.dueDate);
+    }
+    const [invoice] = await db
+      .update(invoices)
+      .set(values)
+      .where(eq(invoices.id, id))
+      .returning();
+    return invoice || undefined;
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    const result = await db.delete(invoices).where(eq(invoices.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Payments
+  async getAllPayments(): Promise<Payment[]> {
+    return await db.select().from(payments).orderBy(desc(payments.paymentDate));
+  }
+
+  async getPayment(id: string): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    return payment || undefined;
+  }
+
+  async getPaymentsByInvoice(invoiceId: string): Promise<Payment[]> {
+    return await db.select().from(payments).where(eq(payments.invoiceId, invoiceId));
+  }
+
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const [payment] = await db
+      .insert(payments)
+      .values({
+        ...insertPayment,
+        paymentDate: new Date(insertPayment.paymentDate),
+      })
+      .returning();
+    return payment;
+  }
+
+  async updatePayment(id: string, updateData: Partial<InsertPayment>): Promise<Payment | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.paymentDate) {
+      values.paymentDate = new Date(updateData.paymentDate);
+    }
+    const [payment] = await db
+      .update(payments)
+      .set(values)
+      .where(eq(payments.id, id))
+      .returning();
+    return payment || undefined;
+  }
+
+  async deletePayment(id: string): Promise<boolean> {
+    const result = await db.delete(payments).where(eq(payments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Inspections
+  async getAllInspections(): Promise<Inspection[]> {
+    return await db.select().from(inspections).orderBy(desc(inspections.inspectionDate));
+  }
+
+  async getInspection(id: string): Promise<Inspection | undefined> {
+    const [inspection] = await db.select().from(inspections).where(eq(inspections.id, id));
+    return inspection || undefined;
+  }
+
+  async getInspectionsByTruck(truckId: string): Promise<Inspection[]> {
+    return await db.select().from(inspections).where(eq(inspections.truckId, truckId));
+  }
+
+  async getInspectionsByDriver(driverId: string): Promise<Inspection[]> {
+    return await db.select().from(inspections).where(eq(inspections.driverId, driverId));
+  }
+
+  async createInspection(insertInspection: InsertInspection): Promise<Inspection> {
+    const [inspection] = await db
+      .insert(inspections)
+      .values({
+        ...insertInspection,
+        inspectionDate: new Date(insertInspection.inspectionDate),
+      })
+      .returning();
+    return inspection;
+  }
+
+  async updateInspection(id: string, updateData: Partial<InsertInspection>): Promise<Inspection | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.inspectionDate) {
+      values.inspectionDate = new Date(updateData.inspectionDate);
+    }
+    const [inspection] = await db
+      .update(inspections)
+      .set(values)
+      .where(eq(inspections.id, id))
+      .returning();
+    return inspection || undefined;
+  }
+
+  async deleteInspection(id: string): Promise<boolean> {
+    const result = await db.delete(inspections).where(eq(inspections.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Accidents
+  async getAllAccidents(): Promise<Accident[]> {
+    return await db.select().from(accidents).orderBy(desc(accidents.accidentDate));
+  }
+
+  async getAccident(id: string): Promise<Accident | undefined> {
+    const [accident] = await db.select().from(accidents).where(eq(accidents.id, id));
+    return accident || undefined;
+  }
+
+  async getAccidentsByDriver(driverId: string): Promise<Accident[]> {
+    return await db.select().from(accidents).where(eq(accidents.driverId, driverId));
+  }
+
+  async createAccident(insertAccident: InsertAccident): Promise<Accident> {
+    const [accident] = await db
+      .insert(accidents)
+      .values({
+        ...insertAccident,
+        accidentDate: new Date(insertAccident.accidentDate),
+      })
+      .returning();
+    return accident;
+  }
+
+  async updateAccident(id: string, updateData: Partial<InsertAccident>): Promise<Accident | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.accidentDate) {
+      values.accidentDate = new Date(updateData.accidentDate);
+    }
+    const [accident] = await db
+      .update(accidents)
+      .set(values)
+      .where(eq(accidents.id, id))
+      .returning();
+    return accident || undefined;
+  }
+
+  async deleteAccident(id: string): Promise<boolean> {
+    const result = await db.delete(accidents).where(eq(accidents.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Violations
+  async getAllViolations(): Promise<Violation[]> {
+    return await db.select().from(violations).orderBy(desc(violations.violationDate));
+  }
+
+  async getViolation(id: string): Promise<Violation | undefined> {
+    const [violation] = await db.select().from(violations).where(eq(violations.id, id));
+    return violation || undefined;
+  }
+
+  async getViolationsByDriver(driverId: string): Promise<Violation[]> {
+    return await db.select().from(violations).where(eq(violations.driverId, driverId));
+  }
+
+  async createViolation(insertViolation: InsertViolation): Promise<Violation> {
+    const [violation] = await db
+      .insert(violations)
+      .values({
+        ...insertViolation,
+        violationDate: new Date(insertViolation.violationDate),
+        dueDate: insertViolation.dueDate ? new Date(insertViolation.dueDate) : undefined,
+      })
+      .returning();
+    return violation;
+  }
+
+  async updateViolation(id: string, updateData: Partial<InsertViolation>): Promise<Violation | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.violationDate) {
+      values.violationDate = new Date(updateData.violationDate);
+    }
+    if (updateData.dueDate) {
+      values.dueDate = new Date(updateData.dueDate);
+    }
+    const [violation] = await db
+      .update(violations)
+      .set(values)
+      .where(eq(violations.id, id))
+      .returning();
+    return violation || undefined;
+  }
+
+  async deleteViolation(id: string): Promise<boolean> {
+    const result = await db.delete(violations).where(eq(violations.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Settlements
+  async getAllSettlements(): Promise<Settlement[]> {
+    return await db.select().from(settlements).orderBy(desc(settlements.periodEnd));
+  }
+
+  async getSettlement(id: string): Promise<Settlement | undefined> {
+    const [settlement] = await db.select().from(settlements).where(eq(settlements.id, id));
+    return settlement || undefined;
+  }
+
+  async getSettlementsByDriver(driverId: string): Promise<Settlement[]> {
+    return await db.select().from(settlements).where(eq(settlements.driverId, driverId));
+  }
+
+  async createSettlement(insertSettlement: InsertSettlement): Promise<Settlement> {
+    const [settlement] = await db
+      .insert(settlements)
+      .values({
+        ...insertSettlement,
+        periodStart: new Date(insertSettlement.periodStart),
+        periodEnd: new Date(insertSettlement.periodEnd),
+        paidDate: insertSettlement.paidDate ? new Date(insertSettlement.paidDate) : undefined,
+      })
+      .returning();
+    return settlement;
+  }
+
+  async updateSettlement(id: string, updateData: Partial<InsertSettlement>): Promise<Settlement | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.periodStart) {
+      values.periodStart = new Date(updateData.periodStart);
+    }
+    if (updateData.periodEnd) {
+      values.periodEnd = new Date(updateData.periodEnd);
+    }
+    if (updateData.paidDate) {
+      values.paidDate = new Date(updateData.paidDate);
+    }
+    const [settlement] = await db
+      .update(settlements)
+      .set(values)
+      .where(eq(settlements.id, id))
+      .returning();
+    return settlement || undefined;
+  }
+
+  async deleteSettlement(id: string): Promise<boolean> {
+    const result = await db.delete(settlements).where(eq(settlements.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Maintenance
+  async getAllMaintenance(): Promise<Maintenance[]> {
+    return await db.select().from(maintenance).orderBy(desc(maintenance.serviceDate));
+  }
+
+  async getMaintenance(id: string): Promise<Maintenance | undefined> {
+    const [record] = await db.select().from(maintenance).where(eq(maintenance.id, id));
+    return record || undefined;
+  }
+
+  async getMaintenanceByTruck(truckId: string): Promise<Maintenance[]> {
+    return await db.select().from(maintenance).where(eq(maintenance.truckId, truckId));
+  }
+
+  async createMaintenance(insertMaintenance: InsertMaintenance): Promise<Maintenance> {
+    const [record] = await db
+      .insert(maintenance)
+      .values({
+        ...insertMaintenance,
+        serviceDate: new Date(insertMaintenance.serviceDate),
+        nextServiceDate: insertMaintenance.nextServiceDate ? new Date(insertMaintenance.nextServiceDate) : undefined,
+      })
+      .returning();
+    return record;
+  }
+
+  async updateMaintenance(id: string, updateData: Partial<InsertMaintenance>): Promise<Maintenance | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.serviceDate) {
+      values.serviceDate = new Date(updateData.serviceDate);
+    }
+    if (updateData.nextServiceDate) {
+      values.nextServiceDate = new Date(updateData.nextServiceDate);
+    }
+    const [record] = await db
+      .update(maintenance)
+      .set(values)
+      .where(eq(maintenance.id, id))
+      .returning();
+    return record || undefined;
+  }
+
+  async deleteMaintenance(id: string): Promise<boolean> {
+    const result = await db.delete(maintenance).where(eq(maintenance.id, id)).returning();
+    return result.length > 0;
   }
 }
 
