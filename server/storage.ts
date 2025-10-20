@@ -27,6 +27,8 @@ import {
   type InsertSettlement,
   type Maintenance,
   type InsertMaintenance,
+  type FuelTransaction,
+  type InsertFuelTransaction,
   users,
   loads,
   trucks,
@@ -40,7 +42,8 @@ import {
   accidents,
   violations,
   settlements,
-  maintenance
+  maintenance,
+  fuelTransactions
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -139,6 +142,16 @@ export interface IStorage {
   createMaintenance(maintenance: InsertMaintenance): Promise<Maintenance>;
   updateMaintenance(id: string, maintenance: Partial<InsertMaintenance>): Promise<Maintenance | undefined>;
   deleteMaintenance(id: string): Promise<boolean>;
+  
+  // Fuel Transactions
+  getAllFuelTransactions(): Promise<FuelTransaction[]>;
+  getFuelTransaction(id: string): Promise<FuelTransaction | undefined>;
+  getFuelTransactionsByTruck(truckId: string): Promise<FuelTransaction[]>;
+  getFuelTransactionsByDriver(driverId: string): Promise<FuelTransaction[]>;
+  getFuelTransactionsByLoad(loadId: string): Promise<FuelTransaction[]>;
+  createFuelTransaction(fuelTransaction: InsertFuelTransaction): Promise<FuelTransaction>;
+  updateFuelTransaction(id: string, fuelTransaction: Partial<InsertFuelTransaction>): Promise<FuelTransaction | undefined>;
+  deleteFuelTransaction(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -671,6 +684,57 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMaintenance(id: string): Promise<boolean> {
     const result = await db.delete(maintenance).where(eq(maintenance.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Fuel Transactions
+  async getAllFuelTransactions(): Promise<FuelTransaction[]> {
+    return await db.select().from(fuelTransactions).orderBy(desc(fuelTransactions.transactionDate));
+  }
+
+  async getFuelTransaction(id: string): Promise<FuelTransaction | undefined> {
+    const [transaction] = await db.select().from(fuelTransactions).where(eq(fuelTransactions.id, id));
+    return transaction || undefined;
+  }
+
+  async getFuelTransactionsByTruck(truckId: string): Promise<FuelTransaction[]> {
+    return await db.select().from(fuelTransactions).where(eq(fuelTransactions.truckId, truckId)).orderBy(desc(fuelTransactions.transactionDate));
+  }
+
+  async getFuelTransactionsByDriver(driverId: string): Promise<FuelTransaction[]> {
+    return await db.select().from(fuelTransactions).where(eq(fuelTransactions.driverId, driverId)).orderBy(desc(fuelTransactions.transactionDate));
+  }
+
+  async getFuelTransactionsByLoad(loadId: string): Promise<FuelTransaction[]> {
+    return await db.select().from(fuelTransactions).where(eq(fuelTransactions.loadId, loadId)).orderBy(desc(fuelTransactions.transactionDate));
+  }
+
+  async createFuelTransaction(insertFuelTransaction: InsertFuelTransaction): Promise<FuelTransaction> {
+    const [transaction] = await db
+      .insert(fuelTransactions)
+      .values({
+        ...insertFuelTransaction,
+        transactionDate: new Date(insertFuelTransaction.transactionDate),
+      })
+      .returning();
+    return transaction;
+  }
+
+  async updateFuelTransaction(id: string, updateData: Partial<InsertFuelTransaction>): Promise<FuelTransaction | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.transactionDate) {
+      values.transactionDate = new Date(updateData.transactionDate);
+    }
+    const [transaction] = await db
+      .update(fuelTransactions)
+      .set(values)
+      .where(eq(fuelTransactions.id, id))
+      .returning();
+    return transaction || undefined;
+  }
+
+  async deleteFuelTransaction(id: string): Promise<boolean> {
+    const result = await db.delete(fuelTransactions).where(eq(fuelTransactions.id, id)).returning();
     return result.length > 0;
   }
 }
