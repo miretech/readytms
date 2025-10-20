@@ -359,3 +359,36 @@ export const insertMaintenanceSchema = createInsertSchema(maintenance).omit({
 
 export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
 export type Maintenance = typeof maintenance.$inferSelect;
+
+// Fuel Transactions - Track fuel purchases with fuel card vendors
+export const fuelTransactions = pgTable("fuel_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  truckId: varchar("truck_id").notNull(),
+  driverId: varchar("driver_id").notNull(),
+  loadId: varchar("load_id"),
+  transactionDate: timestamp("transaction_date").notNull(),
+  vendor: text("vendor").notNull(), // FleetOne, Pilot, Love's, TA, Flying J, Speedway, Other
+  location: text("location").notNull(), // City, State or full address
+  gallons: decimal("gallons", { precision: 10, scale: 3 }).notNull(),
+  pricePerGallon: decimal("price_per_gallon", { precision: 10, scale: 3 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
+  cardNumber: text("card_number"), // Last 4 digits for security
+  receiptNumber: text("receipt_number"),
+  odometerReading: integer("odometer_reading"),
+  fuelType: text("fuel_type").notNull(), // Diesel, Gas, DEF
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFuelTransactionSchema = createInsertSchema(fuelTransactions).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  transactionDate: z.string(),
+  gallons: z.string(),
+  pricePerGallon: z.string(),
+  totalCost: z.string(),
+});
+
+export type InsertFuelTransaction = z.infer<typeof insertFuelTransactionSchema>;
+export type FuelTransaction = typeof fuelTransactions.$inferSelect;
