@@ -6,6 +6,7 @@ import {
   UserCog,
   ShieldCheck,
   Wrench,
+  Fuel,
   DollarSign,
   Receipt,
   Settings
@@ -59,6 +60,11 @@ const menuItems = [
     title: "Maintenance",
     url: "/maintenance",
     icon: Wrench,
+  },
+  {
+    title: "Fuel",
+    url: "/fuel",
+    icon: Fuel,
   },
   {
     title: "Accounting",
