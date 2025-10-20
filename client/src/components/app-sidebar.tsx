@@ -3,7 +3,11 @@ import {
   Package, 
   Truck, 
   Users, 
+  UserCog,
+  ShieldCheck,
+  Wrench,
   DollarSign,
+  Receipt,
   Settings
 } from "lucide-react";
 import {
@@ -42,9 +46,29 @@ const menuItems = [
     icon: Users,
   },
   {
+    title: "Customers",
+    url: "/customers",
+    icon: UserCog,
+  },
+  {
+    title: "Safety",
+    url: "/safety",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Maintenance",
+    url: "/maintenance",
+    icon: Wrench,
+  },
+  {
     title: "Accounting",
     url: "/accounting",
     icon: DollarSign,
+  },
+  {
+    title: "Settlements",
+    url: "/settlements",
+    icon: Receipt,
   },
 ];
 

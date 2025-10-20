@@ -15,7 +15,11 @@ import Dashboard from "@/pages/dashboard";
 import Loads from "@/pages/loads";
 import Fleet from "@/pages/fleet";
 import Drivers from "@/pages/drivers";
+import Customers from "@/pages/customers";
 import Accounting from "@/pages/accounting";
+import Safety from "@/pages/safety";
+import Settlements from "@/pages/settlements";
+import Maintenance from "@/pages/maintenance";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -37,7 +41,11 @@ function Router() {
       <Route path="/loads" component={Loads} />
       <Route path="/fleet" component={Fleet} />
       <Route path="/drivers" component={Drivers} />
+      <Route path="/customers" component={Customers} />
+      <Route path="/safety" component={Safety} />
+      <Route path="/maintenance" component={Maintenance} />
       <Route path="/accounting" component={Accounting} />
+      <Route path="/settlements" component={Settlements} />
       <Route component={NotFound} />
     </Switch>
   );
