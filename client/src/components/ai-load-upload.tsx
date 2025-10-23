@@ -33,10 +33,10 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
     const file = acceptedFiles[0];
     if (!file) return;
 
-    // File size validation: 10MB for PDFs, 10MB for images
-    const maxSize = 10 * 1024 * 1024;
+    // File size validation: 5MB for PDFs/images (OpenAI Vision API limit)
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      setError(`File is too large. Maximum size is 10MB.`);
+      setError(`File is too large. Maximum size is 5MB due to AI processing limits.`);
       return;
     }
 
@@ -129,7 +129,7 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
                 {uploading ? "Processing file..." : isDragActive ? "Drop file here" : "Drag & drop a document"}
               </p>
               <p className="text-sm text-muted-foreground">
-                or click to browse (PDF, images, text files up to 10MB)
+                or click to browse (PDF, images, text files up to 5MB)
               </p>
             </div>
           </div>

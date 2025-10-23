@@ -43,23 +43,26 @@ Guidelines:
       },
     ];
 
-    if (isImage) {
+    // For both images and PDFs, use OpenAI's Vision API
+    if (isImage || fileType === 'application/pdf') {
       messages.push({
         role: "user",
         content: [
           {
             type: "text",
-            text: "Extract load information from this document image:",
+            text: "Extract load information from this document:",
           },
           {
             type: "image_url",
             image_url: {
               url: fileData,
+              detail: "high", // Use high detail for better OCR accuracy
             },
           },
         ],
       });
     } else {
+      // Text files only
       const base64Content = fileData.split(",")[1] || fileData;
       const textContent = Buffer.from(base64Content, "base64").toString("utf-8");
       
@@ -136,11 +139,16 @@ Guidelines:
     
     // Handle OpenAI-specific errors
     if (error?.error?.code === 'context_length_exceeded') {
-      throw new Error("Document is too large for AI processing. Please use a smaller file (under 10MB).");
+      throw new Error("Document is too large for AI processing. Please use a smaller file (under 5MB).");
     }
     
     if (error?.status === 413 || error?.message?.includes('too large')) {
-      throw new Error("Document is too large. Please use a smaller file (under 10MB).");
+      throw new Error("Document is too large. Please use a smaller file (under 5MB).");
+    }
+    
+    // Handle invalid PDF format errors
+    if (error?.message?.includes('invalid') || error?.message?.includes('format')) {
+      throw new Error("Unable to process this PDF. Please ensure it's a valid, readable PDF file.");
     }
     
     // Generic error

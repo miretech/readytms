@@ -219,14 +219,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Server-side file size validation
-      // Base64 adds ~33% overhead, so for a 10MB file limit, max base64 string is ~13.3MB
+      // Base64 adds ~33% overhead, so for a 5MB file limit, max base64 string is ~6.65MB
       const base64Content = fileData.split(",")[1] || fileData;
       const sizeInBytes = (base64Content.length * 3) / 4;
-      const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
+      const maxSizeBytes = 5 * 1024 * 1024; // 5MB limit (OpenAI Vision API constraint)
       
       if (sizeInBytes > maxSizeBytes) {
         return res.status(413).json({ 
-          error: `File is too large. Maximum size is 10MB.` 
+          error: `File is too large. Maximum size is 5MB due to AI processing limits.` 
         });
       }
 
