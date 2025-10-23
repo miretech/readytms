@@ -280,7 +280,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   <FormItem>
                     <FormLabel>Commodity</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., Electronics" data-testid="input-commodity" />
+                      <Input {...field} value={field.value || ""} placeholder="e.g., Electronics" data-testid="input-commodity" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -428,7 +428,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   <FormItem>
                     <FormLabel>Weight (lbs)</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} data-testid="input-weight" />
+                      <Input type="number" {...field} value={field.value || 0} onChange={e => field.onChange(parseInt(e.target.value) || 0)} data-testid="input-weight" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -443,7 +443,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea {...field} rows={3} data-testid="input-notes" />
+                    <Textarea {...field} value={field.value || ""} rows={3} data-testid="input-notes" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -603,7 +603,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Driver (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-driver">
                             <SelectValue placeholder="Select driver" />
@@ -628,7 +628,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Truck (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-truck">
                             <SelectValue placeholder="Select truck" />
@@ -656,7 +656,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                     <FormItem>
                       <FormLabel>Commodity</FormLabel>
                       <FormControl>
-                        <Input {...field} data-testid="input-commodity" />
+                        <Input {...field} value={field.value || ""} data-testid="input-commodity" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -698,7 +698,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                     <FormItem>
                       <FormLabel>Weight (lbs)</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} data-testid="input-weight" />
+                        <Input type="number" {...field} value={field.value || 0} onChange={e => field.onChange(parseInt(e.target.value) || 0)} data-testid="input-weight" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -713,7 +713,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   <FormItem>
                     <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Textarea {...field} rows={3} data-testid="input-notes" />
+                      <Textarea {...field} value={field.value || ""} rows={3} data-testid="input-notes" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
