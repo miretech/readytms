@@ -218,6 +218,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing file data or type" });
       }
 
+      // Server-side file size validation
+      // Base64 adds ~33% overhead, so for a 2MB file limit, max base64 string is ~2.66MB
+      const base64Content = fileData.split(",")[1] || fileData;
+      const sizeInBytes = (base64Content.length * 3) / 4;
+      const maxSizeBytes = fileType === 'application/pdf' ? 2 * 1024 * 1024 : 5 * 1024 * 1024;
+      
+      if (sizeInBytes > maxSizeBytes) {
+        const maxSizeMB = fileType === 'application/pdf' ? '2MB' : '5MB';
+        return res.status(413).json({ 
+          error: `File is too large. Maximum size for ${fileType === 'application/pdf' ? 'PDFs' : 'images'} is ${maxSizeMB}.` 
+        });
+      }
+
       const extractedData = await extractLoadFromDocument(fileData, fileType);
       res.json(extractedData);
     } catch (error: any) {
