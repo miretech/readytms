@@ -62,6 +62,9 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       email: "",
       phone: "",
       licenseNumber: "",
+      licenseExpiration: "",
+      medicalCardNumber: "",
+      medicalCardExpiration: "",
       status: "available",
       assignedTruckId: "",
     },
@@ -74,6 +77,9 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         email: driver.email,
         phone: driver.phone,
         licenseNumber: driver.licenseNumber,
+        licenseExpiration: driver.licenseExpiration ? new Date(driver.licenseExpiration).toISOString().split('T')[0] : "",
+        medicalCardNumber: driver.medicalCardNumber || "",
+        medicalCardExpiration: driver.medicalCardExpiration ? new Date(driver.medicalCardExpiration).toISOString().split('T')[0] : "",
         status: driver.status,
         assignedTruckId: driver.assignedTruckId || "",
       });
@@ -83,6 +89,9 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         email: "",
         phone: "",
         licenseNumber: "",
+        licenseExpiration: "",
+        medicalCardNumber: "",
+        medicalCardExpiration: "",
         status: "available",
         assignedTruckId: "",
       });
@@ -177,9 +186,51 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                 name="licenseNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>License Number</FormLabel>
+                    <FormLabel>CDL License Number</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="DL123456" data-testid="input-license-number" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="licenseExpiration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CDL Expiration Date</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="date" data-testid="input-license-expiration" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="medicalCardNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Medical Card Number</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} placeholder="MC123456" data-testid="input-medical-card-number" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="medicalCardExpiration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Medical Card Expiration</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="date" data-testid="input-medical-card-expiration" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

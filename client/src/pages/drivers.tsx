@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -25,6 +25,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { Driver } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { format, differenceInDays } from "date-fns";
 
 export default function Drivers() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,6 +87,18 @@ export default function Drivers() {
       .join("")
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const getExpirationStatus = (expirationDate: Date | null | undefined) => {
+    if (!expirationDate) return null;
+    const daysUntilExpiration = differenceInDays(new Date(expirationDate), new Date());
+    
+    if (daysUntilExpiration < 0) {
+      return { status: "expired", label: "Expired", variant: "destructive" as const };
+    } else if (daysUntilExpiration <= 30) {
+      return { status: "expiring", label: `${daysUntilExpiration}d`, variant: "secondary" as const };
+    }
+    return { status: "valid", label: "Valid", variant: "outline" as const };
   };
 
   if (isLoading) {
@@ -150,7 +164,7 @@ export default function Drivers() {
                   <TableHead>Driver</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Contact</TableHead>
-                  <TableHead>License #</TableHead>
+                  <TableHead>CDL / Medical</TableHead>
                   <TableHead>Assigned Truck</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
@@ -183,8 +197,41 @@ export default function Drivers() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {driver.licenseNumber}
+                    <TableCell>
+                      <div className="space-y-2">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">CDL: </span>
+                          <span className="font-mono">{driver.licenseNumber}</span>
+                          {driver.licenseExpiration && (
+                            <>
+                              {" "}
+                              {(() => {
+                                const status = getExpirationStatus(driver.licenseExpiration);
+                                return status && (
+                                  <Badge variant={status.variant} className="ml-2">
+                                    {status.status === "expired" ? <AlertTriangle className="h-3 w-3 mr-1" /> : null}
+                                    {status.label}
+                                  </Badge>
+                                );
+                              })()}
+                            </>
+                          )}
+                        </div>
+                        {driver.medicalCardExpiration && (
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Medical: </span>
+                            {(() => {
+                              const status = getExpirationStatus(driver.medicalCardExpiration);
+                              return status && (
+                                <Badge variant={status.variant}>
+                                  {status.status === "expired" ? <AlertTriangle className="h-3 w-3 mr-1" /> : null}
+                                  {status.label}
+                                </Badge>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {driver.assignedTruckId ? (

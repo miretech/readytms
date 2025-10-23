@@ -270,17 +270,49 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDriver(insertDriver: InsertDriver): Promise<Driver> {
+    const values: any = { ...insertDriver };
+    
+    if (insertDriver.licenseExpiration && insertDriver.licenseExpiration.trim() !== "") {
+      values.licenseExpiration = new Date(insertDriver.licenseExpiration);
+    } else {
+      values.licenseExpiration = null;
+    }
+    
+    if (insertDriver.medicalCardExpiration && insertDriver.medicalCardExpiration.trim() !== "") {
+      values.medicalCardExpiration = new Date(insertDriver.medicalCardExpiration);
+    } else {
+      values.medicalCardExpiration = null;
+    }
+    
     const [driver] = await db
       .insert(drivers)
-      .values(insertDriver)
+      .values(values)
       .returning();
     return driver;
   }
 
   async updateDriver(id: string, updateData: Partial<InsertDriver>): Promise<Driver | undefined> {
+    const values: any = { ...updateData };
+    
+    if (updateData.licenseExpiration !== undefined) {
+      if (updateData.licenseExpiration && updateData.licenseExpiration.trim() !== "") {
+        values.licenseExpiration = new Date(updateData.licenseExpiration);
+      } else {
+        values.licenseExpiration = null;
+      }
+    }
+    
+    if (updateData.medicalCardExpiration !== undefined) {
+      if (updateData.medicalCardExpiration && updateData.medicalCardExpiration.trim() !== "") {
+        values.medicalCardExpiration = new Date(updateData.medicalCardExpiration);
+      } else {
+        values.medicalCardExpiration = null;
+      }
+    }
+    
     const [driver] = await db
       .update(drivers)
-      .set(updateData)
+      .set(values)
       .where(eq(drivers.id, id))
       .returning();
     return driver || undefined;
