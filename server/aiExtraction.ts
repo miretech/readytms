@@ -43,8 +43,21 @@ Guidelines:
       },
     ];
 
+    // Validate data URL format
+    if (!fileData.startsWith('data:')) {
+      throw new Error("Invalid file format. Please ensure the file is properly encoded.");
+    }
+
     // For both images and PDFs, use OpenAI's Vision API
     if (isImage || fileType === 'application/pdf') {
+      // Ensure PDF data URLs are properly formatted
+      let dataUrl = fileData;
+      if (fileType === 'application/pdf' && !fileData.startsWith('data:application/pdf;base64,')) {
+        // Try to fix the format if needed
+        const base64Content = fileData.split(',')[1] || fileData;
+        dataUrl = `data:application/pdf;base64,${base64Content}`;
+      }
+
       messages.push({
         role: "user",
         content: [
@@ -55,7 +68,7 @@ Guidelines:
           {
             type: "image_url",
             image_url: {
-              url: fileData,
+              url: dataUrl,
               detail: "high", // Use high detail for better OCR accuracy
             },
           },
