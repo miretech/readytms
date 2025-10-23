@@ -24,7 +24,8 @@ The system provides a comprehensive set of modules:
 - **Dashboard**: Real-time operational metrics, recent activity, fleet status, and quick navigation.
 - **Load Management**: Full load lifecycle, driver/truck assignment, status workflow, expense/profit tracking.
 - **Fleet Management**: Truck inventory, status tracking, maintenance records.
-- **Driver Management**: Driver roster, CDL tracking, assignment history.
+- **Driver Management**: Driver roster, CDL license tracking with expiration alerts, medical card tracking with expiration monitoring, assignment history, and DOT compliance status badges.
+- **GPS Driver Tracking**: Real-time location tracking with API endpoints for GPS data submission from mobile apps, live location display with coordinates and Google Maps links, search and filter capabilities, and speed/heading tracking.
 - **Safety & Compliance**: Includes Inspections (Pre-Trip, DOT, etc.), Accidents & Incidents reporting, and Violations & Citations tracking.
 - **Accounting & Financial Management**: Financial Overview, Invoices (AR), Expense Management, and Payments & Cash Management.
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
@@ -34,9 +35,10 @@ The system provides a comprehensive set of modules:
 ### System Design Choices
 - **Development Approach**: Employs a schema-first design with all data models defined for type consistency, followed by horizontal layer implementation (schemas → storage → API → frontend).
 - **Authentication & Security**: Replit Auth for OAuth, session-based authentication with secure cookie storage, PostgreSQL-backed session persistence, and protected routes.
-- **Data Layer**: PostgreSQL with Drizzle ORM, proper foreign key relationships, data normalization, and Drizzle Kit for migrations.
-- **API Design**: RESTful endpoint structure with Zod validation on request bodies, consistent response formats, and proper HTTP status codes.
+- **Data Layer**: PostgreSQL with Drizzle ORM, proper foreign key relationships, data normalization, and Drizzle Kit for migrations. Date fields properly handle empty strings by converting to null for optional timestamps.
+- **API Design**: RESTful endpoint structure with Zod validation on request bodies, consistent response formats, and proper HTTP status codes. GPS tracking endpoints support mobile app integration.
 - **Performance**: Utilizes TanStack Query for caching, database indexing, and optimized SQL queries.
+- **Compliance Monitoring**: Automated expiration tracking for CDL licenses and medical cards with visual status indicators (Expired/Expiring Soon/Valid) using date-fns calculations.
 
 ## External Dependencies
 - **Database**: PostgreSQL (Neon-backed on Replit)
