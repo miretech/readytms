@@ -163,7 +163,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                         <SelectItem value="Flatbed">Flatbed</SelectItem>
                         <SelectItem value="Step Deck">Step Deck</SelectItem>
                         <SelectItem value="Tanker">Tanker</SelectItem>
-                        <SelectItem value="Box Truck">Box Truck</SelectItem>
+                        <SelectItem value="Semi Truck">Semi Truck</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
