@@ -216,7 +216,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                   <FormItem>
                     <FormLabel>VIN (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="1HGBH41JXMN109186" data-testid="input-vin" />
+                      <Input {...field} value={field.value || ""} placeholder="1HGBH41JXMN109186" data-testid="input-vin" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -233,6 +233,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                       <Input 
                         type="number" 
                         {...field} 
+                        value={field.value || ""}
                         onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                         placeholder="2024" 
                         data-testid="input-year" 
@@ -250,7 +251,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                   <FormItem>
                     <FormLabel>Make (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Freightliner" data-testid="input-make" />
+                      <Input {...field} value={field.value || ""} placeholder="Freightliner" data-testid="input-make" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -264,7 +265,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                   <FormItem>
                     <FormLabel>Model (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Cascadia" data-testid="input-model" />
+                      <Input {...field} value={field.value || ""} placeholder="Cascadia" data-testid="input-model" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

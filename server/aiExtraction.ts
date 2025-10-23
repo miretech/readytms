@@ -136,11 +136,11 @@ Guidelines:
     
     // Handle OpenAI-specific errors
     if (error?.error?.code === 'context_length_exceeded') {
-      throw new Error("Document is too large for AI processing. Please use a smaller file (under 2MB for PDFs).");
+      throw new Error("Document is too large for AI processing. Please use a smaller file (under 10MB).");
     }
     
     if (error?.status === 413 || error?.message?.includes('too large')) {
-      throw new Error("Document is too large. Please use a smaller file (under 2MB for PDFs).");
+      throw new Error("Document is too large. Please use a smaller file (under 10MB).");
     }
     
     // Generic error

@@ -33,11 +33,10 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
     const file = acceptedFiles[0];
     if (!file) return;
 
-    // File size validation: 2MB for PDFs, 5MB for images
-    const maxSize = file.type === 'application/pdf' ? 2 * 1024 * 1024 : 5 * 1024 * 1024;
+    // File size validation: 10MB for PDFs, 10MB for images
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      const maxSizeMB = file.type === 'application/pdf' ? '2MB' : '5MB';
-      setError(`File is too large. Maximum size for ${file.type === 'application/pdf' ? 'PDFs' : 'images'} is ${maxSizeMB}.`);
+      setError(`File is too large. Maximum size is 10MB.`);
       return;
     }
 
@@ -130,7 +129,7 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
                 {uploading ? "Processing file..." : isDragActive ? "Drop file here" : "Drag & drop a document"}
               </p>
               <p className="text-sm text-muted-foreground">
-                or click to browse (PDF up to 2MB, images up to 5MB)
+                or click to browse (PDF, images, text files up to 10MB)
               </p>
             </div>
           </div>
