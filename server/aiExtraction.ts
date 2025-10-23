@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
+// @ts-ignore - pdf-parse has incorrect type definitions
+import pdfParse from "pdf-parse";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -48,16 +50,8 @@ Guidelines:
       throw new Error("Invalid file format. Please ensure the file is properly encoded.");
     }
 
-    // For both images and PDFs, use OpenAI's Vision API
-    if (isImage || fileType === 'application/pdf') {
-      // Ensure PDF data URLs are properly formatted
-      let dataUrl = fileData;
-      if (fileType === 'application/pdf' && !fileData.startsWith('data:application/pdf;base64,')) {
-        // Try to fix the format if needed
-        const base64Content = fileData.split(',')[1] || fileData;
-        dataUrl = `data:application/pdf;base64,${base64Content}`;
-      }
-
+    if (isImage) {
+      // For images, use OpenAI's Vision API
       messages.push({
         role: "user",
         content: [
@@ -68,12 +62,33 @@ Guidelines:
           {
             type: "image_url",
             image_url: {
-              url: dataUrl,
+              url: fileData,
               detail: "high", // Use high detail for better OCR accuracy
             },
           },
         ],
       });
+    } else if (fileType === 'application/pdf') {
+      // For PDFs, extract text using pdf-parse
+      const base64Content = fileData.split(",")[1] || fileData;
+      const pdfBuffer = Buffer.from(base64Content, "base64");
+      
+      try {
+        const pdfData = await pdfParse(pdfBuffer);
+        const textContent = pdfData.text;
+        
+        if (!textContent || textContent.trim().length === 0) {
+          throw new Error("Unable to extract text from PDF. The PDF might be scanned or image-based.");
+        }
+        
+        messages.push({
+          role: "user",
+          content: `Extract load information from this rate confirmation document:\n\n${textContent}`,
+        });
+      } catch (pdfError: any) {
+        console.error("PDF parsing error:", pdfError);
+        throw new Error("Failed to read PDF file. Please ensure it's a valid PDF with readable text.");
+      }
     } else {
       // Text files only
       const base64Content = fileData.split(",")[1] || fileData;
