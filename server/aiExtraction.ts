@@ -7,15 +7,15 @@ const openai = new OpenAI({
 });
 
 const extractedLoadSchema = z.object({
-  loadNumber: z.string().optional().describe("Load number or reference number"),
+  loadNumber: z.string().nullable().describe("Load number or reference number"),
   pickupLocation: z.string().describe("Pickup location city and state"),
   pickupDate: z.string().describe("Pickup date in ISO format YYYY-MM-DD"),
   deliveryLocation: z.string().describe("Delivery location city and state"),
   deliveryDate: z.string().describe("Delivery date in ISO format YYYY-MM-DD"),
   rate: z.string().describe("Rate or revenue amount as a number"),
-  weight: z.number().optional().describe("Weight in pounds"),
-  commodity: z.string().optional().describe("Type of commodity or freight"),
-  notes: z.string().optional().describe("Any additional notes or special instructions"),
+  weight: z.number().nullable().describe("Weight in pounds"),
+  commodity: z.string().nullable().describe("Type of commodity or freight"),
+  notes: z.string().nullable().describe("Any additional notes or special instructions"),
 });
 
 export type ExtractedLoad = z.infer<typeof extractedLoadSchema>;
@@ -81,8 +81,8 @@ Guidelines:
             type: "object",
             properties: {
               loadNumber: {
-                type: "string",
-                description: "Load number or reference number",
+                type: ["string", "null"],
+                description: "Load number or reference number if present",
               },
               pickupLocation: {
                 type: "string",
@@ -105,19 +105,19 @@ Guidelines:
                 description: "Rate or revenue amount as a number",
               },
               weight: {
-                type: "number",
-                description: "Weight in pounds",
+                type: ["number", "null"],
+                description: "Weight in pounds if available",
               },
               commodity: {
-                type: "string",
-                description: "Type of commodity or freight",
+                type: ["string", "null"],
+                description: "Type of commodity or freight if mentioned",
               },
               notes: {
-                type: "string",
+                type: ["string", "null"],
                 description: "Any additional notes or special instructions",
               },
             },
-            required: ["pickupLocation", "pickupDate", "deliveryLocation", "deliveryDate", "rate"],
+            required: ["loadNumber", "pickupLocation", "pickupDate", "deliveryLocation", "deliveryDate", "rate", "weight", "commodity", "notes"],
             additionalProperties: false,
           },
         },

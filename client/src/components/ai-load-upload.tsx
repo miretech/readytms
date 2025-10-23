@@ -47,14 +47,12 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
         setExtracting(true);
 
         try {
-          const result = await apiRequest<ExtractedLoad>("/api/extract-load", {
-            method: "POST",
-            body: JSON.stringify({
-              fileData,
-              fileType: file.type,
-            }),
+          const response = await apiRequest("POST", "/api/extract-load", {
+            fileData,
+            fileType: file.type,
           });
-
+          
+          const result = await response.json();
           setExtracting(false);
           onExtracted(result);
         } catch (err: any) {
