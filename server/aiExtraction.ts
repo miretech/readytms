@@ -1,7 +1,5 @@
 import OpenAI from "openai";
 import { z } from "zod";
-// @ts-ignore - pdf-parse has incorrect type definitions
-import pdfParse from "pdf-parse";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -74,6 +72,9 @@ Guidelines:
       const pdfBuffer = Buffer.from(base64Content, "base64");
       
       try {
+        // Dynamic import of pdf-parse to avoid ESM issues
+        // @ts-ignore - pdf-parse has incorrect type definitions but works at runtime
+        const pdfParse = (await import("pdf-parse")).default;
         const pdfData = await pdfParse(pdfBuffer);
         const textContent = pdfData.text;
         
