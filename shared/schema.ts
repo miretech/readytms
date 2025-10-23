@@ -392,3 +392,31 @@ export const insertFuelTransactionSchema = createInsertSchema(fuelTransactions).
 
 export type InsertFuelTransaction = z.infer<typeof insertFuelTransactionSchema>;
 export type FuelTransaction = typeof fuelTransactions.$inferSelect;
+
+// GPS Locations - Real-time driver/truck tracking
+export const gpsLocations = pgTable("gps_locations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id"),
+  truckId: varchar("truck_id"),
+  loadId: varchar("load_id"),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }).notNull(),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }).notNull(),
+  speed: decimal("speed", { precision: 5, scale: 2 }), // mph
+  heading: integer("heading"), // 0-359 degrees
+  accuracy: integer("accuracy"), // meters
+  timestamp: timestamp("timestamp").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGpsLocationSchema = createInsertSchema(gpsLocations).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  latitude: z.string(),
+  longitude: z.string(),
+  speed: z.string().optional(),
+  timestamp: z.string(),
+});
+
+export type InsertGpsLocation = z.infer<typeof insertGpsLocationSchema>;
+export type GpsLocation = typeof gpsLocations.$inferSelect;
