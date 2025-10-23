@@ -15,7 +15,8 @@ import {
   insertViolationSchema,
   insertSettlementSchema,
   insertMaintenanceSchema,
-  insertFuelTransactionSchema
+  insertFuelTransactionSchema,
+  insertGpsLocationSchema
 } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { extractLoadFromDocument } from "./aiExtraction";
@@ -698,6 +699,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Fuel transaction not found" });
     }
     res.status(204).send();
+  });
+
+  // GPS Tracking Routes
+  app.get("/api/gps", async (_req, res) => {
+    const locations = await storage.getAllGpsLocations();
+    res.json(locations);
+  });
+
+  app.get("/api/gps/latest", async (_req, res) => {
+    const locations = await storage.getLatestGpsLocations();
+    res.json(locations);
+  });
+
+  app.get("/api/gps/driver/:driverId", async (req, res) => {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+    const locations = await storage.getGpsLocationsByDriver(req.params.driverId, limit);
+    res.json(locations);
+  });
+
+  app.get("/api/gps/truck/:truckId", async (req, res) => {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+    const locations = await storage.getGpsLocationsByTruck(req.params.truckId, limit);
+    res.json(locations);
+  });
+
+  app.get("/api/gps/load/:loadId", async (req, res) => {
+    const locations = await storage.getGpsLocationsByLoad(req.params.loadId);
+    res.json(locations);
+  });
+
+  app.post("/api/gps", async (req, res) => {
+    try {
+      const validatedData = insertGpsLocationSchema.parse(req.body);
+      const location = await storage.createGpsLocation(validatedData);
+      res.status(201).json(location);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid GPS location data" });
+    }
   });
 
   const httpServer = createServer(app);
