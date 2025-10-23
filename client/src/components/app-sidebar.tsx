@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Wrench,
   Fuel,
+  MapPin,
   DollarSign,
   Receipt,
   Settings
@@ -65,6 +66,11 @@ const menuItems = [
     title: "Fuel",
     url: "/fuel",
     icon: Fuel,
+  },
+  {
+    title: "GPS Tracking",
+    url: "/gps-tracking",
+    icon: MapPin,
   },
   {
     title: "Accounting",

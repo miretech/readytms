@@ -21,6 +21,7 @@ import Safety from "@/pages/safety";
 import Settlements from "@/pages/settlements";
 import Maintenance from "@/pages/maintenance";
 import Fuel from "@/pages/fuel";
+import GpsTracking from "@/pages/gps-tracking";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/safety" component={Safety} />
       <Route path="/maintenance" component={Maintenance} />
       <Route path="/fuel" component={Fuel} />
+      <Route path="/gps-tracking" component={GpsTracking} />
       <Route path="/accounting" component={Accounting} />
       <Route path="/settlements" component={Settlements} />
       <Route component={NotFound} />
