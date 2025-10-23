@@ -29,6 +29,8 @@ import {
   type InsertMaintenance,
   type FuelTransaction,
   type InsertFuelTransaction,
+  type GpsLocation,
+  type InsertGpsLocation,
   users,
   loads,
   trucks,
@@ -43,7 +45,8 @@ import {
   violations,
   settlements,
   maintenance,
-  fuelTransactions
+  fuelTransactions,
+  gpsLocations
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -152,6 +155,14 @@ export interface IStorage {
   createFuelTransaction(fuelTransaction: InsertFuelTransaction): Promise<FuelTransaction>;
   updateFuelTransaction(id: string, fuelTransaction: Partial<InsertFuelTransaction>): Promise<FuelTransaction | undefined>;
   deleteFuelTransaction(id: string): Promise<boolean>;
+  
+  // GPS Locations
+  getAllGpsLocations(): Promise<GpsLocation[]>;
+  getLatestGpsLocations(): Promise<GpsLocation[]>;
+  getGpsLocationsByDriver(driverId: string, limit?: number): Promise<GpsLocation[]>;
+  getGpsLocationsByTruck(truckId: string, limit?: number): Promise<GpsLocation[]>;
+  getGpsLocationsByLoad(loadId: string): Promise<GpsLocation[]>;
+  createGpsLocation(location: InsertGpsLocation): Promise<GpsLocation>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -736,6 +747,43 @@ export class DatabaseStorage implements IStorage {
   async deleteFuelTransaction(id: string): Promise<boolean> {
     const result = await db.delete(fuelTransactions).where(eq(fuelTransactions.id, id)).returning();
     return result.length > 0;
+  }
+
+  // GPS Locations
+  async getAllGpsLocations(): Promise<GpsLocation[]> {
+    return await db.select().from(gpsLocations).orderBy(desc(gpsLocations.timestamp)).limit(1000);
+  }
+
+  async getLatestGpsLocations(): Promise<GpsLocation[]> {
+    const latestLocations = await db
+      .select()
+      .from(gpsLocations)
+      .orderBy(desc(gpsLocations.timestamp))
+      .limit(100);
+    return latestLocations;
+  }
+
+  async getGpsLocationsByDriver(driverId: string, limit: number = 100): Promise<GpsLocation[]> {
+    return await db.select().from(gpsLocations).where(eq(gpsLocations.driverId, driverId)).orderBy(desc(gpsLocations.timestamp)).limit(limit);
+  }
+
+  async getGpsLocationsByTruck(truckId: string, limit: number = 100): Promise<GpsLocation[]> {
+    return await db.select().from(gpsLocations).where(eq(gpsLocations.truckId, truckId)).orderBy(desc(gpsLocations.timestamp)).limit(limit);
+  }
+
+  async getGpsLocationsByLoad(loadId: string): Promise<GpsLocation[]> {
+    return await db.select().from(gpsLocations).where(eq(gpsLocations.loadId, loadId)).orderBy(desc(gpsLocations.timestamp));
+  }
+
+  async createGpsLocation(insertGpsLocation: InsertGpsLocation): Promise<GpsLocation> {
+    const [location] = await db
+      .insert(gpsLocations)
+      .values({
+        ...insertGpsLocation,
+        timestamp: new Date(insertGpsLocation.timestamp),
+      })
+      .returning();
+    return location;
   }
 }
 
