@@ -48,8 +48,9 @@ Guidelines:
       throw new Error("Invalid file format. Please ensure the file is properly encoded.");
     }
 
-    if (isImage) {
-      // For images, use OpenAI's Vision API
+    if (isImage || fileType === 'application/pdf') {
+      // For images and PDFs, use OpenAI's Vision API
+      // This handles both regular images and scanned/image-based PDFs
       messages.push({
         role: "user",
         content: [
@@ -66,30 +67,6 @@ Guidelines:
           },
         ],
       });
-    } else if (fileType === 'application/pdf') {
-      // For PDFs, extract text using pdf-parse
-      const base64Content = fileData.split(",")[1] || fileData;
-      const pdfBuffer = Buffer.from(base64Content, "base64");
-      
-      try {
-        // Dynamic import of pdf-parse to avoid ESM issues
-        // @ts-ignore - pdf-parse has incorrect type definitions but works at runtime
-        const pdfParse = (await import("pdf-parse")).default;
-        const pdfData = await pdfParse(pdfBuffer);
-        const textContent = pdfData.text;
-        
-        if (!textContent || textContent.trim().length === 0) {
-          throw new Error("Unable to extract text from PDF. The PDF might be scanned or image-based.");
-        }
-        
-        messages.push({
-          role: "user",
-          content: `Extract load information from this rate confirmation document:\n\n${textContent}`,
-        });
-      } catch (pdfError: any) {
-        console.error("PDF parsing error:", pdfError);
-        throw new Error("Failed to read PDF file. Please ensure it's a valid PDF with readable text.");
-      }
     } else {
       // Text files only
       const base64Content = fileData.split(",")[1] || fileData;
