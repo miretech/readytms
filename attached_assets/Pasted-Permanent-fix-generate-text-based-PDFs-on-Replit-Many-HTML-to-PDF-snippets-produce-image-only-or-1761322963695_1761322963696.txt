@@ -1,0 +1,67 @@
+Permanent fix: generate text-based PDFs on Replit
+
+Many “HTML-to-PDF” snippets produce image-only or malformed PDFs. Use headless Chrome (Puppeteer/Playwright) to print real text:
+
+Node + Puppeteer (Replit)
+
+// package.json -> add: "puppeteer": "^22"
+import puppeteer from "puppeteer";
+import fs from "fs";
+
+const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Rate Confirmation</title>
+  <style>
+    body{font:14px/1.4 -apple-system,Segoe UI,Roboto,Helvetica,Arial;}
+    h1{font-size:18px;margin:0 0 8px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #ddd;padding:6px;text-align:left}
+  </style>
+</head>
+<body>
+  <h1>Rate Confirmation</h1>
+  <p>Broker: ABC Logistics<br/>Load #: 3000161385<br/>Carrier: Ready Carrier LLC</p>
+  <table>
+    <tr><th>Pickup</th><th>Delivery</th><th>Miles</th><th>Rate</th></tr>
+    <tr><td>MN → WI</td><td>WI</td><td>310</td><td>$1,200.00</td></tr>
+  </table>
+  <p>Notes: Detention after 2 hrs. Fuel surcharge included.</p>
+</body>
+</html>
+`;
+
+(async () => {
+  const browser = await puppeteer.launch({args: ["--no-sandbox"]});
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
+  await page.emulateMediaType("screen");
+  const pdf = await page.pdf({
+    path: "RateConf_3000161385.pdf",
+    format: "Letter",
+    printBackground: true
+  });
+  await browser.close();
+  console.log("PDF written:", fs.existsSync("RateConf_3000161385.pdf"));
+})();
+
+
+Why this works: it creates a standards-compliant, text PDF (your AI extractor can read it). Avoid libraries that rasterize the page into a single image.
+
+If your source is always a scan/photo
+
+Bake OCR into your flow. Quick workaround:
+
+Upload scan → run an online OCR → download the OCR’d PDF → upload to your TMS.
+
+Common causes of that exact 500 error
+
+Scanned/faxed PDFs (no text layer).
+
+Corrupted generator (some jsPDF/Canvas flows).
+
+Encrypted/signed PDFs (parser can’t read).
+
+Wrong Content-Type on upload or truncated file.
