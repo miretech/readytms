@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,18 @@ import { apiRequest } from "@/lib/queryClient";
 export default function DriverPortal() {
   const { toast } = useToast();
   const [isOnDuty, setIsOnDuty] = useState(false);
+  const [isDutyChanging, setIsDutyChanging] = useState(false);
   const [lastLocation, setLastLocation] = useState<{ lat: number; lon: number; time: Date } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
+  
+  // Use ref to track latest duty state (prevents stale closure issues)
+  const isOnDutyRef = useRef(isOnDuty);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    isOnDutyRef.current = isOnDuty;
+  }, [isOnDuty]);
 
   // Get current user
   const { data: user, isLoading: userLoading } = useQuery<any>({
@@ -123,20 +132,25 @@ export default function DriverPortal() {
         throw new Error("Failed to update location");
       }
 
+      // Update location data
       setLastLocation({
         lat: location.latitude,
         lon: location.longitude,
         time: new Date(),
       });
 
-      setIsTracking(true);
-
-      // Only show success toast when manually requested
-      if (showSuccessToast) {
-        toast({
-          title: "Location Updated",
-          description: "Your location has been shared successfully",
-        });
+      // Only update tracking state if still on duty (check ref for latest value)
+      const stillOnDuty = isOnDutyRef.current;
+      if (stillOnDuty) {
+        setIsTracking(true);
+        
+        // Only show success toast when manually requested and still on duty
+        if (showSuccessToast) {
+          toast({
+            title: "Location Updated",
+            description: "Your location has been shared successfully",
+          });
+        }
       }
 
       return true;
@@ -154,26 +168,35 @@ export default function DriverPortal() {
 
   // Handle On Duty toggle
   const handleDutyToggle = useCallback(async (checked: boolean) => {
+    if (isDutyChanging) return; // Prevent concurrent toggles
+
     if (checked) {
-      // Try to send immediate location update when going on duty
+      // Set duty state first so sendLocationUpdate can activate tracking
+      setIsDutyChanging(true);
+      setIsOnDuty(true);
+      
       try {
         const success = await sendLocationUpdate(false);
         
         if (success) {
-          setIsOnDuty(true);
+          // Success - show toast
           toast({
             title: "On Duty",
             description: "GPS tracking started. Location updates every 3 minutes.",
           });
         } else {
-          // Revert toggle if first upload failed
+          // Failed - revert duty state
           setIsOnDuty(false);
+          setIsTracking(false);
           // Error toast already shown by sendLocationUpdate
         }
       } catch (error: any) {
-        // Revert toggle on failure
+        // Failed - revert duty state
         setIsOnDuty(false);
+        setIsTracking(false);
         // Error toast already shown by sendLocationUpdate
+      } finally {
+        setIsDutyChanging(false);
       }
     } else {
       setIsOnDuty(false);
@@ -184,7 +207,7 @@ export default function DriverPortal() {
         description: "GPS tracking stopped.",
       });
     }
-  }, [sendLocationUpdate, toast]);
+  }, [sendLocationUpdate, toast, isDutyChanging]);
 
   // Auto-update GPS location every 3 minutes when on duty
   useEffect(() => {
@@ -260,7 +283,7 @@ export default function DriverPortal() {
               id="duty-toggle"
               checked={isOnDuty}
               onCheckedChange={handleDutyToggle}
-              disabled={isDataLoading}
+              disabled={isDataLoading || isDutyChanging}
               data-testid="switch-duty-status"
             />
           </div>
