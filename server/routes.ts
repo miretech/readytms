@@ -15,6 +15,7 @@ import {
   insertViolationSchema,
   insertSettlementSchema,
   insertMaintenanceSchema,
+  insertFuelCardSchema,
   insertFuelTransactionSchema,
   insertGpsLocationSchema
 } from "@shared/schema";
@@ -649,6 +650,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const deleted = await storage.deleteMaintenance(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Maintenance record not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Fuel Card Routes
+  app.get("/api/fuel-cards", async (_req, res) => {
+    const cards = await storage.getAllFuelCards();
+    res.json(cards);
+  });
+
+  app.get("/api/fuel-cards/:id", async (req, res) => {
+    const card = await storage.getFuelCard(req.params.id);
+    if (!card) {
+      return res.status(404).json({ error: "Fuel card not found" });
+    }
+    res.json(card);
+  });
+
+  app.post("/api/fuel-cards", async (req, res) => {
+    try {
+      const validatedData = insertFuelCardSchema.parse(req.body);
+      const card = await storage.createFuelCard(validatedData);
+      res.status(201).json(card);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid fuel card data" });
+    }
+  });
+
+  app.patch("/api/fuel-cards/:id", async (req, res) => {
+    try {
+      const validatedData = insertFuelCardSchema.partial().parse(req.body);
+      const card = await storage.updateFuelCard(req.params.id, validatedData);
+      if (!card) {
+        return res.status(404).json({ error: "Fuel card not found" });
+      }
+      res.json(card);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid fuel card data" });
+    }
+  });
+
+  app.delete("/api/fuel-cards/:id", async (req, res) => {
+    const deleted = await storage.deleteFuelCard(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Fuel card not found" });
     }
     res.status(204).send();
   });
