@@ -11,6 +11,7 @@ import {
   Smartphone,
   DollarSign,
   Receipt,
+  Calendar,
   Settings
 } from "lucide-react";
 import {
@@ -87,6 +88,11 @@ const menuItems = [
     title: "Settlements",
     url: "/settlements",
     icon: Receipt,
+  },
+  {
+    title: "Recurring Expenses",
+    url: "/recurring-expenses",
+    icon: Calendar,
   },
 ];
 

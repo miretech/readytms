@@ -19,6 +19,7 @@ import Customers from "@/pages/customers";
 import Accounting from "@/pages/accounting";
 import Safety from "@/pages/safety";
 import Settlements from "@/pages/settlements";
+import RecurringExpenses from "@/pages/recurring-expenses";
 import Maintenance from "@/pages/maintenance";
 import Fuel from "@/pages/fuel";
 import GpsTracking from "@/pages/gps-tracking";
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/driver-portal" component={DriverPortal} />
       <Route path="/accounting" component={Accounting} />
       <Route path="/settlements" component={Settlements} />
+      <Route path="/recurring-expenses" component={RecurringExpenses} />
       <Route component={NotFound} />
     </Switch>
   );
