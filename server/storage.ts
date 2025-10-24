@@ -37,6 +37,12 @@ import {
   type InsertFuelCard,
   type GpsLocation,
   type InsertGpsLocation,
+  type AutomationSetting,
+  type InsertAutomationSetting,
+  type Notification,
+  type InsertNotification,
+  type ActivityLog,
+  type InsertActivityLog,
   users,
   loads,
   trucks,
@@ -55,10 +61,13 @@ import {
   maintenance,
   fuelCards,
   fuelTransactions,
-  gpsLocations
+  gpsLocations,
+  automationSettings,
+  notifications,
+  activityLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -196,6 +205,25 @@ export interface IStorage {
   getGpsLocationsByTruck(truckId: string, limit?: number): Promise<GpsLocation[]>;
   getGpsLocationsByLoad(loadId: string): Promise<GpsLocation[]>;
   createGpsLocation(location: InsertGpsLocation): Promise<GpsLocation>;
+  
+  // Automation Settings
+  getAllAutomationSettings(): Promise<AutomationSetting[]>;
+  getAutomationSetting(name: string): Promise<AutomationSetting | undefined>;
+  createAutomationSetting(setting: InsertAutomationSetting): Promise<AutomationSetting>;
+  updateAutomationSetting(name: string, setting: Partial<InsertAutomationSetting>): Promise<AutomationSetting | undefined>;
+  
+  // Notifications
+  getAllNotifications(): Promise<Notification[]>;
+  getUnreadNotifications(): Promise<Notification[]>;
+  getNotificationsByCategory(category: string): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: string): Promise<boolean>;
+  deleteNotification(id: string): Promise<boolean>;
+  
+  // Activity Log
+  getAllActivityLogs(limit?: number): Promise<ActivityLog[]>;
+  getActivityLogsByEntity(entityType: string, entityId: string): Promise<ActivityLog[]>;
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -980,6 +1008,90 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return location;
+  }
+
+  // Automation Settings
+  async getAllAutomationSettings(): Promise<AutomationSetting[]> {
+    return await db.select().from(automationSettings).orderBy(automationSettings.name);
+  }
+
+  async getAutomationSetting(name: string): Promise<AutomationSetting | undefined> {
+    const [setting] = await db.select().from(automationSettings).where(eq(automationSettings.name, name));
+    return setting || undefined;
+  }
+
+  async createAutomationSetting(insertSetting: InsertAutomationSetting): Promise<AutomationSetting> {
+    const [setting] = await db
+      .insert(automationSettings)
+      .values(insertSetting)
+      .returning();
+    return setting;
+  }
+
+  async updateAutomationSetting(name: string, updateData: Partial<InsertAutomationSetting>): Promise<AutomationSetting | undefined> {
+    const [setting] = await db
+      .update(automationSettings)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(automationSettings.name, name))
+      .returning();
+    return setting || undefined;
+  }
+
+  // Notifications
+  async getAllNotifications(): Promise<Notification[]> {
+    return await db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(100);
+  }
+
+  async getUnreadNotifications(): Promise<Notification[]> {
+    return await db.select().from(notifications).where(eq(notifications.isRead, "false")).orderBy(desc(notifications.createdAt));
+  }
+
+  async getNotificationsByCategory(category: string): Promise<Notification[]> {
+    return await db.select().from(notifications).where(eq(notifications.category, category)).orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const [notification] = await db
+      .insert(notifications)
+      .values(insertNotification)
+      .returning();
+    return notification;
+  }
+
+  async markNotificationAsRead(id: string): Promise<boolean> {
+    const [notification] = await db
+      .update(notifications)
+      .set({ isRead: "true" })
+      .where(eq(notifications.id, id))
+      .returning();
+    return !!notification;
+  }
+
+  async deleteNotification(id: string): Promise<boolean> {
+    const result = await db.delete(notifications).where(eq(notifications.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Activity Log
+  async getAllActivityLogs(limit: number = 100): Promise<ActivityLog[]> {
+    return await db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(limit);
+  }
+
+  async getActivityLogsByEntity(entityType: string, entityId: string): Promise<ActivityLog[]> {
+    return await db.select().from(activityLog)
+      .where(and(
+        eq(activityLog.entityType, entityType),
+        eq(activityLog.entityId, entityId)
+      ))
+      .orderBy(desc(activityLog.createdAt));
+  }
+
+  async createActivityLog(insertLog: InsertActivityLog): Promise<ActivityLog> {
+    const [log] = await db
+      .insert(activityLog)
+      .values(insertLog)
+      .returning();
+    return log;
   }
 }
 

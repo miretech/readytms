@@ -21,6 +21,8 @@ import {
 } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { extractLoadFromDocument } from "./aiExtraction";
+import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
@@ -60,11 +62,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/loads/:id", async (req, res) => {
     try {
+      // Get the old load data before update
+      const oldLoad = await storage.getLoad(req.params.id);
+      if (!oldLoad) {
+        return res.status(404).json({ error: "Load not found" });
+      }
+      
       const validatedData = insertLoadSchema.partial().parse(req.body);
       const load = await storage.updateLoad(req.params.id, validatedData);
       if (!load) {
         return res.status(404).json({ error: "Load not found" });
       }
+
+      // Trigger automation: Auto-generate invoice if status changed to "delivered"
+      if (validatedData.status && validatedData.status.toLowerCase() === "delivered" && oldLoad.status !== "delivered") {
+        await autoGenerateInvoice(load);
+      }
+
+      // Trigger automation: Notify about status change
+      if (validatedData.status && validatedData.status !== oldLoad.status) {
+        await notifyLoadStatusChange(load, oldLoad.status, validatedData.status);
+      }
+      
       res.json(load);
     } catch (error) {
       res.status(400).json({ error: "Invalid load data" });
@@ -1012,6 +1031,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(400).json({ error: "Invalid GPS location data" });
     }
+  });
+
+  // Automation & Notifications Routes
+  app.get("/api/notifications", async (_req, res) => {
+    const notifications = await storage.getAllNotifications();
+    res.json(notifications);
+  });
+
+  app.get("/api/notifications/unread", async (_req, res) => {
+    const notifications = await storage.getUnreadNotifications();
+    res.json(notifications);
+  });
+
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    const success = await storage.markNotificationAsRead(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+    res.status(200).json({ success: true });
+  });
+
+  app.delete("/api/notifications/:id", async (req, res) => {
+    const deleted = await storage.deleteNotification(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+    res.status(204).send();
+  });
+
+  app.get("/api/automation/settings", async (_req, res) => {
+    const settings = await storage.getAllAutomationSettings();
+    res.json(settings);
+  });
+
+  app.patch("/api/automation/settings/:name", async (req, res) => {
+    try {
+      // Validate request body
+      const validData = z.object({
+        enabled: z.enum(["true", "false"]).optional(),
+        config: z.record(z.any()).optional(),
+      }).parse(req.body);
+      
+      const setting = await storage.updateAutomationSetting(req.params.name, validData);
+      if (!setting) {
+        return res.status(404).json({ error: "Automation setting not found" });
+      }
+      res.json(setting);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid automation setting data" });
+    }
+  });
+
+  app.post("/api/automation/check-expiring", async (_req, res) => {
+    try {
+      await checkExpiringDocuments();
+      res.json({ success: true, message: "Expiring documents checked successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check expiring documents" });
+    }
+  });
+
+  app.get("/api/activity-log", async (req, res) => {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+    const logs = await storage.getAllActivityLogs(limit);
+    res.json(logs);
   });
 
   const httpServer = createServer(app);

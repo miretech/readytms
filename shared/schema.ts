@@ -505,3 +505,66 @@ export const insertGpsLocationSchema = createInsertSchema(gpsLocations).omit({
 
 export type InsertGpsLocation = z.infer<typeof insertGpsLocationSchema>;
 export type GpsLocation = typeof gpsLocations.$inferSelect;
+
+// Automation Settings - Configure automated workflows
+export const automationSettings = pgTable("automation_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // e.g., "auto_invoice_on_delivery", "alert_license_expiry"
+  enabled: text("enabled").notNull().default("true"), // "true" or "false"
+  config: jsonb("config"), // JSON configuration for the automation
+  lastRun: timestamp("last_run"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAutomationSettingSchema = createInsertSchema(automationSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAutomationSetting = z.infer<typeof insertAutomationSettingSchema>;
+export type AutomationSetting = typeof automationSettings.$inferSelect;
+
+// Notifications - System-generated alerts and notifications
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // "alert", "info", "warning", "success"
+  category: text("category").notNull(), // "license_expiry", "invoice_created", "load_delivered", etc.
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  relatedEntityType: text("related_entity_type"), // "load", "driver", "invoice", etc.
+  relatedEntityId: varchar("related_entity_id"),
+  isRead: text("is_read").notNull().default("false"), // "true" or "false"
+  recipientEmail: text("recipient_email"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+// Activity Log - Track all automated actions
+export const activityLog = pgTable("activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  action: text("action").notNull(), // "invoice_created", "notification_sent", "alert_triggered"
+  entityType: text("entity_type"), // "load", "driver", "invoice"
+  entityId: varchar("entity_id"),
+  details: text("details"), // Human-readable description
+  metadata: jsonb("metadata"), // Additional data
+  status: text("status").notNull(), // "success", "failed", "pending"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLog.$inferSelect;
