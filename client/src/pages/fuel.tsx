@@ -3,11 +3,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, ExternalLink, CreditCard, Fuel as FuelIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -30,6 +31,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import {
   Select,
@@ -48,8 +50,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { FuelTransaction, Truck, Driver, Load } from "@shared/schema";
-import { insertFuelTransactionSchema } from "@shared/schema";
+import type { FuelTransaction, FuelCard, Truck, Driver, Load } from "@shared/schema";
+import { insertFuelTransactionSchema, insertFuelCardSchema } from "@shared/schema";
 
 const fuelTransactionFormSchema = insertFuelTransactionSchema.extend({
   truckId: z.string().min(1, "Truck is required"),
@@ -63,11 +65,19 @@ const fuelTransactionFormSchema = insertFuelTransactionSchema.extend({
   fuelType: z.string().min(1, "Fuel type is required"),
 });
 
+const fuelCardFormSchema = insertFuelCardSchema.extend({
+  provider: z.string().min(1, "Provider is required"),
+  accountName: z.string().min(1, "Account name is required"),
+  accountNumber: z.string().min(1, "Account number is required"),
+});
+
 type FuelTransactionFormValues = z.infer<typeof fuelTransactionFormSchema>;
+type FuelCardFormValues = z.infer<typeof fuelCardFormSchema>;
 
 const vendorColors: Record<string, string> = {
   "FleetOne": "bg-blue-500",
   "Pilot": "bg-red-500",
+  "Pilot Flying J": "bg-red-500",
   "Love's": "bg-yellow-500",
   "TA": "bg-green-500",
   "Flying J": "bg-purple-500",
@@ -76,6 +86,323 @@ const vendorColors: Record<string, string> = {
   "Other": "bg-gray-500",
 };
 
+// Fuel Card Dialog
+interface FuelCardDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fuelCard?: FuelCard | null;
+}
+
+function FuelCardDialog({ open, onOpenChange, fuelCard }: FuelCardDialogProps) {
+  const { toast } = useToast();
+  const isEditing = !!fuelCard;
+
+  const form = useForm<FuelCardFormValues>({
+    resolver: zodResolver(fuelCardFormSchema),
+    defaultValues: {
+      provider: "",
+      accountName: "",
+      accountNumber: "",
+      cardNumbers: [],
+      apiUsername: "",
+      apiEnabled: "false",
+      portalUrl: "",
+      contactEmail: "",
+      contactPhone: "",
+      notes: "",
+      status: "active",
+    },
+  });
+
+  useEffect(() => {
+    if (fuelCard) {
+      form.reset({
+        provider: fuelCard.provider,
+        accountName: fuelCard.accountName,
+        accountNumber: fuelCard.accountNumber,
+        cardNumbers: fuelCard.cardNumbers || [],
+        apiUsername: fuelCard.apiUsername || "",
+        apiEnabled: fuelCard.apiEnabled || "false",
+        portalUrl: fuelCard.portalUrl || "",
+        contactEmail: fuelCard.contactEmail || "",
+        contactPhone: fuelCard.contactPhone || "",
+        notes: fuelCard.notes || "",
+        status: fuelCard.status || "active",
+      });
+    } else {
+      form.reset({
+        provider: "",
+        accountName: "",
+        accountNumber: "",
+        cardNumbers: [],
+        apiUsername: "",
+        apiEnabled: "false",
+        portalUrl: "",
+        contactEmail: "",
+        contactPhone: "",
+        notes: "",
+        status: "active",
+      });
+    }
+  }, [fuelCard, form]);
+
+  const mutation = useMutation({
+    mutationFn: async (values: FuelCardFormValues) => {
+      if (isEditing) {
+        return await apiRequest("PATCH", `/api/fuel-cards/${fuelCard.id}`, values);
+      }
+      return await apiRequest("POST", "/api/fuel-cards", values);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fuel-cards"] });
+      toast({
+        title: isEditing ? "Fuel card updated" : "Fuel card added",
+        description: `The fuel card account has been successfully ${isEditing ? "updated" : "added"}.`,
+      });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: `Failed to ${isEditing ? "update" : "add"} fuel card. Please try again.`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (values: FuelCardFormValues) => {
+    mutation.mutate(values);
+  };
+
+  // Set default portal URL based on provider
+  useEffect(() => {
+    const provider = form.watch("provider");
+    if (provider === "FleetOne" && !form.getValues("portalUrl")) {
+      form.setValue("portalUrl", "https://manage.fleetone.com/security/fleetOneLogin");
+    } else if (provider === "Pilot Flying J" && !form.getValues("portalUrl")) {
+      form.setValue("portalUrl", "https://customerportal.pilotflyingj.com/");
+    }
+  }, [form.watch("provider")]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? "Edit Fuel Card Account" : "Add Fuel Card Account"}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? "Update fuel card account details" : "Add a new FleetOne or Pilot Flying J account"}
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="provider"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Provider *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-fuel-card-provider">
+                          <SelectValue placeholder="Select provider" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="FleetOne">FleetOne (WEX)</SelectItem>
+                        <SelectItem value="Pilot Flying J">Pilot Flying J</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="accountName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account Name *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Company Name"
+                        {...field}
+                        data-testid="input-fuel-card-account-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="accountNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account Number *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Account #"
+                        {...field}
+                        data-testid="input-fuel-card-account-number"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "active"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-fuel-card-status">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="portalUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Portal URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://..."
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-fuel-card-portal-url"
+                      />
+                    </FormControl>
+                    <FormDescription>Link to the provider's portal</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="contactEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="support@example.com"
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-fuel-card-contact-email"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="contactPhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Phone</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        placeholder="(555) 555-5555"
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-fuel-card-contact-phone"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="apiUsername"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>API Username</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="For future API integration"
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-fuel-card-api-username"
+                      />
+                    </FormControl>
+                    <FormDescription>For automated import (when available)</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Additional notes..."
+                      className="resize-none"
+                      {...field}
+                      value={field.value || ""}
+                      data-testid="input-fuel-card-notes"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-cancel-fuel-card"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={mutation.isPending}
+                data-testid="button-save-fuel-card"
+              >
+                {mutation.isPending ? "Saving..." : isEditing ? "Update" : "Create"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Fuel Transaction Dialog
 interface FuelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -327,6 +654,7 @@ function FuelDialog({ open, onOpenChange, fuelTransaction }: FuelDialogProps) {
                       <SelectContent>
                         <SelectItem value="FleetOne">FleetOne</SelectItem>
                         <SelectItem value="Pilot">Pilot</SelectItem>
+                        <SelectItem value="Pilot Flying J">Pilot Flying J</SelectItem>
                         <SelectItem value="Love's">Love's</SelectItem>
                         <SelectItem value="TA">TA</SelectItem>
                         <SelectItem value="Flying J">Flying J</SelectItem>
@@ -549,13 +877,20 @@ function FuelDialog({ open, onOpenChange, fuelTransaction }: FuelDialogProps) {
 }
 
 export default function Fuel() {
+  const [activeTab, setActiveTab] = useState("cards");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
+  const [editingFuelCard, setEditingFuelCard] = useState<FuelCard | null>(null);
   const [editingFuelTransaction, setEditingFuelTransaction] = useState<FuelTransaction | null>(null);
   const { toast } = useToast();
 
-  const { data: fuelTransactions = [], isLoading } = useQuery<FuelTransaction[]>({
-    queryKey: ["/api/fuel"],
+  const { data: fuelCards = [], isLoading: isLoadingCards } = useQuery<FuelCard[]>({
+    queryKey: ["/api/fuel-cards"],
+  });
+
+  const { data: fuelTransactions = [], isLoading: isLoadingTransactions } = useQuery<FuelTransaction[]>({
+    queryKey: ["/api/fuel-cards"],
   });
 
   const { data: trucks = [] } = useQuery<Truck[]>({
@@ -566,7 +901,27 @@ export default function Fuel() {
     queryKey: ["/api/drivers"],
   });
 
-  const deleteMutation = useMutation({
+  const deleteCardMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/fuel-cards/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fuel-cards"] });
+      toast({
+        title: "Fuel card deleted",
+        description: "The fuel card account has been successfully deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete fuel card. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTransactionMutation = useMutation({
     mutationFn: async (id: string) => {
       return await apiRequest("DELETE", `/api/fuel/${id}`);
     },
@@ -596,6 +951,15 @@ export default function Fuel() {
     return driver?.name || "N/A";
   };
 
+  const filteredFuelCards = fuelCards.filter((card) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      card.provider.toLowerCase().includes(searchLower) ||
+      card.accountName.toLowerCase().includes(searchLower) ||
+      card.accountNumber.toLowerCase().includes(searchLower)
+    );
+  });
+
   const filteredFuelTransactions = fuelTransactions.filter((transaction) => {
     const searchLower = searchQuery.toLowerCase();
     const truckNumber = getTruckNumber(transaction.truckId).toLowerCase();
@@ -611,23 +975,39 @@ export default function Fuel() {
     );
   });
 
-  const handleEdit = (transaction: FuelTransaction) => {
-    setEditingFuelTransaction(transaction);
-    setIsDialogOpen(true);
+  const handleEditCard = (card: FuelCard) => {
+    setEditingFuelCard(card);
+    setIsCardDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this fuel purchase?")) {
-      deleteMutation.mutate(id);
+  const handleDeleteCard = (id: string) => {
+    if (confirm("Are you sure you want to delete this fuel card account?")) {
+      deleteCardMutation.mutate(id);
     }
   };
 
-  const handleDialogClose = () => {
-    setIsDialogOpen(false);
+  const handleEditTransaction = (transaction: FuelTransaction) => {
+    setEditingFuelTransaction(transaction);
+    setIsTransactionDialogOpen(true);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    if (confirm("Are you sure you want to delete this fuel purchase?")) {
+      deleteTransactionMutation.mutate(id);
+    }
+  };
+
+  const handleCardDialogClose = () => {
+    setIsCardDialogOpen(false);
+    setEditingFuelCard(null);
+  };
+
+  const handleTransactionDialogClose = () => {
+    setIsTransactionDialogOpen(false);
     setEditingFuelTransaction(null);
   };
 
-  if (isLoading) {
+  if (isLoadingCards || isLoadingTransactions) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-48" />
@@ -638,139 +1018,245 @@ export default function Fuel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Fuel Management</h1>
-          <p className="text-sm text-muted-foreground">Track fuel purchases and fuel card transactions</p>
-        </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          data-testid="button-create-fuel"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Fuel Purchase
-        </Button>
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">Fuel Management</h1>
+        <p className="text-sm text-muted-foreground">Manage fuel card accounts and track fuel purchases</p>
       </div>
 
-      <Card className="p-6">
-        <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by truck, driver, vendor, or location..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-fuel"
-            />
-          </div>
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="cards" data-testid="tab-fuel-cards">
+            <CreditCard className="mr-2 h-4 w-4" />
+            Fuel Card Accounts
+          </TabsTrigger>
+          <TabsTrigger value="transactions" data-testid="tab-fuel-transactions">
+            <FuelIcon className="mr-2 h-4 w-4" />
+            Fuel Transactions
+          </TabsTrigger>
+        </TabsList>
 
-        {filteredFuelTransactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="rounded-full bg-muted p-4 mb-4">
-              <Plus className="h-8 w-8 text-muted-foreground" />
+        {/* Fuel Cards Tab */}
+        <TabsContent value="cards" className="space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search fuel cards..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-fuel-cards"
+              />
             </div>
-            <h3 className="mb-2 text-lg font-medium">No fuel purchases found</h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              {searchQuery ? "Try adjusting your search" : "Get started by recording your first fuel purchase"}
-            </p>
-            {!searchQuery && (
-              <Button onClick={() => setIsDialogOpen(true)} data-testid="button-empty-create-fuel">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Fuel Purchase
-              </Button>
-            )}
+            <Button
+              onClick={() => setIsCardDialogOpen(true)}
+              data-testid="button-create-fuel-card"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Fuel Card
+            </Button>
           </div>
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Truck</TableHead>
-                  <TableHead>Driver</TableHead>
-                  <TableHead>Vendor</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-right">Gallons</TableHead>
-                  <TableHead className="text-right">Price/Gal</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
-                  <TableHead>Fuel Type</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFuelTransactions.map((transaction) => (
-                  <TableRow key={transaction.id} data-testid={`row-fuel-${transaction.id}`}>
-                    <TableCell>
-                      {new Date(transaction.transactionDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {getTruckNumber(transaction.truckId)}
-                    </TableCell>
-                    <TableCell>{getDriverName(transaction.driverId)}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        className={`${vendorColors[transaction.vendor] || vendorColors.Other} text-white`}
-                        data-testid={`badge-vendor-${transaction.id}`}
-                      >
-                        {transaction.vendor}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{transaction.location}</TableCell>
-                    <TableCell className="text-right">
-                      {Number(transaction.gallons).toFixed(3)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      ${Number(transaction.pricePerGallon).toFixed(3)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      ${Number(transaction.totalCost).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{transaction.fuelType}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            data-testid={`button-actions-${transaction.id}`}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleEdit(transaction)}
-                            data-testid={`button-edit-${transaction.id}`}
-                          >
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(transaction.id)}
-                            className="text-destructive"
-                            data-testid={`button-delete-${transaction.id}`}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </Card>
 
+          <Card className="p-6">
+            {filteredFuelCards.length === 0 ? (
+              <div className="text-center py-12">
+                <CreditCard className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">No fuel cards</h3>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Add your FleetOne or Pilot Flying J accounts to get started
+                </p>
+                <Button onClick={() => setIsCardDialogOpen(true)} className="mt-4">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Fuel Card
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Account Name</TableHead>
+                    <TableHead>Account Number</TableHead>
+                    <TableHead>Portal</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>API Integration</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredFuelCards.map((card) => (
+                    <TableRow key={card.id} data-testid={`row-fuel-card-${card.id}`}>
+                      <TableCell className="font-medium">{card.provider}</TableCell>
+                      <TableCell>{card.accountName}</TableCell>
+                      <TableCell>{card.accountNumber}</TableCell>
+                      <TableCell>
+                        {card.portalUrl ? (
+                          <a
+                            href={card.portalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-sm text-primary hover:underline"
+                            data-testid={`link-fuel-portal-${card.id}`}
+                          >
+                            Open Portal <ExternalLink className="ml-1 h-3 w-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={card.status === "active" ? "default" : "secondary"} data-testid={`badge-fuel-card-status-${card.id}`}>
+                          {card.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={card.apiEnabled === "true" ? "default" : "outline"} data-testid={`badge-fuel-card-api-${card.id}`}>
+                          {card.apiEnabled === "true" ? "Enabled" : "Manual"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-fuel-card-actions-${card.id}`}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditCard(card)} data-testid={`action-edit-fuel-card-${card.id}`}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteCard(card.id)}
+                              className="text-destructive"
+                              data-testid={`action-delete-fuel-card-${card.id}`}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Fuel Transactions Tab */}
+        <TabsContent value="transactions" className="space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search transactions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-fuel-transactions"
+              />
+            </div>
+            <Button
+              onClick={() => setIsTransactionDialogOpen(true)}
+              data-testid="button-create-fuel-transaction"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Fuel Purchase
+            </Button>
+          </div>
+
+          <Card className="p-6">
+            {filteredFuelTransactions.length === 0 ? (
+              <div className="text-center py-12">
+                <FuelIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">No fuel transactions</h3>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Record fuel purchases to track expenses
+                </p>
+                <Button onClick={() => setIsTransactionDialogOpen(true)} className="mt-4">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Fuel Purchase
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Truck</TableHead>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Gallons</TableHead>
+                      <TableHead className="text-right">Price/Gal</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFuelTransactions.map((transaction) => (
+                      <TableRow key={transaction.id} data-testid={`row-fuel-transaction-${transaction.id}`}>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(transaction.transactionDate).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{getTruckNumber(transaction.truckId)}</TableCell>
+                        <TableCell>{getDriverName(transaction.driverId)}</TableCell>
+                        <TableCell>
+                          <Badge className={vendorColors[transaction.vendor] || "bg-gray-500"}>
+                            {transaction.vendor}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{transaction.location}</TableCell>
+                        <TableCell>{transaction.fuelType}</TableCell>
+                        <TableCell className="text-right">{parseFloat(transaction.gallons).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">${parseFloat(transaction.pricePerGallon).toFixed(3)}</TableCell>
+                        <TableCell className="text-right font-medium">${parseFloat(transaction.totalCost).toFixed(2)}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-fuel-transaction-actions-${transaction.id}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditTransaction(transaction)} data-testid={`action-edit-fuel-transaction-${transaction.id}`}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteTransaction(transaction.id)}
+                                className="text-destructive"
+                                data-testid={`action-delete-fuel-transaction-${transaction.id}`}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialogs */}
+      <FuelCardDialog
+        open={isCardDialogOpen}
+        onOpenChange={handleCardDialogClose}
+        fuelCard={editingFuelCard}
+      />
       <FuelDialog
-        open={isDialogOpen}
-        onOpenChange={handleDialogClose}
+        open={isTransactionDialogOpen}
+        onOpenChange={handleTransactionDialogClose}
         fuelTransaction={editingFuelTransaction}
       />
     </div>
