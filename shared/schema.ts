@@ -336,6 +336,58 @@ export const insertSettlementSchema = createInsertSchema(settlements).omit({
 export type InsertSettlement = z.infer<typeof insertSettlementSchema>;
 export type Settlement = typeof settlements.$inferSelect;
 
+// Settlement Line Items - Individual loads/entries within a settlement
+export const settlementLineItems = pgTable("settlement_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  settlementId: varchar("settlement_id").notNull(),
+  loadId: varchar("load_id"), // Optional - can be manual entry
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }), // e.g., miles, loads, hours
+  rate: decimal("rate", { precision: 10, scale: 4 }), // e.g., per mile, per load, per hour
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  itemType: text("item_type").notNull(), // "revenue", "deduction", "bonus", "adjustment"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSettlementLineItemSchema = createInsertSchema(settlementLineItems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  quantity: z.string().optional(),
+  rate: z.string().optional(),
+  amount: z.string(),
+});
+
+export type InsertSettlementLineItem = z.infer<typeof insertSettlementLineItemSchema>;
+export type SettlementLineItem = typeof settlementLineItems.$inferSelect;
+
+// Recurring Expenses - Templates for recurring deductions
+export const recurringExpenses = pgTable("recurring_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id"), // null = applies to all drivers
+  name: text("name").notNull(),
+  description: text("description"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  frequency: text("frequency").notNull(), // "weekly", "biweekly", "monthly"
+  category: text("category").notNull(), // "insurance", "truck_lease", "fuel_advance", "other"
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"), // null = ongoing
+  isActive: text("is_active").notNull().default("true"), // "true" or "false"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertRecurringExpenseSchema = createInsertSchema(recurringExpenses).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  amount: z.string(),
+  startDate: z.string(),
+  endDate: z.string().optional(),
+});
+
+export type InsertRecurringExpense = z.infer<typeof insertRecurringExpenseSchema>;
+export type RecurringExpense = typeof recurringExpenses.$inferSelect;
+
 // Maintenance Records
 export const maintenance = pgTable("maintenance", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

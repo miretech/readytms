@@ -25,6 +25,10 @@ import {
   type InsertViolation,
   type Settlement,
   type InsertSettlement,
+  type SettlementLineItem,
+  type InsertSettlementLineItem,
+  type RecurringExpense,
+  type InsertRecurringExpense,
   type Maintenance,
   type InsertMaintenance,
   type FuelTransaction,
@@ -46,6 +50,8 @@ import {
   accidents,
   violations,
   settlements,
+  settlementLineItems,
+  recurringExpenses,
   maintenance,
   fuelCards,
   fuelTransactions,
@@ -142,6 +148,21 @@ export interface IStorage {
   createSettlement(settlement: InsertSettlement): Promise<Settlement>;
   updateSettlement(id: string, settlement: Partial<InsertSettlement>): Promise<Settlement | undefined>;
   deleteSettlement(id: string): Promise<boolean>;
+  
+  // Settlement Line Items
+  getSettlementLineItems(settlementId: string): Promise<SettlementLineItem[]>;
+  createSettlementLineItem(lineItem: InsertSettlementLineItem): Promise<SettlementLineItem>;
+  updateSettlementLineItem(id: string, lineItem: Partial<InsertSettlementLineItem>): Promise<SettlementLineItem | undefined>;
+  deleteSettlementLineItem(id: string): Promise<boolean>;
+  
+  // Recurring Expenses
+  getAllRecurringExpenses(): Promise<RecurringExpense[]>;
+  getRecurringExpense(id: string): Promise<RecurringExpense | undefined>;
+  getRecurringExpensesByDriver(driverId: string): Promise<RecurringExpense[]>;
+  getActiveRecurringExpenses(driverId?: string): Promise<RecurringExpense[]>;
+  createRecurringExpense(expense: InsertRecurringExpense): Promise<RecurringExpense>;
+  updateRecurringExpense(id: string, expense: Partial<InsertRecurringExpense>): Promise<RecurringExpense | undefined>;
+  deleteRecurringExpense(id: string): Promise<boolean>;
   
   // Maintenance
   getAllMaintenance(): Promise<Maintenance[]>;
@@ -702,6 +723,95 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSettlement(id: string): Promise<boolean> {
     const result = await db.delete(settlements).where(eq(settlements.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Settlement Line Items
+  async getSettlementLineItems(settlementId: string): Promise<SettlementLineItem[]> {
+    return await db.select().from(settlementLineItems).where(eq(settlementLineItems.settlementId, settlementId));
+  }
+
+  async createSettlementLineItem(lineItem: InsertSettlementLineItem): Promise<SettlementLineItem> {
+    const [created] = await db
+      .insert(settlementLineItems)
+      .values(lineItem)
+      .returning();
+    return created;
+  }
+
+  async updateSettlementLineItem(id: string, updateData: Partial<InsertSettlementLineItem>): Promise<SettlementLineItem | undefined> {
+    const [updated] = await db
+      .update(settlementLineItems)
+      .set(updateData)
+      .where(eq(settlementLineItems.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSettlementLineItem(id: string): Promise<boolean> {
+    const result = await db.delete(settlementLineItems).where(eq(settlementLineItems.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Recurring Expenses
+  async getAllRecurringExpenses(): Promise<RecurringExpense[]> {
+    return await db.select().from(recurringExpenses).orderBy(desc(recurringExpenses.createdAt));
+  }
+
+  async getRecurringExpense(id: string): Promise<RecurringExpense | undefined> {
+    const [expense] = await db.select().from(recurringExpenses).where(eq(recurringExpenses.id, id));
+    return expense || undefined;
+  }
+
+  async getRecurringExpensesByDriver(driverId: string): Promise<RecurringExpense[]> {
+    return await db.select().from(recurringExpenses).where(eq(recurringExpenses.driverId, driverId));
+  }
+
+  async getActiveRecurringExpenses(driverId?: string): Promise<RecurringExpense[]> {
+    const now = new Date();
+    let query = db
+      .select()
+      .from(recurringExpenses)
+      .where(eq(recurringExpenses.isActive, "true"))
+      .$dynamic();
+    
+    if (driverId) {
+      query = query.where(eq(recurringExpenses.driverId, driverId));
+    }
+    
+    return await query;
+  }
+
+  async createRecurringExpense(insertExpense: InsertRecurringExpense): Promise<RecurringExpense> {
+    const [expense] = await db
+      .insert(recurringExpenses)
+      .values({
+        ...insertExpense,
+        startDate: new Date(insertExpense.startDate),
+        endDate: insertExpense.endDate ? new Date(insertExpense.endDate) : undefined,
+      })
+      .returning();
+    return expense;
+  }
+
+  async updateRecurringExpense(id: string, updateData: Partial<InsertRecurringExpense>): Promise<RecurringExpense | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.startDate) {
+      values.startDate = new Date(updateData.startDate);
+    }
+    if (updateData.endDate) {
+      values.endDate = new Date(updateData.endDate);
+    }
+    const [expense] = await db
+      .update(recurringExpenses)
+      .set(values)
+      .where(eq(recurringExpenses.id, id))
+      .returning();
+    return expense || undefined;
+  }
+
+  async deleteRecurringExpense(id: string): Promise<boolean> {
+    const result = await db.delete(recurringExpenses).where(eq(recurringExpenses.id, id)).returning();
     return result.length > 0;
   }
 
