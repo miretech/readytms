@@ -103,7 +103,7 @@ function RecurringExpenseDialog({
         category: expense.category,
         startDate: new Date(expense.startDate).toISOString().split("T")[0],
         endDate: expense.endDate ? new Date(expense.endDate).toISOString().split("T")[0] : "",
-        isActive: expense.isActive,
+        isActive: expense.isActive === "true" ? "true" : "false",
       });
     } else {
       const today = new Date().toISOString().split("T")[0];
@@ -125,7 +125,7 @@ function RecurringExpenseDialog({
     mutationFn: async (values: RecurringExpenseFormValues) => {
       const payload = {
         ...values,
-        driverId: values.driverId || undefined,
+        driverId: values.driverId && values.driverId !== "none" ? values.driverId : undefined,
         description: values.description || undefined,
         endDate: values.endDate || undefined,
       };
