@@ -29,6 +29,8 @@ import {
   type InsertMaintenance,
   type FuelTransaction,
   type InsertFuelTransaction,
+  type FuelCard,
+  type InsertFuelCard,
   type GpsLocation,
   type InsertGpsLocation,
   users,
@@ -45,6 +47,7 @@ import {
   violations,
   settlements,
   maintenance,
+  fuelCards,
   fuelTransactions,
   gpsLocations
 } from "@shared/schema";
@@ -145,6 +148,13 @@ export interface IStorage {
   createMaintenance(maintenance: InsertMaintenance): Promise<Maintenance>;
   updateMaintenance(id: string, maintenance: Partial<InsertMaintenance>): Promise<Maintenance | undefined>;
   deleteMaintenance(id: string): Promise<boolean>;
+  
+  // Fuel Cards
+  getAllFuelCards(): Promise<FuelCard[]>;
+  getFuelCard(id: string): Promise<FuelCard | undefined>;
+  createFuelCard(fuelCard: InsertFuelCard): Promise<FuelCard>;
+  updateFuelCard(id: string, fuelCard: Partial<InsertFuelCard>): Promise<FuelCard | undefined>;
+  deleteFuelCard(id: string): Promise<boolean>;
   
   // Fuel Transactions
   getAllFuelTransactions(): Promise<FuelTransaction[]>;
@@ -727,6 +737,38 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMaintenance(id: string): Promise<boolean> {
     const result = await db.delete(maintenance).where(eq(maintenance.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Fuel Cards
+  async getAllFuelCards(): Promise<FuelCard[]> {
+    return await db.select().from(fuelCards).orderBy(desc(fuelCards.createdAt));
+  }
+
+  async getFuelCard(id: string): Promise<FuelCard | undefined> {
+    const [card] = await db.select().from(fuelCards).where(eq(fuelCards.id, id));
+    return card || undefined;
+  }
+
+  async createFuelCard(insertFuelCard: InsertFuelCard): Promise<FuelCard> {
+    const [card] = await db
+      .insert(fuelCards)
+      .values(insertFuelCard)
+      .returning();
+    return card;
+  }
+
+  async updateFuelCard(id: string, updateData: Partial<InsertFuelCard>): Promise<FuelCard | undefined> {
+    const [card] = await db
+      .update(fuelCards)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(fuelCards.id, id))
+      .returning();
+    return card || undefined;
+  }
+
+  async deleteFuelCard(id: string): Promise<boolean> {
+    const result = await db.delete(fuelCards).where(eq(fuelCards.id, id)).returning();
     return result.length > 0;
   }
 
