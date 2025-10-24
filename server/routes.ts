@@ -635,6 +635,192 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Settlement Line Items Routes
+  app.get("/api/settlements/:settlementId/line-items", async (req, res) => {
+    const lineItems = await storage.getSettlementLineItems(req.params.settlementId);
+    res.json(lineItems);
+  });
+
+  app.post("/api/settlements/:settlementId/line-items", async (req, res) => {
+    try {
+      const { insertSettlementLineItemSchema } = await import("@shared/schema");
+      const validatedData = insertSettlementLineItemSchema.parse({
+        ...req.body,
+        settlementId: req.params.settlementId,
+      });
+      const lineItem = await storage.createSettlementLineItem(validatedData);
+      res.status(201).json(lineItem);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid line item data" });
+    }
+  });
+
+  app.patch("/api/settlement-line-items/:id", async (req, res) => {
+    try {
+      const { insertSettlementLineItemSchema } = await import("@shared/schema");
+      const validatedData = insertSettlementLineItemSchema.partial().parse(req.body);
+      const lineItem = await storage.updateSettlementLineItem(req.params.id, validatedData);
+      if (!lineItem) {
+        return res.status(404).json({ error: "Line item not found" });
+      }
+      res.json(lineItem);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid line item data" });
+    }
+  });
+
+  app.delete("/api/settlement-line-items/:id", async (req, res) => {
+    const deleted = await storage.deleteSettlementLineItem(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Line item not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Auto-generate settlement from loads
+  app.post("/api/settlements/auto-generate", async (req, res) => {
+    try {
+      const { driverId, periodStart, periodEnd, payRate } = req.body;
+      
+      if (!driverId || !periodStart || !periodEnd) {
+        return res.status(400).json({ error: "driverId, periodStart, and periodEnd are required" });
+      }
+
+      // Get all delivered loads for the driver in the period
+      const allLoads = await storage.getAllLoads();
+      const driverLoads = allLoads.filter(load => 
+        load.assignedDriverId === driverId &&
+        load.status === "Delivered" &&
+        new Date(load.deliveryDate) >= new Date(periodStart) &&
+        new Date(load.deliveryDate) <= new Date(periodEnd)
+      );
+
+      if (driverLoads.length === 0) {
+        return res.status(404).json({ error: "No delivered loads found for this driver in the period" });
+      }
+
+      // Calculate totals
+      const totalRevenue = driverLoads.reduce((sum, load) => sum + parseFloat(load.rate.toString()), 0);
+      const totalMiles = driverLoads.reduce((sum, load) => sum + (load.weight || 0), 0); // Using weight as placeholder for miles
+
+      // Calculate driver pay (using percentage or per-mile rate)
+      const rateValue = parseFloat(payRate || "0.70"); // Default 70% of revenue
+      const driverPay = payRate && payRate < 10 ? totalRevenue * rateValue : totalMiles * rateValue;
+
+      // Get recurring expenses for this driver
+      const recurringExpenses = await storage.getActiveRecurringExpenses(driverId);
+      const deductions = recurringExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount.toString()), 0);
+
+      const netPay = driverPay - deductions;
+
+      // Generate settlement number
+      const today = new Date();
+      const settlementNumber = `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+
+      // Create settlement
+      const settlement = await storage.createSettlement({
+        driverId,
+        settlementNumber,
+        periodStart,
+        periodEnd,
+        totalMiles,
+        totalRevenue: totalRevenue.toFixed(2),
+        driverPay: driverPay.toFixed(2),
+        deductions: deductions.toFixed(2),
+        netPay: netPay.toFixed(2),
+        status: "Pending",
+      });
+
+      // Create line items for each load
+      for (const load of driverLoads) {
+        const loadRevenue = parseFloat(load.rate.toString());
+        const loadPay = payRate && payRate < 10 ? loadRevenue * rateValue : (load.weight || 0) * rateValue;
+        
+        await storage.createSettlementLineItem({
+          settlementId: settlement.id,
+          loadId: load.id,
+          description: `Load ${load.loadNumber} - ${load.pickupLocation} to ${load.deliveryLocation}`,
+          quantity: (load.weight || 0).toString(),
+          rate: rateValue.toFixed(4),
+          amount: loadPay.toFixed(2),
+          itemType: "revenue",
+        });
+      }
+
+      // Create line items for recurring expenses
+      for (const expense of recurringExpenses) {
+        await storage.createSettlementLineItem({
+          settlementId: settlement.id,
+          description: `${expense.name} - ${expense.description || expense.category}`,
+          amount: `-${expense.amount}`,
+          itemType: "deduction",
+        });
+      }
+
+      res.status(201).json(settlement);
+    } catch (error) {
+      console.error("Error auto-generating settlement:", error);
+      res.status(500).json({ error: "Failed to auto-generate settlement" });
+    }
+  });
+
+  // Recurring Expenses Routes
+  app.get("/api/recurring-expenses", async (_req, res) => {
+    const expenses = await storage.getAllRecurringExpenses();
+    res.json(expenses);
+  });
+
+  app.get("/api/recurring-expenses/:id", async (req, res) => {
+    const expense = await storage.getRecurringExpense(req.params.id);
+    if (!expense) {
+      return res.status(404).json({ error: "Recurring expense not found" });
+    }
+    res.json(expense);
+  });
+
+  app.get("/api/recurring-expenses/driver/:driverId", async (req, res) => {
+    const expenses = await storage.getRecurringExpensesByDriver(req.params.driverId);
+    res.json(expenses);
+  });
+
+  app.get("/api/recurring-expenses/active/:driverId?", async (req, res) => {
+    const expenses = await storage.getActiveRecurringExpenses(req.params.driverId);
+    res.json(expenses);
+  });
+
+  app.post("/api/recurring-expenses", async (req, res) => {
+    try {
+      const { insertRecurringExpenseSchema } = await import("@shared/schema");
+      const validatedData = insertRecurringExpenseSchema.parse(req.body);
+      const expense = await storage.createRecurringExpense(validatedData);
+      res.status(201).json(expense);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid recurring expense data" });
+    }
+  });
+
+  app.patch("/api/recurring-expenses/:id", async (req, res) => {
+    try {
+      const { insertRecurringExpenseSchema } = await import("@shared/schema");
+      const validatedData = insertRecurringExpenseSchema.partial().parse(req.body);
+      const expense = await storage.updateRecurringExpense(req.params.id, validatedData);
+      if (!expense) {
+        return res.status(404).json({ error: "Recurring expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid recurring expense data" });
+    }
+  });
+
+  app.delete("/api/recurring-expenses/:id", async (req, res) => {
+    const deleted = await storage.deleteRecurringExpense(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Recurring expense not found" });
+    }
+    res.status(204).send();
+  });
+
   // Maintenance Routes
   app.get("/api/maintenance", async (_req, res) => {
     const maintenance = await storage.getAllMaintenance();
