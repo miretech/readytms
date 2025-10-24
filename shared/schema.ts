@@ -366,6 +366,33 @@ export const insertMaintenanceSchema = createInsertSchema(maintenance).omit({
 export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
 export type Maintenance = typeof maintenance.$inferSelect;
 
+// Fuel Cards - Store fuel card account information for FleetOne, Pilot Flying J, etc.
+export const fuelCards = pgTable("fuel_cards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull(), // FleetOne, Pilot Flying J
+  accountName: text("account_name").notNull(),
+  accountNumber: text("account_number").notNull(),
+  cardNumbers: text("card_numbers").array(), // List of card numbers
+  apiUsername: text("api_username"), // For future API integration
+  apiEnabled: text("api_enabled").notNull().default("false"), // true/false
+  portalUrl: text("portal_url"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  notes: text("notes"),
+  status: text("status").notNull().default("active"), // active, inactive
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFuelCardSchema = createInsertSchema(fuelCards).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFuelCard = z.infer<typeof insertFuelCardSchema>;
+export type FuelCard = typeof fuelCards.$inferSelect;
+
 // Fuel Transactions - Track fuel purchases with fuel card vendors
 export const fuelTransactions = pgTable("fuel_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
