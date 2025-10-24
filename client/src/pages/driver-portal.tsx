@@ -30,12 +30,12 @@ export default function DriverPortal() {
   const [isTracking, setIsTracking] = useState(false);
 
   // Get current user
-  const { data: user } = useQuery<any>({
+  const { data: user, isLoading: userLoading } = useQuery<any>({
     queryKey: ["/api/auth/user"],
   });
 
   // Get driver info for current user
-  const { data: drivers = [] } = useQuery<Driver[]>({
+  const { data: drivers = [], isLoading: driversLoading } = useQuery<Driver[]>({
     queryKey: ["/api/drivers"],
   });
 
@@ -43,9 +43,11 @@ export default function DriverPortal() {
   const currentDriver = drivers.find(d => d.email === user?.email);
 
   // Get loads assigned to this driver
-  const { data: loads = [] } = useQuery<Load[]>({
+  const { data: loads = [], isLoading: loadsLoading } = useQuery<Load[]>({
     queryKey: ["/api/loads"],
   });
+
+  const isDataLoading = userLoading || driversLoading || loadsLoading;
 
   const currentLoad = loads.find(
     l => l.assignedDriverId === currentDriver?.id && l.status !== "delivered" && l.status !== "cancelled"
@@ -90,11 +92,12 @@ export default function DriverPortal() {
     });
   }, []);
 
-  // Send GPS location to server
-  const sendLocationUpdate = useCallback(async () => {
+  // Send GPS location to server (silent on success, only shows errors)
+  const sendLocationUpdate = useCallback(async (showSuccessToast: boolean = false): Promise<boolean> => {
     if (!currentDriver) {
-      setLocationError("Driver profile not found");
-      return;
+      const errorMsg = "Driver profile not found";
+      setLocationError(errorMsg);
+      throw new Error(errorMsg);
     }
 
     try {
@@ -128,34 +131,54 @@ export default function DriverPortal() {
 
       setIsTracking(true);
 
-      toast({
-        title: "Location Updated",
-        description: "Your location has been shared successfully",
-      });
+      // Only show success toast when manually requested
+      if (showSuccessToast) {
+        toast({
+          title: "Location Updated",
+          description: "Your location has been shared successfully",
+        });
+      }
+
+      return true;
     } catch (error: any) {
       setLocationError(error.message);
+      setIsTracking(false);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
+      return false;
     }
   }, [currentDriver, currentLoad, getCurrentLocation, toast]);
 
   // Handle On Duty toggle
   const handleDutyToggle = useCallback(async (checked: boolean) => {
-    setIsOnDuty(checked);
-    
     if (checked) {
-      // Send immediate location update when going on duty
-      await sendLocationUpdate();
-      
-      toast({
-        title: "On Duty",
-        description: "GPS tracking started. Location updates every 3 minutes.",
-      });
+      // Try to send immediate location update when going on duty
+      try {
+        const success = await sendLocationUpdate(false);
+        
+        if (success) {
+          setIsOnDuty(true);
+          toast({
+            title: "On Duty",
+            description: "GPS tracking started. Location updates every 3 minutes.",
+          });
+        } else {
+          // Revert toggle if first upload failed
+          setIsOnDuty(false);
+          // Error toast already shown by sendLocationUpdate
+        }
+      } catch (error: any) {
+        // Revert toggle on failure
+        setIsOnDuty(false);
+        // Error toast already shown by sendLocationUpdate
+      }
     } else {
+      setIsOnDuty(false);
       setIsTracking(false);
+      setLocationError(null);
       toast({
         title: "Off Duty",
         description: "GPS tracking stopped.",
@@ -226,7 +249,9 @@ export default function DriverPortal() {
                 {isOnDuty ? "On Duty" : "Off Duty"}
               </Label>
               <p className="text-sm text-muted-foreground">
-                {isOnDuty
+                {isDataLoading
+                  ? "Loading driver information..."
+                  : isOnDuty
                   ? "GPS tracking is active. Your location is being shared."
                   : "Turn on duty to start GPS tracking."}
               </p>
@@ -235,6 +260,7 @@ export default function DriverPortal() {
               id="duty-toggle"
               checked={isOnDuty}
               onCheckedChange={handleDutyToggle}
+              disabled={isDataLoading}
               data-testid="switch-duty-status"
             />
           </div>
@@ -284,7 +310,7 @@ export default function DriverPortal() {
               )}
 
               <Button
-                onClick={sendLocationUpdate}
+                onClick={() => sendLocationUpdate(true)}
                 variant="outline"
                 className="w-full"
                 data-testid="button-share-location"

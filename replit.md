@@ -26,6 +26,7 @@ The system provides a comprehensive set of modules:
 - **Fleet Management**: Truck inventory, status tracking, maintenance records.
 - **Driver Management**: Driver roster, CDL license tracking with expiration alerts, medical card tracking with expiration monitoring, assignment history, and DOT compliance status badges.
 - **GPS Driver Tracking**: Real-time location tracking with API endpoints for GPS data submission from mobile apps, live location display with coordinates and Google Maps links, search and filter capabilities, and speed/heading tracking.
+- **Driver Portal**: Mobile-friendly web portal for drivers to share their GPS location using their phone's browser. Features include On Duty/Off Duty toggle, automatic location updates every 3 minutes when on duty, manual "Share Location Now" button, current load assignment display, and real-time tracking status. Drivers are matched to their profile via email authentication, and location data includes truck and load assignments. No app download required - works in any phone browser.
 - **Safety & Compliance**: Includes Inspections (Pre-Trip, DOT, etc.), Accidents & Incidents reporting, and Violations & Citations tracking.
 - **Accounting & Financial Management**: Financial Overview, Invoices (AR), Expense Management, and Payments & Cash Management.
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
