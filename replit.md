@@ -34,6 +34,13 @@ The system provides a comprehensive set of modules:
 - **Driver Settlements**: Automated payroll calculations, deduction tracking, net pay, and settlement history.
 - **Maintenance Management**: Service record system, preventive maintenance scheduling, and overdue alerts.
 - **Fuel Tracking & Management**: Comprehensive fuel card account management with FleetOne (WEX) and Pilot Flying J integration. Features include fuel card account setup with portal links, manual fuel transaction entry, expense tracking by truck/driver/load, vendor tracking, and future-ready API integration framework. Direct portal links to https://manage.fleetone.com/ and https://customerportal.pilotflyingj.com/ for easy access to fuel card provider portals.
+- **Automation & Workflows**: Enterprise-grade automation engine that eliminates manual tasks and ensures consistent operations. Features include:
+  - **Auto-Invoice Generation**: Automatically creates invoices when loads are marked as "delivered", with duplicate prevention and activity logging
+  - **Expiring Document Alerts**: Proactive notifications for CDL licenses and medical cards expiring within configurable thresholds (default 30 days)
+  - **Load Status Notifications**: Real-time alerts when load status changes (dispatched, in-transit, delivered, etc.)
+  - **Activity Logging**: Comprehensive audit trail of all automation actions for compliance and troubleshooting
+  - **Configurable Settings**: Dashboard-managed automation settings with enable/disable toggles and customizable parameters
+  - Database schema includes automation_settings, notifications, and activity_log tables with full CRUD API support
 
 ### System Design Choices
 - **Development Approach**: Employs a schema-first design with all data models defined for type consistency, followed by horizontal layer implementation (schemas → storage → API → frontend).
