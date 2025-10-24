@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,11 +16,12 @@ import {
   Activity,
   Package,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  UserPlus
 } from "lucide-react";
 import type { Load, Driver } from "@shared/schema";
 import { format } from "date-fns";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function DriverPortal() {
   const { toast } = useToast();
@@ -50,6 +51,32 @@ export default function DriverPortal() {
 
   // Match driver by email since there's no userId field
   const currentDriver = drivers.find(d => d.email === user?.email);
+
+  // Auto-create driver profile mutation
+  const createDriverProfile = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/drivers/signup", {
+        name: user?.name || user?.email?.split("@")[0] || "Driver",
+        email: user?.email,
+        phone: "0000000000",
+        licenseNumber: "TEMP-" + Date.now(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/drivers"] });
+      toast({
+        title: "Profile Created",
+        description: "Your driver profile has been created. You can update your details in the Drivers section.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create driver profile",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Get loads assigned to this driver
   const { data: loads = [], isLoading: loadsLoading } = useQuery<Load[]>({
@@ -238,11 +265,32 @@ export default function DriverPortal() {
       <div className="flex items-center justify-center min-h-screen p-6">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Driver Profile Not Found</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <UserPlus className="h-6 w-6" />
+              Create Driver Profile
+            </CardTitle>
             <CardDescription>
-              Your account is not linked to a driver profile. Please contact your dispatcher.
+              You need a driver profile to access the Driver Portal. Click below to create one automatically.
             </CardDescription>
           </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              <p>Your profile will be created with:</p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Email: {user?.email}</li>
+                <li>Name: {user?.name || user?.email?.split("@")[0] || "Driver"}</li>
+              </ul>
+              <p className="mt-3">You can update your details (phone, CDL license, etc.) after creation.</p>
+            </div>
+            <Button 
+              onClick={() => createDriverProfile.mutate()} 
+              disabled={createDriverProfile.isPending}
+              className="w-full"
+              data-testid="button-create-driver-profile"
+            >
+              {createDriverProfile.isPending ? "Creating Profile..." : "Create My Driver Profile"}
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
