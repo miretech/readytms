@@ -51,10 +51,18 @@ export default function DriverSignup() {
   const onSubmit = async (data: SignupFormData) => {
     setIsSubmitting(true);
     try {
+      // Normalize optional date fields to undefined if empty
+      const payload = {
+        ...data,
+        licenseExpiration: data.licenseExpiration || undefined,
+        medicalCardNumber: data.medicalCardNumber || undefined,
+        medicalCardExpiration: data.medicalCardExpiration || undefined,
+      };
+
       const response = await fetch("/api/drivers/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -63,13 +71,13 @@ export default function DriverSignup() {
       }
 
       toast({
-        title: "Registration Successful! 🎉",
+        title: "Registration Successful",
         description: "Your driver account has been created. Please log in to continue.",
       });
 
       // Redirect to login after 2 seconds
       setTimeout(() => {
-        window.location.href = "/api/login";
+        setLocation("/api/login");
       }, 2000);
     } catch (error: any) {
       toast({
