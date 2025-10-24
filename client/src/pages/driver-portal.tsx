@@ -255,6 +255,15 @@ export default function DriverPortal() {
             <CardTitle>Driver Portal</CardTitle>
             <CardDescription>Please log in to access the driver portal</CardDescription>
           </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => window.location.href = '/api/login'}
+              className="w-full"
+              data-testid="button-login"
+            >
+              Log In
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
