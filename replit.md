@@ -31,6 +31,7 @@ The system provides a comprehensive set of modules:
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
 - **Driver Settlements**: Automated payroll calculations, deduction tracking, net pay, and settlement history.
 - **Maintenance Management**: Service record system, preventive maintenance scheduling, and overdue alerts.
+- **Fuel Tracking & Management**: Comprehensive fuel card account management with FleetOne (WEX) and Pilot Flying J integration. Features include fuel card account setup with portal links, manual fuel transaction entry, expense tracking by truck/driver/load, vendor tracking, and future-ready API integration framework. Direct portal links to https://manage.fleetone.com/ and https://customerportal.pilotflyingj.com/ for easy access to fuel card provider portals.
 
 ### System Design Choices
 - **Development Approach**: Employs a schema-first design with all data models defined for type consistency, followed by horizontal layer implementation (schemas → storage → API → frontend).
