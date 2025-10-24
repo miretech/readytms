@@ -8,6 +8,7 @@ import {
   Wrench,
   Fuel,
   MapPin,
+  Smartphone,
   DollarSign,
   Receipt,
   Settings
@@ -71,6 +72,11 @@ const menuItems = [
     title: "GPS Tracking",
     url: "/gps-tracking",
     icon: MapPin,
+  },
+  {
+    title: "Driver Portal",
+    url: "/driver-portal",
+    icon: Smartphone,
   },
   {
     title: "Accounting",
