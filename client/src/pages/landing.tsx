@@ -14,9 +14,14 @@ export default function Landing() {
             <p className="text-sm text-muted-foreground">Transportation Management System</p>
           </div>
         </div>
-        <Button asChild size="lg" data-testid="button-login">
-          <a href="/api/login">Log In</a>
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button asChild variant="outline" size="lg" data-testid="button-driver-signup">
+            <a href="/driver-signup">Driver Sign Up</a>
+          </Button>
+          <Button asChild size="lg" data-testid="button-login">
+            <a href="/api/login">Log In</a>
+          </Button>
+        </div>
       </header>
 
       <main className="container mx-auto px-6 py-16">
@@ -98,16 +103,30 @@ export default function Landing() {
           </div>
         </div>
 
-        <div className="mx-auto mt-24 max-w-3xl rounded-lg border border-border bg-card p-12 text-center">
-          <h3 className="mb-4 text-3xl font-bold text-card-foreground">
-            Ready to optimize your operations?
-          </h3>
-          <p className="mb-8 text-lg text-muted-foreground">
-            Join trucking companies that trust Ready TMS for their transportation management needs.
-          </p>
-          <Button asChild size="lg" className="px-8" data-testid="button-login-footer">
-            <a href="/api/login">Log In to Get Started</a>
-          </Button>
+        <div className="mx-auto mt-24 grid max-w-5xl gap-8 md:grid-cols-2">
+          <div className="rounded-lg border border-border bg-card p-12 text-center">
+            <h3 className="mb-4 text-3xl font-bold text-card-foreground">
+              For Drivers
+            </h3>
+            <p className="mb-8 text-lg text-muted-foreground">
+              New driver? Create your account to access the driver portal and start sharing your location.
+            </p>
+            <Button asChild size="lg" variant="default" className="px-8" data-testid="button-driver-signup-cta">
+              <a href="/driver-signup">Create Driver Account</a>
+            </Button>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-12 text-center">
+            <h3 className="mb-4 text-3xl font-bold text-card-foreground">
+              For Admins
+            </h3>
+            <p className="mb-8 text-lg text-muted-foreground">
+              Manage your fleet, track loads, and optimize operations all in one place.
+            </p>
+            <Button asChild size="lg" className="px-8" data-testid="button-login-footer">
+              <a href="/api/login">Log In to Get Started</a>
+            </Button>
+          </div>
         </div>
       </main>
 
