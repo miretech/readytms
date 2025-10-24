@@ -23,6 +23,7 @@ import Maintenance from "@/pages/maintenance";
 import Fuel from "@/pages/fuel";
 import GpsTracking from "@/pages/gps-tracking";
 import DriverPortal from "@/pages/driver-portal";
+import DriverSignup from "@/pages/driver-signup";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -33,6 +34,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/driver-signup" component={DriverSignup} />
         <Route component={Landing} />
       </Switch>
     );

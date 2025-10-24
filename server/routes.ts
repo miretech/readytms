@@ -136,6 +136,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(driver);
   });
 
+  // Public driver signup endpoint (no authentication required)
+  app.post("/api/drivers/signup", async (req, res) => {
+    try {
+      const validatedData = insertDriverSchema.parse({
+        ...req.body,
+        status: "Active", // Default status for new drivers
+      });
+      
+      // Check if driver with this email already exists
+      const existingDriver = await storage.getDriverByEmail(validatedData.email);
+      if (existingDriver) {
+        return res.status(409).json({ message: "A driver with this email already exists" });
+      }
+      
+      // Check if driver with this license number already exists
+      const existingLicense = await storage.getDriverByLicense(validatedData.licenseNumber);
+      if (existingLicense) {
+        return res.status(409).json({ message: "A driver with this CDL license number already exists" });
+      }
+      
+      const driver = await storage.createDriver(validatedData);
+      res.status(201).json({ 
+        message: "Driver account created successfully",
+        driver: { id: driver.id, name: driver.name, email: driver.email }
+      });
+    } catch (error: any) {
+      console.error("Driver signup error:", error);
+      res.status(400).json({ message: error.message || "Invalid driver data" });
+    }
+  });
+
   app.post("/api/drivers", async (req, res) => {
     try {
       const validatedData = insertDriverSchema.parse(req.body);
