@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 import { z } from "zod";
-import * as pdfParse from "pdf-parse";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -52,34 +51,9 @@ Guidelines:
     const base64Content = fileData.split(",")[1] || fileData;
 
     if (fileType === 'application/pdf') {
-      // Try to extract text from PDF using pdf-parse
-      try {
-        const pdfBuffer = Buffer.from(base64Content, "base64");
-        const data = await (pdfParse as any)(pdfBuffer);
-        
-        if (data.text && data.text.trim().length > 50) {
-          // PDF has extractable text, use it directly
-          console.log(`Extracted ${data.text.length} characters from PDF`);
-          messages.push({
-            role: "user",
-            content: `Extract load information from this document:\n\n${data.text}`,
-          });
-        } else {
-          // PDF has minimal or no text (likely scanned/image-based)
-          console.log("PDF has minimal text content");
-          throw new Error("This PDF appears to be scanned or image-based. Please convert it to a PNG or JPG image first, then upload it for AI extraction.");
-        }
-      } catch (pdfError: any) {
-        console.error("PDF parsing error:", pdfError.message);
-        
-        // If it's already our custom error message, re-throw it
-        if (pdfError.message.includes("convert it to a PNG or JPG")) {
-          throw pdfError;
-        }
-        
-        // Otherwise, provide clear instructions
-        throw new Error("Unable to read this PDF. For scanned documents, please convert to PNG or JPG first. For text-based PDFs, ensure the file is not corrupted.");
-      }
+      // PDF files are not supported - OpenAI Vision API doesn't accept PDFs
+      // and pdf-parse has ESM import issues in this environment
+      throw new Error("PDF files are not currently supported for AI extraction. Please convert your document to PNG or JPG first. You can: 1) Open the PDF, 2) Take a screenshot or use 'Export as Image', 3) Upload the PNG/JPG file here for AI extraction.");
     } else if (isImage) {
       // For images, use OpenAI's Vision API
       messages.push({
