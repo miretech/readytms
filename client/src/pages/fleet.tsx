@@ -63,15 +63,19 @@ export default function Fleet() {
     )
     .sort((a, b) => {
       // Extract numeric parts from truck numbers for intelligent sorting
-      const numA = parseInt(a.truckNumber.replace(/\D/g, '')) || 0;
-      const numB = parseInt(b.truckNumber.replace(/\D/g, '')) || 0;
+      const numA = parseInt(a.truckNumber.replace(/\D/g, ''));
+      const numB = parseInt(b.truckNumber.replace(/\D/g, ''));
       
-      // If both have numbers, sort numerically
-      if (numA !== 0 || numB !== 0) {
+      // If both have valid numbers, sort numerically
+      if (!isNaN(numA) && !isNaN(numB)) {
         return numA - numB;
       }
       
-      // Otherwise, sort alphabetically
+      // If only one has a number, put it first
+      if (!isNaN(numA)) return -1;
+      if (!isNaN(numB)) return 1;
+      
+      // If neither has a number, sort alphabetically
       return a.truckNumber.localeCompare(b.truckNumber);
     });
 
