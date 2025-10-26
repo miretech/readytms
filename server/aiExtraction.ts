@@ -52,7 +52,7 @@ Guidelines:
     const base64Content = fileData.split(",")[1] || fileData;
 
     if (fileType === 'application/pdf') {
-      // Try to extract text from PDF first using pdf-parse
+      // Try to extract text from PDF using pdf-parse
       try {
         const pdfBuffer = Buffer.from(base64Content, "base64");
         const data = await (pdfParse as any)(pdfBuffer);
@@ -65,44 +65,20 @@ Guidelines:
             content: `Extract load information from this document:\n\n${data.text}`,
           });
         } else {
-          // PDF is likely scanned/image-based, fall back to Vision API
-          console.log("PDF has minimal text, using Vision API for OCR");
-          messages.push({
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Extract load information from this scanned document:",
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: fileData,
-                  detail: "high", // Use high detail for better OCR accuracy
-                },
-              },
-            ],
-          });
+          // PDF has minimal or no text (likely scanned/image-based)
+          console.log("PDF has minimal text content");
+          throw new Error("This PDF appears to be scanned or image-based. Please convert it to a PNG or JPG image first, then upload it for AI extraction.");
         }
       } catch (pdfError: any) {
-        console.error("PDF parsing error, falling back to Vision API:", pdfError.message);
-        // If pdf-parse fails, try Vision API as fallback
-        messages.push({
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Extract load information from this document:",
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: fileData,
-                detail: "high",
-              },
-            },
-          ],
-        });
+        console.error("PDF parsing error:", pdfError.message);
+        
+        // If it's already our custom error message, re-throw it
+        if (pdfError.message.includes("convert it to a PNG or JPG")) {
+          throw pdfError;
+        }
+        
+        // Otherwise, provide clear instructions
+        throw new Error("Unable to read this PDF. For scanned documents, please convert to PNG or JPG first. For text-based PDFs, ensure the file is not corrupted.");
       }
     } else if (isImage) {
       // For images, use OpenAI's Vision API

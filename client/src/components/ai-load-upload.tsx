@@ -129,7 +129,10 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
                 {uploading ? "Processing file..." : isDragActive ? "Drop file here" : "Drag & drop a document"}
               </p>
               <p className="text-sm text-muted-foreground">
-                or click to browse (PDF, images, text files up to 5MB)
+                or click to browse (PNG, JPG, PDF, or text files up to 5MB)
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                💡 For scanned documents, use PNG or JPG for best results
               </p>
             </div>
           </div>
