@@ -55,11 +55,25 @@ export default function Fleet() {
     },
   });
 
-  const filteredTrucks = trucks.filter((truck) =>
-    truck.truckNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    truck.licensePlate.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    truck.type.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTrucks = trucks
+    .filter((truck) =>
+      truck.truckNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      truck.licensePlate.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      truck.type.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Extract numeric parts from truck numbers for intelligent sorting
+      const numA = parseInt(a.truckNumber.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.truckNumber.replace(/\D/g, '')) || 0;
+      
+      // If both have numbers, sort numerically
+      if (numA !== 0 || numB !== 0) {
+        return numA - numB;
+      }
+      
+      // Otherwise, sort alphabetically
+      return a.truckNumber.localeCompare(b.truckNumber);
+    });
 
   const handleEdit = (truck: Truck) => {
     setEditingTruck(truck);
