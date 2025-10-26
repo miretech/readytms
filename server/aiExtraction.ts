@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import * as pdfParse from "pdf-parse";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -48,9 +49,63 @@ Guidelines:
       throw new Error("Invalid file format. Please ensure the file is properly encoded.");
     }
 
-    if (isImage || fileType === 'application/pdf') {
-      // For images and PDFs, use OpenAI's Vision API
-      // This handles both regular images and scanned/image-based PDFs
+    const base64Content = fileData.split(",")[1] || fileData;
+
+    if (fileType === 'application/pdf') {
+      // Try to extract text from PDF first using pdf-parse
+      try {
+        const pdfBuffer = Buffer.from(base64Content, "base64");
+        const data = await (pdfParse as any)(pdfBuffer);
+        
+        if (data.text && data.text.trim().length > 50) {
+          // PDF has extractable text, use it directly
+          console.log(`Extracted ${data.text.length} characters from PDF`);
+          messages.push({
+            role: "user",
+            content: `Extract load information from this document:\n\n${data.text}`,
+          });
+        } else {
+          // PDF is likely scanned/image-based, fall back to Vision API
+          console.log("PDF has minimal text, using Vision API for OCR");
+          messages.push({
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Extract load information from this scanned document:",
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: fileData,
+                  detail: "high", // Use high detail for better OCR accuracy
+                },
+              },
+            ],
+          });
+        }
+      } catch (pdfError: any) {
+        console.error("PDF parsing error, falling back to Vision API:", pdfError.message);
+        // If pdf-parse fails, try Vision API as fallback
+        messages.push({
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract load information from this document:",
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: fileData,
+                detail: "high",
+              },
+            },
+          ],
+        });
+      }
+    } else if (isImage) {
+      // For images, use OpenAI's Vision API
       messages.push({
         role: "user",
         content: [
@@ -69,7 +124,6 @@ Guidelines:
       });
     } else {
       // Text files only
-      const base64Content = fileData.split(",")[1] || fileData;
       const textContent = Buffer.from(base64Content, "base64").toString("utf-8");
       
       messages.push({
@@ -142,6 +196,13 @@ Guidelines:
     return extractedLoadSchema.parse(parsed);
   } catch (error: any) {
     console.error("Error extracting load data:", error);
+    console.error("Error details:", {
+      message: error?.message,
+      status: error?.status,
+      code: error?.error?.code,
+      type: error?.error?.type,
+      response: error?.response?.data,
+    });
     
     // Handle OpenAI-specific errors
     if (error?.error?.code === 'context_length_exceeded') {
@@ -152,13 +213,18 @@ Guidelines:
       throw new Error("Document is too large. Please use a smaller file (under 5MB).");
     }
     
-    // Handle invalid PDF format errors
-    if (error?.message?.includes('invalid') || error?.message?.includes('format')) {
-      throw new Error("Unable to process this PDF. Please ensure it's a valid, readable PDF file.");
+    // Handle invalid image URL errors (common with PDFs)
+    if (error?.error?.code === 'invalid_image_url' || error?.message?.includes('invalid_image_url')) {
+      throw new Error("Unable to process this PDF with Vision API. The PDF may be corrupted or in an unsupported format. Please try converting it to an image (PNG/JPG) first.");
     }
     
-    // Generic error
-    const message = error?.message || "Failed to extract load information from document";
+    // Handle invalid PDF format errors
+    if (error?.message?.includes('invalid') || error?.message?.includes('format')) {
+      throw new Error("Unable to process this document. Please ensure it's a valid PDF or image file. For PDFs, try converting to PNG/JPG first.");
+    }
+    
+    // Provide more specific error messages
+    const message = error?.message || error?.error?.message || "Failed to extract load information from document";
     throw new Error(message);
   }
 }
