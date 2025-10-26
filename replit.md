@@ -24,7 +24,13 @@ The system provides a comprehensive set of modules:
 - **Dashboard**: Real-time operational metrics, recent activity, fleet status, and quick navigation.
 - **Load Management**: Full load lifecycle, driver/truck assignment, status workflow, expense/profit tracking.
 - **Fleet Management**: Truck inventory, status tracking, maintenance records.
-- **Driver Management**: Driver roster, CDL license tracking with expiration alerts, medical card tracking with expiration monitoring, assignment history, and DOT compliance status badges.
+- **Driver Management**: Comprehensive driver roster with full DOT compliance tracking including:
+  - CDL license information with number, expiration date, issued place, and file attachment upload
+  - Medical card tracking with issued date, expiration date (with automated alerts), and card number
+  - Social Security Number and document attachment upload
+  - Employment information: date hired, date terminated, active/inactive status
+  - Contact information and truck assignments
+  - DOT compliance status badges with expiration monitoring
 - **GPS Driver Tracking**: Real-time location tracking with API endpoints for GPS data submission from mobile apps, live location display with coordinates and Google Maps links, search and filter capabilities, and speed/heading tracking.
 - **Driver Self-Registration**: Public-facing driver signup page at `/driver-signup` where new drivers can create their own accounts. Drivers fill out a registration form with their name, email, phone, CDL license information, and medical card details. The system validates that email addresses and license numbers are unique before creating accounts. After successful registration, drivers are redirected to log in and can immediately access the Driver Portal. This eliminates the need for admin-created driver accounts and allows drivers to self-onboard.
 - **Driver Portal**: Mobile-friendly web portal for drivers to share their GPS location using their phone's browser. Features include On Duty/Off Duty toggle, automatic location updates every 3 minutes when on duty, manual "Share Location Now" button, current load assignment display, and real-time tracking status. Drivers are matched to their profile via email authentication, and location data includes truck and load assignments. No app download required - works in any phone browser.

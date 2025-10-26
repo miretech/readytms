@@ -54,9 +54,17 @@ export const drivers = pgTable("drivers", {
   phone: text("phone").notNull(),
   licenseNumber: text("license_number").notNull().unique(),
   licenseExpiration: timestamp("license_expiration"),
+  licenseIssuedPlace: text("license_issued_place"),
+  licenseAttachment: text("license_attachment"),
   medicalCardNumber: text("medical_card_number"),
   medicalCardExpiration: timestamp("medical_card_expiration"),
+  medicalCardIssuedDate: timestamp("medical_card_issued_date"),
+  socialSecurityNumber: text("social_security_number"),
+  socialSecurityAttachment: text("social_security_attachment"),
   status: text("status").notNull(),
+  isActive: text("is_active").notNull().default("true"),
+  dateHired: timestamp("date_hired"),
+  dateTerminated: timestamp("date_terminated"),
   assignedTruckId: varchar("assigned_truck_id"),
 });
 
@@ -65,6 +73,9 @@ export const insertDriverSchema = createInsertSchema(drivers).omit({
 }).extend({
   licenseExpiration: z.string().optional(),
   medicalCardExpiration: z.string().optional(),
+  medicalCardIssuedDate: z.string().optional(),
+  dateHired: z.string().optional(),
+  dateTerminated: z.string().optional(),
 });
 
 export type InsertDriver = z.infer<typeof insertDriverSchema>;
