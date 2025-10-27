@@ -113,6 +113,8 @@ export const loads = pgTable("loads", {
   weight: integer("weight"),
   commodity: text("commodity"),
   notes: text("notes"),
+  invoiceAttachment: text("invoice_attachment"), // Base64 encoded invoice document
+  podAttachment: text("pod_attachment"), // Base64 encoded proof of delivery document
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -579,3 +581,62 @@ export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
 
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
+
+// Short Pays - Track loads with payment discrepancies
+export const shortPays = pgTable("short_pays", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  loadId: varchar("load_id").notNull(),
+  loadNumber: text("load_number").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  customerName: text("customer_name").notNull(),
+  expectedAmount: decimal("expected_amount", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).notNull(),
+  shortAmount: decimal("short_amount", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason"),
+  status: text("status").notNull().default("open"), // "open", "disputed", "resolved", "written_off"
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const insertShortPaySchema = createInsertSchema(shortPays).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  expectedAmount: z.string(),
+  paidAmount: z.string(),
+  shortAmount: z.string(),
+});
+
+export type InsertShortPay = z.infer<typeof insertShortPaySchema>;
+export type ShortPay = typeof shortPays.$inferSelect;
+
+// Charge Backs - Track customer charge backs and disputes
+export const chargeBacks = pgTable("charge_backs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  loadId: varchar("load_id").notNull(),
+  loadNumber: text("load_number").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  customerName: text("customer_name").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  category: text("category").notNull(), // "damaged_freight", "late_delivery", "missing_items", "billing_dispute", "other"
+  status: text("status").notNull().default("pending"), // "pending", "under_review", "approved", "denied", "resolved"
+  submittedDate: timestamp("submitted_date").notNull(),
+  resolvedDate: timestamp("resolved_date"),
+  resolution: text("resolution"), // Description of how it was resolved
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertChargeBackSchema = createInsertSchema(chargeBacks).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  amount: z.string(),
+  submittedDate: z.string(),
+  resolvedDate: z.string().optional(),
+});
+
+export type InsertChargeBack = z.infer<typeof insertChargeBackSchema>;
+export type ChargeBack = typeof chargeBacks.$inferSelect;
