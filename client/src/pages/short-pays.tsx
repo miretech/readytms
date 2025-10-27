@@ -64,14 +64,16 @@ import {
 } from "@shared/schema";
 import { format } from "date-fns";
 
-const shortPayFormSchema = insertShortPaySchema.extend({
+const shortPayFormSchema = z.object({
   loadId: z.string().min(1, "Load is required"),
   customerId: z.string().min(1, "Customer is required"),
   originalAmount: z.string().min(1, "Original amount is required"),
   paidAmount: z.string().min(1, "Paid amount is required"),
-  shortPayAmount: z.string().min(1, "Short pay amount is required"),
+  shortPayAmount: z.string().optional(),
   reason: z.string().min(1, "Reason is required"),
   status: z.string().min(1, "Status is required"),
+  resolutionDate: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 type ShortPayFormValues = z.infer<typeof shortPayFormSchema>;
@@ -111,12 +113,12 @@ function ShortPayDialog({
       form.reset({
         loadId: shortPay.loadId,
         customerId: shortPay.customerId,
-        originalAmount: shortPay.originalAmount.toString(),
+        originalAmount: shortPay.expectedAmount.toString(),
         paidAmount: shortPay.paidAmount.toString(),
-        shortPayAmount: shortPay.shortPayAmount.toString(),
+        shortPayAmount: shortPay.shortAmount.toString(),
         reason: shortPay.reason,
         status: shortPay.status,
-        resolutionDate: shortPay.resolutionDate ? new Date(shortPay.resolutionDate).toISOString().split("T")[0] : "",
+        resolutionDate: shortPay.resolvedAt ? new Date(shortPay.resolvedAt).toISOString().split("T")[0] : "",
         notes: shortPay.notes || "",
       });
     } else {
@@ -451,8 +453,8 @@ export default function ShortPaysPage() {
 
   // Calculate totals
   const totalShortPays = filteredShortPays.length;
-  const totalAmount = filteredShortPays.reduce((sum, sp) => sum + parseFloat(sp.shortPayAmount.toString()), 0);
-  const pendingCount = filteredShortPays.filter((sp) => sp.status === "pending").length;
+  const totalAmount = filteredShortPays.reduce((sum, sp) => sum + parseFloat((sp.shortAmount || 0).toString()), 0);
+  const pendingCount = filteredShortPays.filter((sp) => sp.status === "pending" || sp.status === "open").length;
   const resolvedCount = filteredShortPays.filter((sp) => sp.status === "resolved").length;
 
   const handleEdit = (shortPay: ShortPay) => {
@@ -589,13 +591,13 @@ export default function ShortPaysPage() {
                         {getCustomerName(shortPay.customerId)}
                       </TableCell>
                       <TableCell className="text-right" data-testid={`text-original-${shortPay.id}`}>
-                        ${parseFloat(shortPay.originalAmount.toString()).toFixed(2)}
+                        ${parseFloat(shortPay.expectedAmount.toString()).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right" data-testid={`text-paid-${shortPay.id}`}>
                         ${parseFloat(shortPay.paidAmount.toString()).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right font-medium text-destructive" data-testid={`text-short-pay-${shortPay.id}`}>
-                        ${parseFloat(shortPay.shortPayAmount.toString()).toFixed(2)}
+                        ${parseFloat(shortPay.shortAmount.toString()).toFixed(2)}
                       </TableCell>
                       <TableCell className="max-w-xs truncate" data-testid={`text-reason-${shortPay.id}`}>
                         {shortPay.reason}

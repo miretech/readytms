@@ -64,12 +64,15 @@ import {
 } from "@shared/schema";
 import { format } from "date-fns";
 
-const chargeBackFormSchema = insertChargeBackSchema.extend({
+const chargeBackFormSchema = z.object({
   loadId: z.string().min(1, "Load is required"),
   customerId: z.string().min(1, "Customer is required"),
   amount: z.string().min(1, "Amount is required"),
   reason: z.string().min(1, "Reason is required"),
+  chargeBackDate: z.string().optional(),
   status: z.string().min(1, "Status is required"),
+  resolutionDate: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 type ChargeBackFormValues = z.infer<typeof chargeBackFormSchema>;

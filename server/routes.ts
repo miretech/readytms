@@ -1126,24 +1126,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/short-pays", async (req, res) => {
     try {
-      const validatedData = insertShortPaySchema.parse(req.body);
+      // Get load and customer info
+      const load = await storage.getLoad(req.body.loadId);
+      const customer = await storage.getCustomer(req.body.customerId);
+      
+      if (!load || !customer) {
+        return res.status(400).json({ error: "Invalid load or customer" });
+      }
+
+      // Map form data to schema
+      const shortPayData = {
+        loadId: req.body.loadId,
+        loadNumber: load.loadNumber,
+        customerId: req.body.customerId,
+        customerName: customer.name,
+        expectedAmount: req.body.originalAmount || req.body.expectedAmount,
+        paidAmount: req.body.paidAmount,
+        shortAmount: req.body.shortPayAmount || req.body.shortAmount,
+        reason: req.body.reason,
+        status: req.body.status || "open",
+        notes: req.body.notes || null,
+        resolvedAt: req.body.resolutionDate ? new Date(req.body.resolutionDate) : null,
+      };
+
+      const validatedData = insertShortPaySchema.parse(shortPayData);
       const shortPay = await storage.createShortPay(validatedData);
       res.status(201).json(shortPay);
     } catch (error) {
-      res.status(400).json({ error: "Invalid short pay data" });
+      console.error("Short pay creation error:", error);
+      res.status(400).json({ error: "Invalid short pay data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
   app.patch("/api/short-pays/:id", async (req, res) => {
     try {
-      const validatedData = insertShortPaySchema.partial().parse(req.body);
+      // Get load and customer info if IDs are provided
+      const updateData: any = {};
+      
+      if (req.body.loadId) {
+        const load = await storage.getLoad(req.body.loadId);
+        if (!load) {
+          return res.status(400).json({ error: "Invalid load" });
+        }
+        updateData.loadId = req.body.loadId;
+        updateData.loadNumber = load.loadNumber;
+      }
+      
+      if (req.body.customerId) {
+        const customer = await storage.getCustomer(req.body.customerId);
+        if (!customer) {
+          return res.status(400).json({ error: "Invalid customer" });
+        }
+        updateData.customerId = req.body.customerId;
+        updateData.customerName = customer.name;
+      }
+      
+      // Map field names
+      if (req.body.originalAmount) updateData.expectedAmount = req.body.originalAmount;
+      if (req.body.paidAmount) updateData.paidAmount = req.body.paidAmount;
+      if (req.body.shortPayAmount) updateData.shortAmount = req.body.shortPayAmount;
+      if (req.body.reason) updateData.reason = req.body.reason;
+      if (req.body.status) updateData.status = req.body.status;
+      if (req.body.notes !== undefined) updateData.notes = req.body.notes;
+      if (req.body.resolutionDate) updateData.resolvedAt = new Date(req.body.resolutionDate);
+
+      const validatedData = insertShortPaySchema.partial().parse(updateData);
       const shortPay = await storage.updateShortPay(req.params.id, validatedData);
       if (!shortPay) {
         return res.status(404).json({ error: "Short pay not found" });
       }
       res.json(shortPay);
     } catch (error) {
-      res.status(400).json({ error: "Invalid short pay data" });
+      console.error("Short pay update error:", error);
+      res.status(400).json({ error: "Invalid short pay data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
@@ -1181,24 +1236,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/charge-backs", async (req, res) => {
     try {
-      const validatedData = insertChargeBackSchema.parse(req.body);
+      // Get load and customer info
+      const load = await storage.getLoad(req.body.loadId);
+      const customer = await storage.getCustomer(req.body.customerId);
+      
+      if (!load || !customer) {
+        return res.status(400).json({ error: "Invalid load or customer" });
+      }
+
+      // Map form data to schema
+      const chargeBackData = {
+        loadId: req.body.loadId,
+        loadNumber: load.loadNumber,
+        customerId: req.body.customerId,
+        customerName: customer.name,
+        amount: req.body.amount,
+        reason: req.body.reason,
+        category: req.body.category || "other",
+        status: req.body.status || "pending",
+        submittedDate: req.body.chargeBackDate || new Date().toISOString().split("T")[0],
+        resolvedDate: req.body.resolutionDate || null,
+        resolution: req.body.resolution || null,
+        notes: req.body.notes || null,
+      };
+
+      const validatedData = insertChargeBackSchema.parse(chargeBackData);
       const chargeBack = await storage.createChargeBack(validatedData);
       res.status(201).json(chargeBack);
     } catch (error) {
-      res.status(400).json({ error: "Invalid charge back data" });
+      console.error("Charge back creation error:", error);
+      res.status(400).json({ error: "Invalid charge back data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
   app.patch("/api/charge-backs/:id", async (req, res) => {
     try {
-      const validatedData = insertChargeBackSchema.partial().parse(req.body);
+      // Get load and customer info if IDs are provided
+      const updateData: any = {};
+      
+      if (req.body.loadId) {
+        const load = await storage.getLoad(req.body.loadId);
+        if (!load) {
+          return res.status(400).json({ error: "Invalid load" });
+        }
+        updateData.loadId = req.body.loadId;
+        updateData.loadNumber = load.loadNumber;
+      }
+      
+      if (req.body.customerId) {
+        const customer = await storage.getCustomer(req.body.customerId);
+        if (!customer) {
+          return res.status(400).json({ error: "Invalid customer" });
+        }
+        updateData.customerId = req.body.customerId;
+        updateData.customerName = customer.name;
+      }
+      
+      // Map field names
+      if (req.body.amount) updateData.amount = req.body.amount;
+      if (req.body.reason) updateData.reason = req.body.reason;
+      if (req.body.category) updateData.category = req.body.category;
+      if (req.body.status) updateData.status = req.body.status;
+      if (req.body.chargeBackDate) updateData.submittedDate = req.body.chargeBackDate;
+      if (req.body.resolutionDate) updateData.resolvedDate = req.body.resolutionDate;
+      if (req.body.resolution) updateData.resolution = req.body.resolution;
+      if (req.body.notes !== undefined) updateData.notes = req.body.notes;
+
+      const validatedData = insertChargeBackSchema.partial().parse(updateData);
       const chargeBack = await storage.updateChargeBack(req.params.id, validatedData);
       if (!chargeBack) {
         return res.status(404).json({ error: "Charge back not found" });
       }
       res.json(chargeBack);
     } catch (error) {
-      res.status(400).json({ error: "Invalid charge back data" });
+      console.error("Charge back update error:", error);
+      res.status(400).json({ error: "Invalid charge back data", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
