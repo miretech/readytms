@@ -12,6 +12,8 @@ import {
   DollarSign,
   Receipt,
   Calendar,
+  AlertCircle,
+  AlertTriangle,
   Settings
 } from "lucide-react";
 import {
@@ -83,6 +85,16 @@ const menuItems = [
     title: "Accounting",
     url: "/accounting",
     icon: DollarSign,
+  },
+  {
+    title: "Short Pays",
+    url: "/short-pays",
+    icon: AlertCircle,
+  },
+  {
+    title: "Charge Backs",
+    url: "/charge-backs",
+    icon: AlertTriangle,
   },
   {
     title: "Settlements",

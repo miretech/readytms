@@ -25,6 +25,8 @@ import Fuel from "@/pages/fuel";
 import GpsTracking from "@/pages/gps-tracking";
 import DriverPortal from "@/pages/driver-portal";
 import DriverSignup from "@/pages/driver-signup";
+import ShortPays from "@/pages/short-pays";
+import ChargeBacks from "@/pages/charge-backs";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -54,6 +56,8 @@ function Router() {
       <Route path="/gps-tracking" component={GpsTracking} />
       <Route path="/driver-portal" component={DriverPortal} />
       <Route path="/accounting" component={Accounting} />
+      <Route path="/short-pays" component={ShortPays} />
+      <Route path="/charge-backs" component={ChargeBacks} />
       <Route path="/settlements" component={Settlements} />
       <Route path="/recurring-expenses" component={RecurringExpenses} />
       <Route component={NotFound} />
