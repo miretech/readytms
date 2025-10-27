@@ -41,6 +41,8 @@ const formSchema = insertLoadSchema.extend({
   pickupLocation: z.string().min(1, "Pickup location is required"),
   deliveryLocation: z.string().min(1, "Delivery location is required"),
   rate: z.string().min(1, "Rate is required"),
+  invoiceAttachment: z.string().optional(),
+  podAttachment: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -85,6 +87,8 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
       weight: 0,
       commodity: "",
       notes: "",
+      invoiceAttachment: "",
+      podAttachment: "",
     },
   });
 
@@ -105,6 +109,8 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
         weight: load.weight || 0,
         commodity: load.commodity || "",
         notes: load.notes || "",
+        invoiceAttachment: load.invoiceAttachment || "",
+        podAttachment: load.podAttachment || "",
       });
     } else {
       form.reset({
@@ -122,6 +128,8 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
         weight: 0,
         commodity: "",
         notes: "",
+        invoiceAttachment: "",
+        podAttachment: "",
       });
     }
   }, [load, form]);
@@ -450,6 +458,36 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
               )}
             />
 
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="invoiceAttachment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Invoice Attachment URL (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-invoice-attachment" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="podAttachment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>POD Attachment URL (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-pod-attachment" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
@@ -719,6 +757,36 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   </FormItem>
                 )}
               />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="invoiceAttachment"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Invoice Attachment URL (Optional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-invoice-attachment" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="podAttachment"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>POD Attachment URL (Optional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-pod-attachment" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="flex justify-end gap-2">
                 <Button
