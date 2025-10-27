@@ -17,7 +17,9 @@ import {
   insertMaintenanceSchema,
   insertFuelCardSchema,
   insertFuelTransactionSchema,
-  insertGpsLocationSchema
+  insertGpsLocationSchema,
+  insertShortPaySchema,
+  insertChargeBackSchema
 } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { extractLoadFromDocument } from "./aiExtraction";
@@ -1096,6 +1098,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
     const logs = await storage.getAllActivityLogs(limit);
     res.json(logs);
+  });
+
+  // Short Pays Routes
+  app.get("/api/short-pays", async (_req, res) => {
+    const shortPays = await storage.getAllShortPays();
+    res.json(shortPays);
+  });
+
+  app.get("/api/short-pays/:id", async (req, res) => {
+    const shortPay = await storage.getShortPay(req.params.id);
+    if (!shortPay) {
+      return res.status(404).json({ error: "Short pay not found" });
+    }
+    res.json(shortPay);
+  });
+
+  app.get("/api/short-pays/customer/:customerId", async (req, res) => {
+    const shortPays = await storage.getShortPaysByCustomer(req.params.customerId);
+    res.json(shortPays);
+  });
+
+  app.get("/api/short-pays/status/:status", async (req, res) => {
+    const shortPays = await storage.getShortPaysByStatus(req.params.status);
+    res.json(shortPays);
+  });
+
+  app.post("/api/short-pays", async (req, res) => {
+    try {
+      const validatedData = insertShortPaySchema.parse(req.body);
+      const shortPay = await storage.createShortPay(validatedData);
+      res.status(201).json(shortPay);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid short pay data" });
+    }
+  });
+
+  app.patch("/api/short-pays/:id", async (req, res) => {
+    try {
+      const validatedData = insertShortPaySchema.partial().parse(req.body);
+      const shortPay = await storage.updateShortPay(req.params.id, validatedData);
+      if (!shortPay) {
+        return res.status(404).json({ error: "Short pay not found" });
+      }
+      res.json(shortPay);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid short pay data" });
+    }
+  });
+
+  app.delete("/api/short-pays/:id", async (req, res) => {
+    const success = await storage.deleteShortPay(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: "Short pay not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Charge Backs Routes
+  app.get("/api/charge-backs", async (_req, res) => {
+    const chargeBacks = await storage.getAllChargeBacks();
+    res.json(chargeBacks);
+  });
+
+  app.get("/api/charge-backs/:id", async (req, res) => {
+    const chargeBack = await storage.getChargeBack(req.params.id);
+    if (!chargeBack) {
+      return res.status(404).json({ error: "Charge back not found" });
+    }
+    res.json(chargeBack);
+  });
+
+  app.get("/api/charge-backs/customer/:customerId", async (req, res) => {
+    const chargeBacks = await storage.getChargeBacksByCustomer(req.params.customerId);
+    res.json(chargeBacks);
+  });
+
+  app.get("/api/charge-backs/status/:status", async (req, res) => {
+    const chargeBacks = await storage.getChargeBacksByStatus(req.params.status);
+    res.json(chargeBacks);
+  });
+
+  app.post("/api/charge-backs", async (req, res) => {
+    try {
+      const validatedData = insertChargeBackSchema.parse(req.body);
+      const chargeBack = await storage.createChargeBack(validatedData);
+      res.status(201).json(chargeBack);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid charge back data" });
+    }
+  });
+
+  app.patch("/api/charge-backs/:id", async (req, res) => {
+    try {
+      const validatedData = insertChargeBackSchema.partial().parse(req.body);
+      const chargeBack = await storage.updateChargeBack(req.params.id, validatedData);
+      if (!chargeBack) {
+        return res.status(404).json({ error: "Charge back not found" });
+      }
+      res.json(chargeBack);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid charge back data" });
+    }
+  });
+
+  app.delete("/api/charge-backs/:id", async (req, res) => {
+    const success = await storage.deleteChargeBack(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: "Charge back not found" });
+    }
+    res.status(204).send();
   });
 
   const httpServer = createServer(app);
