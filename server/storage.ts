@@ -43,6 +43,10 @@ import {
   type InsertNotification,
   type ActivityLog,
   type InsertActivityLog,
+  type ShortPay,
+  type InsertShortPay,
+  type ChargeBack,
+  type InsertChargeBack,
   users,
   loads,
   trucks,
@@ -64,7 +68,9 @@ import {
   gpsLocations,
   automationSettings,
   notifications,
-  activityLog
+  activityLog,
+  shortPays,
+  chargeBacks
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -224,6 +230,24 @@ export interface IStorage {
   getAllActivityLogs(limit?: number): Promise<ActivityLog[]>;
   getActivityLogsByEntity(entityType: string, entityId: string): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  
+  // Short Pays
+  getAllShortPays(): Promise<ShortPay[]>;
+  getShortPay(id: string): Promise<ShortPay | undefined>;
+  getShortPaysByCustomer(customerId: string): Promise<ShortPay[]>;
+  getShortPaysByStatus(status: string): Promise<ShortPay[]>;
+  createShortPay(shortPay: InsertShortPay): Promise<ShortPay>;
+  updateShortPay(id: string, shortPay: Partial<InsertShortPay>): Promise<ShortPay | undefined>;
+  deleteShortPay(id: string): Promise<boolean>;
+  
+  // Charge Backs
+  getAllChargeBacks(): Promise<ChargeBack[]>;
+  getChargeBack(id: string): Promise<ChargeBack | undefined>;
+  getChargeBacksByCustomer(customerId: string): Promise<ChargeBack[]>;
+  getChargeBacksByStatus(status: string): Promise<ChargeBack[]>;
+  createChargeBack(chargeBack: InsertChargeBack): Promise<ChargeBack>;
+  updateChargeBack(id: string, chargeBack: Partial<InsertChargeBack>): Promise<ChargeBack | undefined>;
+  deleteChargeBack(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1092,6 +1116,94 @@ export class DatabaseStorage implements IStorage {
       .values(insertLog)
       .returning();
     return log;
+  }
+  
+  // Short Pays Implementation
+  async getAllShortPays(): Promise<ShortPay[]> {
+    return await db.select().from(shortPays).orderBy(desc(shortPays.createdAt));
+  }
+
+  async getShortPay(id: string): Promise<ShortPay | undefined> {
+    const [shortPay] = await db.select().from(shortPays).where(eq(shortPays.id, id));
+    return shortPay || undefined;
+  }
+
+  async getShortPaysByCustomer(customerId: string): Promise<ShortPay[]> {
+    return await db.select().from(shortPays)
+      .where(eq(shortPays.customerId, customerId))
+      .orderBy(desc(shortPays.createdAt));
+  }
+
+  async getShortPaysByStatus(status: string): Promise<ShortPay[]> {
+    return await db.select().from(shortPays)
+      .where(eq(shortPays.status, status))
+      .orderBy(desc(shortPays.createdAt));
+  }
+
+  async createShortPay(insertShortPay: InsertShortPay): Promise<ShortPay> {
+    const [shortPay] = await db
+      .insert(shortPays)
+      .values(insertShortPay)
+      .returning();
+    return shortPay;
+  }
+
+  async updateShortPay(id: string, updateData: Partial<InsertShortPay>): Promise<ShortPay | undefined> {
+    const [shortPay] = await db
+      .update(shortPays)
+      .set(updateData)
+      .where(eq(shortPays.id, id))
+      .returning();
+    return shortPay || undefined;
+  }
+
+  async deleteShortPay(id: string): Promise<boolean> {
+    const result = await db.delete(shortPays).where(eq(shortPays.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+  
+  // Charge Backs Implementation
+  async getAllChargeBacks(): Promise<ChargeBack[]> {
+    return await db.select().from(chargeBacks).orderBy(desc(chargeBacks.createdAt));
+  }
+
+  async getChargeBack(id: string): Promise<ChargeBack | undefined> {
+    const [chargeBack] = await db.select().from(chargeBacks).where(eq(chargeBacks.id, id));
+    return chargeBack || undefined;
+  }
+
+  async getChargeBacksByCustomer(customerId: string): Promise<ChargeBack[]> {
+    return await db.select().from(chargeBacks)
+      .where(eq(chargeBacks.customerId, customerId))
+      .orderBy(desc(chargeBacks.createdAt));
+  }
+
+  async getChargeBacksByStatus(status: string): Promise<ChargeBack[]> {
+    return await db.select().from(chargeBacks)
+      .where(eq(chargeBacks.status, status))
+      .orderBy(desc(chargeBacks.createdAt));
+  }
+
+  async createChargeBack(insertChargeBack: InsertChargeBack): Promise<ChargeBack> {
+    const [chargeBack] = await db
+      .insert(chargeBacks)
+      .values(insertChargeBack)
+      .returning();
+    return chargeBack;
+  }
+
+  async updateChargeBack(id: string, updateData: Partial<InsertChargeBack>): Promise<ChargeBack | undefined> {
+    const [chargeBack] = await db
+      .update(chargeBacks)
+      .set(updateData)
+      .where(eq(chargeBacks.id, id))
+      .returning();
+    return chargeBack || undefined;
+  }
+
+  async deleteChargeBack(id: string): Promise<boolean> {
+    const result = await db.delete(chargeBacks).where(eq(chargeBacks.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 }
 
