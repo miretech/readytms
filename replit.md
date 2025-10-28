@@ -29,7 +29,8 @@ The system provides a comprehensive set of modules:
   - Medical card tracking with issued date, expiration date (with automated alerts), and card number
   - Social Security Number and document attachment upload
   - Employment information: date hired, date terminated, active/inactive status
-  - Contact information and truck assignments
+  - Contact information: name, email, phone, and full address
+  - Truck assignments
   - DOT compliance status badges with expiration monitoring
 - **GPS Driver Tracking**: Real-time location tracking with API endpoints for GPS data submission from mobile apps, live location display with coordinates and Google Maps links, search and filter capabilities, and speed/heading tracking.
 - **Driver Self-Registration**: Public-facing driver signup page at `/driver-signup` where new drivers can create their own accounts. Drivers fill out a registration form with their name, email, phone, CDL license information, and medical card details. The system validates that email addresses and license numbers are unique before creating accounts. After successful registration, drivers are redirected to log in and can immediately access the Driver Portal. This eliminates the need for admin-created driver accounts and allows drivers to self-onboard.

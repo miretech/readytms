@@ -182,8 +182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertDriverSchema.parse(req.body);
       const driver = await storage.createDriver(validatedData);
       res.status(201).json(driver);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid driver data" });
+    } catch (error: any) {
+      console.error("Driver validation error:", error);
+      res.status(400).json({ error: "Invalid driver data", details: error.message });
     }
   });
 

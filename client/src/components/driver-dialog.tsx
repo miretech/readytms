@@ -66,6 +66,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       name: "",
       email: "",
       phone: "",
+      address: "",
       licenseNumber: "",
       licenseExpiration: "",
       licenseIssuedPlace: "",
@@ -89,6 +90,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         name: driver.name,
         email: driver.email,
         phone: driver.phone,
+        address: driver.address || "",
         licenseNumber: driver.licenseNumber,
         licenseExpiration: driver.licenseExpiration ? new Date(driver.licenseExpiration).toISOString().split('T')[0] : "",
         licenseIssuedPlace: driver.licenseIssuedPlace || "",
@@ -111,6 +113,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         name: "",
         email: "",
         phone: "",
+        address: "",
         licenseNumber: "",
         licenseExpiration: "",
         licenseIssuedPlace: "",
@@ -236,6 +239,20 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="(555) 123-4567" data-testid="input-driver-phone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} placeholder="123 Main St, City, State ZIP" data-testid="input-driver-address" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
