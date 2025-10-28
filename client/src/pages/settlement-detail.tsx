@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Download, Printer, Mail, Truck, Phone, MapPin } from "lucide-react";
+import { ArrowLeft, Download, Printer, Mail, Truck as TruckIcon, Phone, MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   Settlement,
@@ -250,7 +250,7 @@ export default function SettlementDetail() {
               <div className="space-y-4">
                 {truck && (
                   <div className="flex items-start gap-3">
-                    <Truck className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <TruckIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm text-muted-foreground">Truck Number</p>
                       <p className="text-lg font-medium" data-testid="text-truck-number">
