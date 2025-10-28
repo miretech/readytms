@@ -78,6 +78,10 @@ import { eq, desc, and } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  getPendingUsers(): Promise<User[]>;
+  updateUserStatus(id: string, status: string, approvedById?: string): Promise<User | undefined>;
+  updateUserRole(id: string, role: string): Promise<User | undefined>;
   
   getAllLoads(): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
@@ -269,6 +273,34 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async getPendingUsers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.status, "pending")).orderBy(desc(users.createdAt));
+  }
+
+  async updateUserStatus(id: string, status: string, approvedById?: string): Promise<User | undefined> {
+    const updateData: any = {
+      status,
+      updatedAt: new Date(),
+    };
+    
+    if (status === "approved" && approvedById) {
+      updateData.approvedBy = approvedById;
+      updateData.approvedAt = new Date();
+    }
+    
+    const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
+    return user || undefined;
+  }
+
+  async updateUserRole(id: string, role: string): Promise<User | undefined> {
+    const [user] = await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return user || undefined;
   }
 
   async getAllLoads(): Promise<Load[]> {

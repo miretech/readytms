@@ -136,7 +136,27 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
-    return next();
+    // Check if user is approved
+    try {
+      const userId = user.claims.sub;
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      if (dbUser.status !== "approved") {
+        return res.status(403).json({ 
+          message: "Account pending approval", 
+          status: dbUser.status 
+        });
+      }
+      
+      return next();
+    } catch (error) {
+      console.error("Error checking user approval status:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
   }
 
   const refreshToken = user.refresh_token;
@@ -149,9 +169,44 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
+    
+    // Also check approval status after token refresh
+    const userId = user.claims.sub;
+    const dbUser = await storage.getUser(userId);
+    
+    if (!dbUser || dbUser.status !== "approved") {
+      return res.status(403).json({ 
+        message: "Account pending approval", 
+        status: dbUser?.status 
+      });
+    }
+    
     return next();
   } catch (error) {
     res.status(401).json({ message: "Unauthorized" });
     return;
+  }
+};
+
+// Admin-only middleware
+export const isAdmin: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+  
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  try {
+    const userId = user.claims.sub;
+    const dbUser = await storage.getUser(userId);
+    
+    if (!dbUser || dbUser.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    return next();
+  } catch (error) {
+    console.error("Error checking admin status:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };

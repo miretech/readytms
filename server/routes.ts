@@ -21,7 +21,7 @@ import {
   insertShortPaySchema,
   insertChargeBackSchema
 } from "@shared/schema";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { z } from "zod";
@@ -1322,6 +1322,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Charge back not found" });
     }
     res.status(204).send();
+  });
+
+  // Admin Routes - User Management
+  app.get("/api/admin/users", isAuthenticated, isAdmin, async (_req, res) => {
+    const users = await storage.getAllUsers();
+    res.json(users);
+  });
+
+  app.get("/api/admin/users/pending", isAuthenticated, isAdmin, async (_req, res) => {
+    const users = await storage.getPendingUsers();
+    res.json(users);
+  });
+
+  app.patch("/api/admin/users/:id/status", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { status } = req.body;
+      const adminUserId = req.user.claims.sub;
+      
+      if (!status || !["pending", "approved", "suspended"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      
+      const user = await storage.updateUserStatus(req.params.id, status, adminUserId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Create notification for approved users
+      if (status === "approved") {
+        await storage.createNotification({
+          type: "success",
+          category: "user_approved",
+          title: "Account Approved",
+          message: "Your account has been approved and you can now access the system.",
+          recipientEmail: user.email || undefined,
+        });
+      }
+      
+      // Log activity
+      await storage.createActivityLog({
+        action: "user_status_changed",
+        entityType: "user",
+        entityId: req.params.id,
+        details: `User status changed to ${status} by admin`,
+        metadata: { userId: req.params.id, status, adminId: adminUserId },
+        status: "success",
+      });
+      
+      res.json(user);
+    } catch (error) {
+      console.error("User status update error:", error);
+      res.status(400).json({ error: "Failed to update user status" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/role", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { role } = req.body;
+      const adminUserId = req.user.claims.sub;
+      
+      if (!role || !["admin", "manager", "user"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+      
+      const user = await storage.updateUserRole(req.params.id, role);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Log activity
+      await storage.createActivityLog({
+        action: "user_role_changed",
+        entityType: "user",
+        entityId: req.params.id,
+        details: `User role changed to ${role} by admin`,
+        metadata: { userId: req.params.id, role, adminId: adminUserId },
+        status: "success",
+      });
+      
+      res.json(user);
+    } catch (error) {
+      console.error("User role update error:", error);
+      res.status(400).json({ error: "Failed to update user role" });
+    }
+  });
+
+  // Admin Routes - Activity Tracking
+  app.get("/api/admin/activity", isAuthenticated, isAdmin, async (req, res) => {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+    const logs = await storage.getAllActivityLogs(limit);
+    res.json(logs);
   });
 
   const httpServer = createServer(app);
