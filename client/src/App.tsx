@@ -23,6 +23,7 @@ import DriverPortal from "@/pages/driver-portal";
 import DriverSignup from "@/pages/driver-signup";
 import ShortPays from "@/pages/short-pays";
 import ChargeBacks from "@/pages/charge-backs";
+import Tasks from "@/pages/tasks";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/charge-backs" component={ChargeBacks} />
       <Route path="/settlements" component={Settlements} />
       <Route path="/recurring-expenses" component={RecurringExpenses} />
+      <Route path="/tasks" component={Tasks} />
       <Route component={NotFound} />
     </Switch>
   );

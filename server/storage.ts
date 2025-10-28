@@ -47,6 +47,8 @@ import {
   type InsertShortPay,
   type ChargeBack,
   type InsertChargeBack,
+  type Task,
+  type InsertTask,
   users,
   loads,
   trucks,
@@ -70,7 +72,8 @@ import {
   notifications,
   activityLog,
   shortPays,
-  chargeBacks
+  chargeBacks,
+  tasks
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -248,6 +251,14 @@ export interface IStorage {
   createChargeBack(chargeBack: InsertChargeBack): Promise<ChargeBack>;
   updateChargeBack(id: string, chargeBack: Partial<InsertChargeBack>): Promise<ChargeBack | undefined>;
   deleteChargeBack(id: string): Promise<boolean>;
+  
+  // Tasks
+  getAllTasks(): Promise<Task[]>;
+  getTask(id: string): Promise<Task | undefined>;
+  getTasksByStatus(status: string): Promise<Task[]>;
+  createTask(task: InsertTask): Promise<Task>;
+  updateTask(id: string, task: Partial<InsertTask>): Promise<Task | undefined>;
+  deleteTask(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1228,6 +1239,55 @@ export class DatabaseStorage implements IStorage {
 
   async deleteChargeBack(id: string): Promise<boolean> {
     const result = await db.delete(chargeBacks).where(eq(chargeBacks.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+  
+  // Tasks Implementation
+  async getAllTasks(): Promise<Task[]> {
+    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+  }
+
+  async getTask(id: string): Promise<Task | undefined> {
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    return task || undefined;
+  }
+
+  async getTasksByStatus(status: string): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .where(eq(tasks.status, status))
+      .orderBy(desc(tasks.dueDate));
+  }
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const [task] = await db
+      .insert(tasks)
+      .values({
+        ...insertTask,
+        dueDate: new Date(insertTask.dueDate),
+        completedAt: insertTask.completedAt ? new Date(insertTask.completedAt) : undefined,
+      })
+      .returning();
+    return task;
+  }
+
+  async updateTask(id: string, updateData: Partial<InsertTask>): Promise<Task | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.dueDate) {
+      values.dueDate = new Date(updateData.dueDate);
+    }
+    if (updateData.completedAt) {
+      values.completedAt = new Date(updateData.completedAt);
+    }
+    const [task] = await db
+      .update(tasks)
+      .set(values)
+      .where(eq(tasks.id, id))
+      .returning();
+    return task || undefined;
+  }
+
+  async deleteTask(id: string): Promise<boolean> {
+    const result = await db.delete(tasks).where(eq(tasks.id, id));
     return result.rowCount !== null && result.rowCount > 0;
   }
 }

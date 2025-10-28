@@ -14,6 +14,7 @@ import {
   Calendar,
   AlertCircle,
   AlertTriangle,
+  CheckSquare,
   Settings
 } from "lucide-react";
 import {
@@ -105,6 +106,11 @@ const menuItems = [
     title: "Recurring Expenses",
     url: "/recurring-expenses",
     icon: Calendar,
+  },
+  {
+    title: "Tasks",
+    url: "/tasks",
+    icon: CheckSquare,
   },
 ];
 

@@ -660,3 +660,30 @@ export const insertChargeBackSchema = createInsertSchema(chargeBacks).omit({
 
 export type InsertChargeBack = z.infer<typeof insertChargeBackSchema>;
 export type ChargeBack = typeof chargeBacks.$inferSelect;
+
+// Tasks - Track daily reminders and recurring tasks
+export const tasks = pgTable("tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  dueDate: timestamp("due_date").notNull(),
+  dueTime: text("due_time"), // HH:MM format like "09:00"
+  repeatDaily: text("repeat_daily").notNull().default("false"), // "true" or "false"
+  assignedTo: text("assigned_to"), // Person/department responsible
+  status: text("status").notNull().default("pending"), // "pending", "completed", "overdue"
+  priority: text("priority").notNull().default("medium"), // "low", "medium", "high"
+  category: text("category"), // "maintenance", "paperwork", "dispatch", "other"
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  dueDate: z.string(),
+  completedAt: z.string().optional().transform(val => val === "" ? undefined : val),
+});
+
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;

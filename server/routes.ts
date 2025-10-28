@@ -1312,6 +1312,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Tasks routes
+  app.get("/api/tasks", async (_req, res) => {
+    const tasks = await storage.getAllTasks();
+    res.json(tasks);
+  });
+
+  app.get("/api/tasks/:id", async (req, res) => {
+    const task = await storage.getTask(req.params.id);
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+    res.json(task);
+  });
+
+  app.post("/api/tasks", async (req, res) => {
+    try {
+      const { insertTaskSchema } = await import("@shared/schema");
+      const validatedData = insertTaskSchema.parse(req.body);
+      const task = await storage.createTask(validatedData);
+      res.status(201).json(task);
+    } catch (error: any) {
+      console.error("Task creation error:", error);
+      res.status(400).json({ error: "Invalid task data", details: error.message });
+    }
+  });
+
+  app.patch("/api/tasks/:id", async (req, res) => {
+    try {
+      const { insertTaskSchema } = await import("@shared/schema");
+      const validatedData = insertTaskSchema.partial().parse(req.body);
+      const task = await storage.updateTask(req.params.id, validatedData);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json(task);
+    } catch (error: any) {
+      console.error("Task update error:", error);
+      res.status(400).json({ error: "Invalid task data", details: error.message });
+    }
+  });
+
+  app.delete("/api/tasks/:id", async (req, res) => {
+    const success = await storage.deleteTask(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+    res.status(204).send();
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
