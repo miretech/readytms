@@ -22,7 +22,7 @@ The application is a full-stack web application. The frontend is built with Reac
 ### Feature Specifications
 The system provides a comprehensive set of modules:
 - **Dashboard**: Real-time operational metrics, recent activity, fleet status, and quick navigation.
-- **Load Management**: Full load lifecycle, driver/truck assignment, status workflow, expense/profit tracking.
+- **Load Management**: Full load lifecycle, driver/truck assignment, status workflow, expense/profit tracking, file attachments (PDFs/images for invoices and PODs with drag-and-drop upload, view, and download capabilities).
 - **Fleet Management**: Truck inventory, status tracking, maintenance records.
 - **Driver Management**: Comprehensive driver roster with full DOT compliance tracking including:
   - CDL license information with number, expiration date, issued place, and file attachment upload
