@@ -42,8 +42,8 @@ const formSchema = insertLoadSchema.extend({
   pickupLocation: z.string().min(1, "Pickup location is required"),
   deliveryLocation: z.string().min(1, "Delivery location is required"),
   rate: z.string().min(1, "Rate is required"),
-  invoiceAttachment: z.string().optional(),
-  podAttachment: z.string().optional(),
+  invoiceAttachment: z.string().nullable().optional(),
+  podAttachment: z.string().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
