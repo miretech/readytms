@@ -22,11 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { ArrowLeft, Download, Printer, Mail, Truck, Phone, MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   Settlement,
   Driver,
+  Truck,
   SettlementLineItem,
   SettlementDeduction,
 } from "@shared/schema";
@@ -94,6 +95,11 @@ export default function SettlementDetail() {
     enabled: !!settlement?.driverId,
   });
 
+  const { data: truck, isLoading: truckLoading } = useQuery<Truck>({
+    queryKey: [`/api/trucks/${driver?.assignedTruckId}`],
+    enabled: !!driver?.assignedTruckId,
+  });
+
   const { data: lineItems = [], isLoading: lineItemsLoading } = useQuery<SettlementLineItem[]>({
     queryKey: [`/api/settlements/${settlementId}/line-items`],
     enabled: !!settlementId,
@@ -104,7 +110,7 @@ export default function SettlementDetail() {
     enabled: !!settlementId,
   });
 
-  const isLoading = settlementLoading || driverLoading || lineItemsLoading || deductionsLoading;
+  const isLoading = settlementLoading || driverLoading || truckLoading || lineItemsLoading || deductionsLoading;
 
   if (isLoading) {
     return (
@@ -228,6 +234,89 @@ export default function SettlementDetail() {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Driver Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Driver Information</CardTitle>
+            <CardDescription>
+              Contact and assignment details for this settlement
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                {truck && (
+                  <div className="flex items-start gap-3">
+                    <Truck className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Truck Number</p>
+                      <p className="text-lg font-medium" data-testid="text-truck-number">
+                        {truck.truckNumber}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {driver?.phone && (
+                  <div className="flex items-start gap-3">
+                    <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <a 
+                        href={`tel:${driver.phone}`}
+                        className="text-lg font-medium hover:text-primary transition-colors"
+                        data-testid="link-phone"
+                      >
+                        {driver.phone}
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-4">
+                {driver?.address && (
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Address</p>
+                      <p className="text-lg font-medium" data-testid="text-address">
+                        {driver.address}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {driver?.email && (
+                  <div className="flex items-start gap-3">
+                    <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <div className="flex items-center gap-2">
+                        <a 
+                          href={`mailto:${driver.email}`}
+                          className="text-lg font-medium hover:text-primary transition-colors"
+                          data-testid="link-email"
+                        >
+                          {driver.email}
+                        </a>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          asChild
+                          data-testid="button-send-email"
+                        >
+                          <a href={`mailto:${driver.email}?subject=Settlement ${settlement.settlementNumber}`}>
+                            <Mail className="h-4 w-4 mr-2" />
+                            Send Email
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
