@@ -327,8 +327,10 @@ export const settlements = pgTable("settlements", {
   periodEnd: timestamp("period_end").notNull(),
   totalMiles: integer("total_miles"),
   totalRevenue: decimal("total_revenue", { precision: 10, scale: 2 }).notNull(),
+  factoringPercentage: decimal("factoring_percentage", { precision: 5, scale: 2 }).default("3.00"), // Factoring fee %
+  revenueAfterFactoring: decimal("revenue_after_factoring", { precision: 10, scale: 2 }), // Total after factoring
   driverPay: decimal("driver_pay", { precision: 10, scale: 2 }).notNull(),
-  deductions: decimal("deductions", { precision: 10, scale: 2 }).default("0"),
+  totalDeductions: decimal("total_deductions", { precision: 10, scale: 2 }).default("0"),
   netPay: decimal("net_pay", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull(),
   paidDate: timestamp("paid_date"),
@@ -344,8 +346,10 @@ export const insertSettlementSchema = createInsertSchema(settlements).omit({
   periodStart: z.string(),
   periodEnd: z.string(),
   totalRevenue: z.string(),
+  factoringPercentage: z.string().optional(),
+  revenueAfterFactoring: z.string().optional(),
   driverPay: z.string(),
-  deductions: z.string().optional(),
+  totalDeductions: z.string().optional(),
   netPay: z.string(),
   paidDate: z.string().optional(),
 });
@@ -358,10 +362,12 @@ export const settlementLineItems = pgTable("settlement_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   settlementId: varchar("settlement_id").notNull(),
   loadId: varchar("load_id"), // Optional - can be manual entry
+  companyName: text("company_name"), // For loads - customer/broker name
   description: text("description").notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 2 }), // e.g., miles, loads, hours
   rate: decimal("rate", { precision: 10, scale: 4 }), // e.g., per mile, per load, per hour
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Original revenue
+  factoredAmount: decimal("factored_amount", { precision: 10, scale: 2 }), // Amount after factoring fee
   itemType: text("item_type").notNull(), // "revenue", "deduction", "bonus", "adjustment"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -373,10 +379,38 @@ export const insertSettlementLineItemSchema = createInsertSchema(settlementLineI
   quantity: z.string().optional(),
   rate: z.string().optional(),
   amount: z.string(),
+  factoredAmount: z.string().optional(),
 });
 
 export type InsertSettlementLineItem = z.infer<typeof insertSettlementLineItemSchema>;
 export type SettlementLineItem = typeof settlementLineItems.$inferSelect;
+
+// Settlement Deductions - Detailed deductions for each settlement
+export const settlementDeductions = pgTable("settlement_deductions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  settlementId: varchar("settlement_id").notNull(),
+  category: text("category").notNull(), // "tolls", "insurance", "trailer", "dispatch", "prepass", "eld", "fuel_fleet_one", "fuel_flying_j", "oil_change", "repair", "tires", "cash_advance", "other"
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  percentage: decimal("percentage", { precision: 5, scale: 2 }), // For percentage-based deductions like dispatch
+  periodStart: timestamp("period_start"), // For tracking deduction period
+  periodEnd: timestamp("period_end"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSettlementDeductionSchema = createInsertSchema(settlementDeductions).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  amount: z.string(),
+  percentage: z.string().optional(),
+  periodStart: z.string().optional(),
+  periodEnd: z.string().optional(),
+});
+
+export type InsertSettlementDeduction = z.infer<typeof insertSettlementDeductionSchema>;
+export type SettlementDeduction = typeof settlementDeductions.$inferSelect;
 
 // Recurring Expenses - Templates for recurring deductions
 export const recurringExpenses = pgTable("recurring_expenses", {
