@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AILoadUpload } from "@/components/ai-load-upload";
+import { FileUpload } from "@/components/file-upload";
 
 const formSchema = insertLoadSchema.extend({
   customerId: z.string().min(1, "Customer is required"),
@@ -464,9 +465,14 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                 name="invoiceAttachment"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Invoice Attachment URL (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-invoice-attachment" />
+                      <FileUpload
+                        value={field.value || null}
+                        onChange={field.onChange}
+                        accept={[".pdf", ".png", ".jpg", ".jpeg"]}
+                        label="Invoice Attachment (Optional)"
+                        testId="upload-invoice-attachment"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -478,9 +484,14 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                 name="podAttachment"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>POD Attachment URL (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-pod-attachment" />
+                      <FileUpload
+                        value={field.value || null}
+                        onChange={field.onChange}
+                        accept={[".pdf", ".png", ".jpg", ".jpeg"]}
+                        label="POD Attachment (Optional)"
+                        testId="upload-pod-attachment"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -764,9 +775,14 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   name="invoiceAttachment"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Invoice Attachment URL (Optional)</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-invoice-attachment" />
+                        <FileUpload
+                          value={field.value || null}
+                          onChange={field.onChange}
+                          accept={[".pdf", ".png", ".jpg", ".jpeg"]}
+                          label="Invoice Attachment (Optional)"
+                          testId="upload-invoice-attachment"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -778,9 +794,14 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   name="podAttachment"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>POD Attachment URL (Optional)</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-pod-attachment" />
+                        <FileUpload
+                          value={field.value || null}
+                          onChange={field.onChange}
+                          accept={[".pdf", ".png", ".jpg", ".jpeg"]}
+                          label="POD Attachment (Optional)"
+                          testId="upload-pod-attachment"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

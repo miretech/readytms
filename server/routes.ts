@@ -1312,6 +1312,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // File upload routes
+  app.post("/api/upload", async (req, res) => {
+    try {
+      const { file, filename } = req.body;
+      
+      if (!file || !filename) {
+        return res.status(400).json({ error: "File and filename are required" });
+      }
+
+      // Extract base64 data (remove data:image/png;base64, or similar prefix)
+      const base64Data = file.replace(/^data:([A-Za-z-+\/]+);base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      // Generate unique filename to prevent collisions
+      const timestamp = Date.now();
+      const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const uniqueFilename = `${timestamp}-${sanitizedFilename}`;
+      const filePath = `uploaded_files/${uniqueFilename}`;
+
+      // Write file to disk
+      const fs = await import('fs/promises');
+      await fs.writeFile(filePath, buffer);
+
+      res.json({ 
+        success: true, 
+        filename: uniqueFilename,
+        path: `/api/files/${uniqueFilename}`
+      });
+    } catch (error) {
+      console.error("File upload error:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  app.get("/api/files/:filename", async (req, res) => {
+    try {
+      const { filename } = req.params;
+      const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filePath = `uploaded_files/${sanitizedFilename}`;
+
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      // Check if file exists
+      try {
+        await fs.access(filePath);
+      } catch {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      // Determine content type based on extension
+      const ext = path.extname(sanitizedFilename).toLowerCase();
+      const contentTypes: Record<string, string> = {
+        '.pdf': 'application/pdf',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+      };
+
+      const contentType = contentTypes[ext] || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `inline; filename="${sanitizedFilename}"`);
+
+      const fileBuffer = await fs.readFile(filePath);
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error("File serve error:", error);
+      res.status(500).json({ error: "Failed to serve file" });
+    }
+  });
+
+  app.delete("/api/files/:filename", async (req, res) => {
+    try {
+      const { filename } = req.params;
+      const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filePath = `uploaded_files/${sanitizedFilename}`;
+
+      const fs = await import('fs/promises');
+      
+      try {
+        await fs.unlink(filePath);
+        res.json({ success: true });
+      } catch {
+        return res.status(404).json({ error: "File not found" });
+      }
+    } catch (error) {
+      console.error("File delete error:", error);
+      res.status(500).json({ error: "Failed to delete file" });
+    }
+  });
+
   // Tasks routes
   app.get("/api/tasks", async (_req, res) => {
     const tasks = await storage.getAllTasks();
