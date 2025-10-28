@@ -1245,7 +1245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Map form data to schema
-      const chargeBackData = {
+      const chargeBackData: any = {
         loadId: req.body.loadId,
         loadNumber: load.loadNumber,
         customerId: req.body.customerId,
@@ -1255,10 +1255,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         category: req.body.category || "other",
         status: req.body.status || "pending",
         submittedDate: req.body.chargeBackDate || new Date().toISOString().split("T")[0],
-        resolvedDate: req.body.resolutionDate || null,
-        resolution: req.body.resolution || null,
-        notes: req.body.notes || null,
       };
+      
+      // Only include optional fields if they have values
+      if (req.body.resolutionDate) chargeBackData.resolvedDate = req.body.resolutionDate;
+      if (req.body.resolution) chargeBackData.resolution = req.body.resolution;
+      if (req.body.notes) chargeBackData.notes = req.body.notes;
 
       const validatedData = insertChargeBackSchema.parse(chargeBackData);
       const chargeBack = await storage.createChargeBack(validatedData);

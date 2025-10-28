@@ -416,6 +416,7 @@ export const maintenance = pgTable("maintenance", {
   status: text("status").notNull(),
   invoiceNumber: text("invoice_number"),
   notes: text("notes"),
+  attachmentUrl: text("attachment_url"), // File path for invoices, receipts, etc.
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
