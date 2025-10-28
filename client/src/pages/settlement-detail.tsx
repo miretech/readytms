@@ -1,5 +1,7 @@
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import "@/styles/print.css";
 import {
   Card,
   CardContent,
@@ -10,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { generateSettlementPDF } from "@/lib/pdf-generator";
 import {
   Table,
   TableBody,
@@ -46,6 +50,39 @@ export default function SettlementDetail() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const settlementId = params.id;
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const { toast } = useToast();
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!settlement) return;
+    
+    setIsGeneratingPDF(true);
+    try {
+      await generateSettlementPDF(
+        settlement,
+        driver,
+        lineItems,
+        deductions
+      );
+      toast({
+        title: "PDF Downloaded",
+        description: "Settlement PDF has been downloaded successfully.",
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   const { data: settlement, isLoading: settlementLoading } = useQuery<Settlement>({
     queryKey: [`/api/settlements/${settlementId}`],
@@ -109,7 +146,7 @@ export default function SettlementDetail() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="space-y-6">
+      <div id="settlement-content" className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -118,6 +155,7 @@ export default function SettlementDetail() {
               size="icon"
               onClick={() => setLocation("/settlements")}
               data-testid="button-back"
+              className="print:hidden"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -130,14 +168,14 @@ export default function SettlementDetail() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" data-testid="button-print">
+          <div className="flex gap-2 print:hidden">
+            <Button variant="outline" onClick={handlePrint} data-testid="button-print">
               <Printer className="mr-2 h-4 w-4" />
               Print
             </Button>
-            <Button data-testid="button-download-pdf">
+            <Button onClick={handleDownloadPDF} disabled={isGeneratingPDF} data-testid="button-download-pdf">
               <Download className="mr-2 h-4 w-4" />
-              Download PDF
+              {isGeneratingPDF ? "Generating..." : "Download PDF"}
             </Button>
           </div>
         </div>

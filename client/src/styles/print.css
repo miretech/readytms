@@ -1,0 +1,77 @@
+@media print {
+  @page {
+    margin: 1.5cm;
+    size: letter;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Prevent page breaks inside tables and cards */
+  table, .card {
+    page-break-inside: avoid;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Hide interactive elements when printing */
+  button:not(.no-print-hide),
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Ensure readable text */
+  body {
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  h1 {
+    font-size: 20pt;
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: 16pt;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Ensure table borders are visible */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+  }
+
+  th {
+    background-color: #f5f5f5 !important;
+    font-weight: 600;
+  }
+
+  /* Preserve spacing between sections */
+  .space-y-6 > * + * {
+    margin-top: 1.5rem !important;
+  }
+
+  /* Make sure cards have visible borders */
+  .card {
+    border: 1px solid #ddd;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Badge styling for print */
+  .badge {
+    border: 1px solid currentColor;
+    padding: 2px 8px;
+  }
+}
