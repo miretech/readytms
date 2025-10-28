@@ -192,6 +192,8 @@ function SettlementDialog({
         // Calculate driver pay from NET revenue (after factoring)
         const driverPay = (netRevenue * driverPayPct) / 100;
         
+        // Note: driverPay is calculated but not stored - it's computed from percentages when needed
+        
         // Sum all other deductions (NOT including factoring - it's already deducted from revenue)
         const tolls = parseFloat(value.tolls || "0");
         const fuel = parseFloat(value.fuel || "0");
