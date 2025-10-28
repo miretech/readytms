@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, MoreVertical, Edit, Trash2, Receipt, Eye, Zap, Package } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Receipt, Eye, Zap, Package, Download } from "lucide-react";
+import { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -57,7 +58,7 @@ const settlementFormSchema = insertSettlementSchema.extend({
   periodStart: z.string().min(1, "Period start is required"),
   periodEnd: z.string().min(1, "Period end is required"),
   totalRevenue: z.string().min(1, "Total revenue is required"),
-  driverPay: z.string().min(1, "Driver pay is required"),
+  driverPayPercentage: z.string().min(1, "Driver pay percentage is required"),
   tolls: z.string().optional(),
   fuel: z.string().optional(),
   advance: z.string().optional(),
@@ -98,7 +99,7 @@ function SettlementDialog({
       periodEnd: "",
       totalMiles: undefined,
       totalRevenue: "",
-      driverPay: "",
+      driverPayPercentage: "",
       tolls: "0",
       fuel: "0",
       advance: "0",
@@ -126,7 +127,7 @@ function SettlementDialog({
         periodEnd: new Date(settlement.periodEnd).toISOString().split("T")[0],
         totalMiles: settlement.totalMiles || undefined,
         totalRevenue: settlement.totalRevenue.toString(),
-        driverPay: settlement.driverPay.toString(),
+        driverPayPercentage: settlement.driverPayPercentage.toString(),
         tolls: settlement.tolls?.toString() || "0",
         fuel: settlement.fuel?.toString() || "0",
         advance: settlement.advance?.toString() || "0",
@@ -153,7 +154,7 @@ function SettlementDialog({
         periodEnd: "",
         totalMiles: undefined,
         totalRevenue: "",
-        driverPay: "",
+        driverPayPercentage: "",
         tolls: "0",
         fuel: "0",
         advance: "0",
@@ -175,12 +176,15 @@ function SettlementDialog({
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       // Calculate total deductions and net pay when any relevant field changes
-      const relevantFields = ["driverPay", "totalRevenue", "factoringFeePercentage", "tolls", "fuel", "advance", "insurance", "trailerFee", "truckRepair", "trailerRepair"];
+      const relevantFields = ["driverPayPercentage", "totalRevenue", "factoringFeePercentage", "tolls", "fuel", "advance", "insurance", "trailerFee", "truckRepair", "trailerRepair"];
       
       if (relevantFields.includes(name || "")) {
-        const driverPay = parseFloat(value.driverPay || "0");
         const totalRevenue = parseFloat(value.totalRevenue || "0");
+        const driverPayPct = parseFloat(value.driverPayPercentage || "0");
         const factoringPct = parseFloat(value.factoringFeePercentage || "0");
+        
+        // Calculate driver pay from percentage
+        const driverPay = (totalRevenue * driverPayPct) / 100;
         
         // Calculate factoring fee from percentage
         const factoringFee = (totalRevenue * factoringPct) / 100;
@@ -374,16 +378,16 @@ function SettlementDialog({
 
               <FormField
                 control={form.control}
-                name="driverPay"
+                name="driverPayPercentage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Driver Pay</FormLabel>
+                    <FormLabel>Driver Pay (%)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
                         {...field}
-                        data-testid="input-driver-pay"
+                        data-testid="input-driver-pay-percentage"
                         placeholder="0.00"
                       />
                     </FormControl>
@@ -998,6 +1002,118 @@ export default function Settlements() {
     setIsDetailsDialogOpen(true);
   };
 
+  const handleDownloadPDF = (settlement: Settlement) => {
+    const doc = new jsPDF();
+    const driverName = getDriverName(settlement.driverId);
+    
+    // Calculate values
+    const totalRevenue = Number(settlement.totalRevenue);
+    const driverPayPct = Number(settlement.driverPayPercentage);
+    const driverPay = (totalRevenue * driverPayPct) / 100;
+    const factoringPct = Number(settlement.factoringFeePercentage || 0);
+    const factoringFee = (totalRevenue * factoringPct) / 100;
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text("Driver Settlement", 105, 20, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.text(`Settlement #: ${settlement.settlementNumber}`, 20, 35);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 35);
+    
+    // Driver Info
+    doc.setFontSize(14);
+    doc.text("Driver Information", 20, 50);
+    doc.setFontSize(10);
+    doc.text(`Driver: ${driverName}`, 20, 60);
+    doc.text(`Truck: ${settlement.truckNumber || "N/A"}`, 20, 67);
+    doc.text(`Period: ${new Date(settlement.periodStart).toLocaleDateString()} - ${new Date(settlement.periodEnd).toLocaleDateString()}`, 20, 74);
+    
+    // Revenue Section
+    doc.setFontSize(14);
+    doc.text("Revenue", 20, 90);
+    doc.setFontSize(10);
+    doc.text(`Total Revenue:`, 20, 100);
+    doc.text(`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 100, { align: "right" });
+    doc.text(`Driver Pay (${driverPayPct.toFixed(2)}%):`, 20, 107);
+    doc.text(`$${driverPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 107, { align: "right" });
+    
+    // Deductions Section
+    doc.setFontSize(14);
+    doc.text("Deductions", 20, 125);
+    doc.setFontSize(10);
+    let yPos = 135;
+    
+    if (factoringFee > 0) {
+      doc.text(`Factoring Fee (${factoringPct.toFixed(2)}%):`, 20, yPos);
+      doc.text(`$${factoringFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+      yPos += 7;
+    }
+    
+    const deductions = [
+      { label: "Tolls", value: Number(settlement.tolls || 0) },
+      { label: "Fuel", value: Number(settlement.fuel || 0) },
+      { label: "Advance", value: Number(settlement.advance || 0) },
+      { label: "Insurance", value: Number(settlement.insurance || 0) },
+      { label: "Trailer Fee", value: Number(settlement.trailerFee || 0) },
+      { label: "Truck Repair", value: Number(settlement.truckRepair || 0) },
+      { label: "Trailer Repair", value: Number(settlement.trailerRepair || 0) },
+    ];
+    
+    deductions.forEach(({ label, value }) => {
+      if (value > 0) {
+        doc.text(`${label}:`, 20, yPos);
+        doc.text(`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+        yPos += 7;
+      }
+    });
+    
+    // Total Deductions
+    doc.setFontSize(12);
+    yPos += 5;
+    doc.text(`Total Deductions:`, 20, yPos);
+    doc.text(`$${Number(settlement.deductions || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+    
+    // Net Pay
+    yPos += 12;
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Net Pay:`, 20, yPos);
+    doc.text(`$${Number(settlement.netPay).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+    
+    // Payment Info
+    if (settlement.status === "Paid" && settlement.paidDate) {
+      yPos += 15;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(`Payment Status: ${settlement.status}`, 20, yPos);
+      doc.text(`Paid Date: ${new Date(settlement.paidDate).toLocaleDateString()}`, 20, yPos + 7);
+      if (settlement.paymentMethod) {
+        doc.text(`Payment Method: ${settlement.paymentMethod}`, 20, yPos + 14);
+      }
+    }
+    
+    // Notes
+    if (settlement.notes) {
+      yPos += 25;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Notes:", 20, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const lines = doc.splitTextToSize(settlement.notes, 170);
+      doc.text(lines, 20, yPos + 7);
+    }
+    
+    // Save PDF
+    doc.save(`Settlement-${settlement.settlementNumber}.pdf`);
+    
+    toast({
+      title: "PDF Downloaded",
+      description: `Settlement ${settlement.settlementNumber} has been downloaded as PDF.`,
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -1080,7 +1196,7 @@ export default function Settlements() {
                   <TableHead>Period</TableHead>
                   <TableHead>Total Miles</TableHead>
                   <TableHead>Revenue</TableHead>
-                  <TableHead>Driver Pay</TableHead>
+                  <TableHead>Driver Pay %</TableHead>
                   <TableHead>Deductions</TableHead>
                   <TableHead>Net Pay</TableHead>
                   <TableHead>Status</TableHead>
@@ -1113,7 +1229,7 @@ export default function Settlements() {
                       ${Number(settlement.totalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="font-medium" data-testid={`text-driver-pay-${settlement.id}`}>
-                      ${Number(settlement.driverPay).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {Number(settlement.driverPayPercentage).toFixed(2)}%
                     </TableCell>
                     <TableCell data-testid={`text-deductions-${settlement.id}`}>
                       ${Number(settlement.deductions || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1147,6 +1263,13 @@ export default function Settlements() {
                           >
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadPDF(settlement)}
+                            data-testid={`button-download-pdf-${settlement.id}`}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download PDF
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleEdit(settlement)}

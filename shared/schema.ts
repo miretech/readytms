@@ -324,7 +324,7 @@ export const settlements = pgTable("settlements", {
   periodEnd: timestamp("period_end").notNull(),
   totalMiles: integer("total_miles"),
   totalRevenue: decimal("total_revenue", { precision: 10, scale: 2 }).notNull(),
-  driverPay: decimal("driver_pay", { precision: 10, scale: 2 }).notNull(),
+  driverPayPercentage: decimal("driver_pay_percentage", { precision: 5, scale: 2 }).notNull(),
   // Individual deduction fields
   tolls: decimal("tolls", { precision: 10, scale: 2 }).default("0"),
   fuel: decimal("fuel", { precision: 10, scale: 2 }).default("0"),
@@ -350,7 +350,7 @@ export const insertSettlementSchema = createInsertSchema(settlements).omit({
   periodStart: z.string(),
   periodEnd: z.string(),
   totalRevenue: z.string(),
-  driverPay: z.string(),
+  driverPayPercentage: z.string(),
   tolls: z.string().optional(),
   fuel: z.string().optional(),
   advance: z.string().optional(),
