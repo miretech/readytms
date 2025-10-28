@@ -47,6 +47,14 @@ The system provides a comprehensive set of modules:
   - **Activity Logging**: Comprehensive audit trail of all automation actions for compliance and troubleshooting
   - **Configurable Settings**: Dashboard-managed automation settings with enable/disable toggles and customizable parameters
   - Database schema includes automation_settings, notifications, and activity_log tables with full CRUD API support
+- **Admin & User Management**: Complete user permission system with role-based access control. Features include:
+  - **User Approval Workflow**: New signups default to "pending" status and require admin approval before accessing the system
+  - **Role Management**: Three user roles (admin, manager, user) with admin-only access to system management features
+  - **User Status Control**: Admins can approve, suspend, or manage user accounts with real-time status updates
+  - **Signup Notifications**: Automated notifications alert admins when new users register, ensuring timely account reviews
+  - **Activity Tracking**: Comprehensive activity log captures all admin actions (approvals, role changes, suspensions) with metadata including action type, user, timestamp, and details
+  - **Admin Dashboard**: Dedicated admin pages for user management and activity monitoring with filtering by date, user, and action type
+  - **Security**: Backend middleware enforces approval status checks and role-based access control on all protected routes
 
 ### System Design Choices
 - **Development Approach**: Employs a schema-first design with all data models defined for type consistency, followed by horizontal layer implementation (schemas → storage → API → frontend).
