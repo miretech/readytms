@@ -1269,15 +1269,27 @@ export class DatabaseStorage implements IStorage {
   async createChargeBack(insertChargeBack: InsertChargeBack): Promise<ChargeBack> {
     const [chargeBack] = await db
       .insert(chargeBacks)
-      .values(insertChargeBack)
+      .values({
+        ...insertChargeBack,
+        submittedDate: new Date(insertChargeBack.submittedDate),
+        resolvedDate: insertChargeBack.resolvedDate ? new Date(insertChargeBack.resolvedDate) : undefined,
+      })
       .returning();
     return chargeBack;
   }
 
   async updateChargeBack(id: string, updateData: Partial<InsertChargeBack>): Promise<ChargeBack | undefined> {
+    const dataToUpdate: any = { ...updateData };
+    if (updateData.submittedDate) {
+      dataToUpdate.submittedDate = new Date(updateData.submittedDate);
+    }
+    if (updateData.resolvedDate) {
+      dataToUpdate.resolvedDate = new Date(updateData.resolvedDate);
+    }
+    
     const [chargeBack] = await db
       .update(chargeBacks)
-      .set(updateData)
+      .set(dataToUpdate)
       .where(eq(chargeBacks.id, id))
       .returning();
     return chargeBack || undefined;
