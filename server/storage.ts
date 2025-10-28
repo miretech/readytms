@@ -73,7 +73,7 @@ import {
   chargeBacks
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -265,12 +265,13 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.email, userData.email));
       
       if (existingUser) {
-        // Update existing user by email
+        // Update existing user by email, preserving isAdmin status
         const [updated] = await db
           .update(users)
           .set({
             ...userData,
             id: existingUser.id, // Keep the existing ID
+            isAdmin: existingUser.isAdmin, // Preserve admin status
             updatedAt: new Date(),
           })
           .where(eq(users.email, userData.email))
@@ -287,6 +288,7 @@ export class DatabaseStorage implements IStorage {
         target: users.id,
         set: {
           ...userData,
+          isAdmin: sql`COALESCE(${users.isAdmin}, 'false')`, // Preserve existing isAdmin on conflict
           updatedAt: new Date(),
         },
       })
