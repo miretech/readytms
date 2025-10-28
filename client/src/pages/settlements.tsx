@@ -183,18 +183,13 @@ function SettlementDialog({
         const driverPayPct = parseFloat(value.driverPayPercentage || "0");
         const factoringPct = parseFloat(value.factoringFeePercentage || "0");
         
-        // Calculate factoring fee from percentage (deducted from revenue first)
+        // Calculate driver pay from GROSS revenue
+        const driverPay = (totalRevenue * driverPayPct) / 100;
+        
+        // Calculate factoring fee from percentage
         const factoringFee = (totalRevenue * factoringPct) / 100;
         
-        // Calculate net revenue after factoring
-        const netRevenue = totalRevenue - factoringFee;
-        
-        // Calculate driver pay from NET revenue (after factoring)
-        const driverPay = (netRevenue * driverPayPct) / 100;
-        
-        // Note: driverPay is calculated but not stored - it's computed from percentages when needed
-        
-        // Sum all other deductions (NOT including factoring - it's already deducted from revenue)
+        // Sum all deductions INCLUDING factoring
         const tolls = parseFloat(value.tolls || "0");
         const fuel = parseFloat(value.fuel || "0");
         const advance = parseFloat(value.advance || "0");
@@ -203,14 +198,14 @@ function SettlementDialog({
         const truckRepair = parseFloat(value.truckRepair || "0");
         const trailerRepair = parseFloat(value.trailerRepair || "0");
         
-        // Calculate ONLY other deductions (factoring already removed from revenue, so don't count it again)
-        const otherDeductions = tolls + fuel + advance + insurance + trailerFee + truckRepair + trailerRepair;
+        // Total deductions = factoring + all other deductions
+        const totalDeductions = factoringFee + tolls + fuel + advance + insurance + trailerFee + truckRepair + trailerRepair;
         
-        // Store only OTHER deductions in the deductions field (for consistency)
-        form.setValue("deductions", otherDeductions.toFixed(2));
+        // Store total deductions
+        form.setValue("deductions", totalDeductions.toFixed(2));
         
-        // Net pay = driver pay (from net revenue) - other deductions
-        const netPay = driverPay - otherDeductions;
+        // Net pay = driver pay (from gross) - total deductions
+        const netPay = driverPay - totalDeductions;
         form.setValue("netPay", netPay.toFixed(2));
       }
     });
@@ -1014,13 +1009,12 @@ export default function Settlements() {
     const doc = new jsPDF();
     const driverName = getDriverName(settlement.driverId);
     
-    // Calculate values - CORRECT METHOD: Factoring deducted FIRST
+    // Calculate values - Driver pay from GROSS revenue
     const totalRevenue = Number(settlement.totalRevenue);
     const factoringPct = Number(settlement.factoringFeePercentage || 0);
     const factoringFee = (totalRevenue * factoringPct) / 100;
-    const netRevenue = totalRevenue - factoringFee; // Revenue after factoring
     const driverPayPct = Number(settlement.driverPayPercentage);
-    const driverPay = (netRevenue * driverPayPct) / 100; // Driver pay from NET revenue
+    const driverPay = (totalRevenue * driverPayPct) / 100; // Driver pay from GROSS revenue
     
     // Header
     doc.setFontSize(20);
@@ -1040,33 +1034,22 @@ export default function Settlements() {
     
     // Revenue Section
     doc.setFontSize(14);
-    doc.text("Revenue Breakdown", 20, 90);
+    doc.text("Revenue", 20, 90);
     doc.setFontSize(10);
     doc.text(`Total Revenue:`, 20, 100);
     doc.text(`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 100, { align: "right" });
+    doc.text(`Driver Pay (${driverPayPct.toFixed(2)}%):`, 20, 107);
+    doc.text(`$${driverPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 107, { align: "right" });
     
-    if (factoringFee > 0) {
-      doc.text(`Less: Factoring Fee (${factoringPct.toFixed(2)}%):`, 20, 107);
-      doc.text(`-$${factoringFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 107, { align: "right" });
-      doc.setFont("helvetica", "bold");
-      doc.text(`Net Revenue (after factoring):`, 20, 114);
-      doc.text(`$${netRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 114, { align: "right" });
-      doc.setFont("helvetica", "normal");
-      doc.text(`Driver Pay (${driverPayPct.toFixed(2)}% of net):`, 20, 121);
-      doc.text(`$${driverPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 121, { align: "right" });
-    } else {
-      doc.text(`Driver Pay (${driverPayPct.toFixed(2)}%):`, 20, 107);
-      doc.text(`$${driverPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 107, { align: "right" });
-    }
-    
-    // Deductions Section (factoring already handled above)
-    const startYPos = factoringFee > 0 ? 135 : 120;
+    // Deductions Section
     doc.setFontSize(14);
-    doc.text("Other Deductions", 20, startYPos);
+    doc.text("Deductions", 20, 125);
     doc.setFontSize(10);
-    let yPos = startYPos + 10;
+    let yPos = 135;
     
+    // Add factoring fee first, then all other deductions
     const deductions = [
+      { label: `Factoring Fee (${factoringPct.toFixed(2)}%)`, value: factoringFee },
       { label: "Tolls", value: Number(settlement.tolls || 0) },
       { label: "Fuel", value: Number(settlement.fuel || 0) },
       { label: "Advance", value: Number(settlement.advance || 0) },
@@ -1084,15 +1067,15 @@ export default function Settlements() {
       }
     });
     
-    // Total Other Deductions - recalculate to ensure accuracy
-    const otherDeductionsTotal = deductions.reduce((sum, { value }) => sum + value, 0);
+    // Total Deductions - ALL deductions including factoring
+    const totalDeductions = deductions.reduce((sum, { value }) => sum + value, 0);
     doc.setFontSize(12);
     yPos += 5;
-    doc.text(`Total Other Deductions:`, 20, yPos);
-    doc.text(`$${otherDeductionsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+    doc.text(`Total Deductions:`, 20, yPos);
+    doc.text(`$${totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
     
-    // Net Pay - recalculate from driverPay - otherDeductions (factoring already removed from revenue)
-    const correctNetPay = driverPay - otherDeductionsTotal;
+    // Net Pay = driver pay - total deductions
+    const correctNetPay = driverPay - totalDeductions;
     yPos += 12;
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
