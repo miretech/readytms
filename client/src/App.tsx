@@ -19,6 +19,7 @@ import Customers from "@/pages/customers";
 import Accounting from "@/pages/accounting";
 import Safety from "@/pages/safety";
 import Settlements from "@/pages/settlements";
+import SettlementDetail from "@/pages/settlement-detail";
 import RecurringExpenses from "@/pages/recurring-expenses";
 import Maintenance from "@/pages/maintenance";
 import Fuel from "@/pages/fuel";
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/short-pays" component={ShortPays} />
       <Route path="/charge-backs" component={ChargeBacks} />
       <Route path="/settlements" component={Settlements} />
+      <Route path="/settlements/:id" component={SettlementDetail} />
       <Route path="/recurring-expenses" component={RecurringExpenses} />
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/activity" component={AdminActivity} />

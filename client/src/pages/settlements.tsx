@@ -753,9 +753,10 @@ export default function Settlements() {
     setEditingSettlement(null);
   };
 
+  const [, setLocation] = useLocation();
+
   const handleViewDetails = (settlementId: string) => {
-    setSelectedSettlementId(settlementId);
-    setIsDetailsDialogOpen(true);
+    setLocation(`/settlements/${settlementId}`);
   };
 
   if (isLoading) {
