@@ -635,7 +635,7 @@ export const insertChargeBackSchema = createInsertSchema(chargeBacks).omit({
 }).extend({
   amount: z.string(),
   submittedDate: z.string(),
-  resolvedDate: z.string().optional(),
+  resolvedDate: z.string().nullable().optional(),
 });
 
 export type InsertChargeBack = z.infer<typeof insertChargeBackSchema>;
