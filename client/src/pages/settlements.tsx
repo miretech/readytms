@@ -52,11 +52,20 @@ import { insertSettlementSchema, type Settlement, type Driver, type SettlementLi
 
 const settlementFormSchema = insertSettlementSchema.extend({
   driverId: z.string().min(1, "Driver is required"),
+  truckNumber: z.string().optional(),
   settlementNumber: z.string().min(1, "Settlement number is required"),
   periodStart: z.string().min(1, "Period start is required"),
   periodEnd: z.string().min(1, "Period end is required"),
   totalRevenue: z.string().min(1, "Total revenue is required"),
   driverPay: z.string().min(1, "Driver pay is required"),
+  tolls: z.string().optional(),
+  fuel: z.string().optional(),
+  advance: z.string().optional(),
+  factoringFeePercentage: z.string().optional(),
+  insurance: z.string().optional(),
+  trailerFee: z.string().optional(),
+  truckRepair: z.string().optional(),
+  trailerRepair: z.string().optional(),
   deductions: z.string().optional(),
   netPay: z.string().min(1, "Net pay is required"),
   status: z.string().min(1, "Status is required"),
@@ -83,12 +92,21 @@ function SettlementDialog({
     resolver: zodResolver(settlementFormSchema),
     defaultValues: {
       driverId: "",
+      truckNumber: "",
       settlementNumber: "",
       periodStart: "",
       periodEnd: "",
       totalMiles: undefined,
       totalRevenue: "",
       driverPay: "",
+      tolls: "0",
+      fuel: "0",
+      advance: "0",
+      factoringFeePercentage: "0",
+      insurance: "0",
+      trailerFee: "0",
+      truckRepair: "0",
+      trailerRepair: "0",
       deductions: "0",
       netPay: "",
       status: "Pending",
@@ -102,12 +120,21 @@ function SettlementDialog({
     if (settlement) {
       form.reset({
         driverId: settlement.driverId,
+        truckNumber: settlement.truckNumber || "",
         settlementNumber: settlement.settlementNumber,
         periodStart: new Date(settlement.periodStart).toISOString().split("T")[0],
         periodEnd: new Date(settlement.periodEnd).toISOString().split("T")[0],
         totalMiles: settlement.totalMiles || undefined,
         totalRevenue: settlement.totalRevenue.toString(),
         driverPay: settlement.driverPay.toString(),
+        tolls: settlement.tolls?.toString() || "0",
+        fuel: settlement.fuel?.toString() || "0",
+        advance: settlement.advance?.toString() || "0",
+        factoringFeePercentage: settlement.factoringFeePercentage?.toString() || "0",
+        insurance: settlement.insurance?.toString() || "0",
+        trailerFee: settlement.trailerFee?.toString() || "0",
+        truckRepair: settlement.truckRepair?.toString() || "0",
+        trailerRepair: settlement.trailerRepair?.toString() || "0",
         deductions: settlement.deductions?.toString() || "0",
         netPay: settlement.netPay.toString(),
         status: settlement.status,
@@ -120,12 +147,21 @@ function SettlementDialog({
       const settlementNumber = `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
       form.reset({
         driverId: "",
+        truckNumber: "",
         settlementNumber,
         periodStart: "",
         periodEnd: "",
         totalMiles: undefined,
         totalRevenue: "",
         driverPay: "",
+        tolls: "0",
+        fuel: "0",
+        advance: "0",
+        factoringFeePercentage: "0",
+        insurance: "0",
+        trailerFee: "0",
+        truckRepair: "0",
+        trailerRepair: "0",
         deductions: "0",
         netPay: "",
         status: "Pending",
@@ -138,10 +174,31 @@ function SettlementDialog({
 
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === "driverPay" || name === "deductions") {
+      // Calculate total deductions and net pay when any relevant field changes
+      const relevantFields = ["driverPay", "totalRevenue", "factoringFeePercentage", "tolls", "fuel", "advance", "insurance", "trailerFee", "truckRepair", "trailerRepair"];
+      
+      if (relevantFields.includes(name || "")) {
         const driverPay = parseFloat(value.driverPay || "0");
-        const deductions = parseFloat(value.deductions || "0");
-        const netPay = driverPay - deductions;
+        const totalRevenue = parseFloat(value.totalRevenue || "0");
+        const factoringPct = parseFloat(value.factoringFeePercentage || "0");
+        
+        // Calculate factoring fee from percentage
+        const factoringFee = (totalRevenue * factoringPct) / 100;
+        
+        // Sum all deductions
+        const tolls = parseFloat(value.tolls || "0");
+        const fuel = parseFloat(value.fuel || "0");
+        const advance = parseFloat(value.advance || "0");
+        const insurance = parseFloat(value.insurance || "0");
+        const trailerFee = parseFloat(value.trailerFee || "0");
+        const truckRepair = parseFloat(value.truckRepair || "0");
+        const trailerRepair = parseFloat(value.trailerRepair || "0");
+        
+        const totalDeductions = factoringFee + tolls + fuel + advance + insurance + trailerFee + truckRepair + trailerRepair;
+        
+        // Update deductions and net pay
+        form.setValue("deductions", totalDeductions.toFixed(2));
+        const netPay = driverPay - totalDeductions;
         form.setValue("netPay", netPay.toFixed(2));
       }
     });
@@ -235,6 +292,20 @@ function SettlementDialog({
 
               <FormField
                 control={form.control}
+                name="truckNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Truck Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-truck-number" placeholder="TRK-001" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="periodStart"
                 render={({ field }) => (
                   <FormItem>
@@ -320,13 +391,180 @@ function SettlementDialog({
                   </FormItem>
                 )}
               />
+            </div>
 
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Deductions</h3>
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="factoringFeePercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Factoring Fee (%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-factoring-fee-percentage"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="tolls"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tolls ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-tolls"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="fuel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fuel ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-fuel"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="advance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Advance ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-advance"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="insurance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Insurance ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-insurance"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="trailerFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trailer Fee ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-trailer-fee"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="truckRepair"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Truck Repair ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-truck-repair"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="trailerRepair"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trailer Repair ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-trailer-repair"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="deductions"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Deductions</FormLabel>
+                    <FormLabel>Total Deductions (Auto-calculated)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -334,6 +572,8 @@ function SettlementDialog({
                         {...field}
                         data-testid="input-deductions"
                         placeholder="0.00"
+                        readOnly
+                        className="bg-muted"
                       />
                     </FormControl>
                     <FormMessage />
@@ -835,6 +1075,7 @@ export default function Settlements() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Settlement #</TableHead>
+                  <TableHead>Truck #</TableHead>
                   <TableHead>Driver</TableHead>
                   <TableHead>Period</TableHead>
                   <TableHead>Total Miles</TableHead>
@@ -852,6 +1093,9 @@ export default function Settlements() {
                   <TableRow key={settlement.id} data-testid={`row-settlement-${settlement.id}`}>
                     <TableCell className="font-medium" data-testid={`text-settlement-number-${settlement.id}`}>
                       {settlement.settlementNumber}
+                    </TableCell>
+                    <TableCell data-testid={`text-truck-number-${settlement.id}`}>
+                      {settlement.truckNumber || "-"}
                     </TableCell>
                     <TableCell data-testid={`text-driver-${settlement.id}`}>
                       {getDriverName(settlement.driverId)}
