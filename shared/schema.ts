@@ -21,6 +21,10 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  role: text("role").notNull().default("user"), // "admin", "manager", "user"
+  status: text("status").notNull().default("pending"), // "pending", "approved", "suspended"
+  approvedBy: varchar("approved_by"), // User ID who approved
+  approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
