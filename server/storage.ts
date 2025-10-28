@@ -80,7 +80,13 @@ import { eq, desc, and, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  createUser(user: Partial<UpsertUser>): Promise<User>;
+  updateUser(id: string, user: Partial<UpsertUser>): Promise<User | undefined>;
+  updateUserPassword(id: string, passwordHash: string): Promise<void>;
+  updateUserResetToken(id: string, resetToken: string | null, resetTokenExpires: Date | null): Promise<void>;
+  updateUserLastLogin(id: string): Promise<void>;
   
   getAllLoads(): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
@@ -305,6 +311,46 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async createUser(userData: Partial<UpsertUser>): Promise<User> {
+    const [user] = await db.insert(users).values(userData as UpsertUser).returning();
+    return user;
+  }
+
+  async updateUser(id: string, userData: Partial<UpsertUser>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...userData, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async updateUserPassword(id: string, passwordHash: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, id));
+  }
+
+  async updateUserResetToken(id: string, resetToken: string | null, resetTokenExpires: Date | null): Promise<void> {
+    await db
+      .update(users)
+      .set({ resetToken, resetTokenExpires, updatedAt: new Date() })
+      .where(eq(users.id, id));
+  }
+
+  async updateUserLastLogin(id: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, id));
   }
 
   async getAllLoads(): Promise<Load[]> {

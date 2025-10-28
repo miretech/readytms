@@ -24,10 +24,175 @@ import {
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
+import { hashPassword, comparePassword, generateResetToken, hashResetToken, requireAuth, optionalAuth } from "./auth";
+import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema, users } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication disabled per user request
+  // Authentication routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { email, password, firstName, lastName } = registerSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "User with this email already exists" });
+      }
+
+      // Hash password
+      const passwordHash = await hashPassword(password);
+
+      // Create user
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        firstName,
+        lastName,
+      });
+
+      // Set session
+      req.session.userId = user.id;
+      req.session.email = user.email!;
+
+      res.status(201).json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        isAdmin: user.isAdmin,
+      });
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      res.status(400).json({ error: error.message || "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = loginSchema.parse(req.body);
+
+      // Find user
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.passwordHash) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Verify password
+      const isValid = await comparePassword(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Update last login
+      await storage.updateUserLastLogin(user.id);
+
+      // Set session
+      req.session.userId = user.id;
+      req.session.email = user.email!;
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        isAdmin: user.isAdmin,
+      });
+    } catch (error: any) {
+      console.error("Login error:", error);
+      res.status(400).json({ error: error.message || "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.clearCookie("connect.sid");
+      res.json({ success: true });
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      isAdmin: user.isAdmin,
+    });
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = forgotPasswordSchema.parse(req.body);
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if user exists
+        return res.json({ success: true });
+      }
+
+      // Generate reset token
+      const resetToken = generateResetToken();
+      const hashedToken = hashResetToken(resetToken);
+      const resetTokenExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+      await storage.updateUserResetToken(user.id, hashedToken, resetTokenExpires);
+
+      // In a real app, send email here. For now, return token (dev only)
+      console.log(`Password reset token for ${email}: ${resetToken}`);
+      
+      res.json({ 
+        success: true,
+        // Remove this in production - only for development
+        resetToken: process.env.NODE_ENV === "development" ? resetToken : undefined
+      });
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      res.status(400).json({ error: error.message || "Request failed" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = resetPasswordSchema.parse(req.body);
+
+      const hashedToken = hashResetToken(token);
+
+      // Find user with valid reset token
+      const allUsers = await db.select().from(users).where(eq(users.resetToken, hashedToken));
+      const user = allUsers[0];
+
+      if (!user || !user.resetTokenExpires || user.resetTokenExpires < new Date()) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+      }
+
+      // Hash new password
+      const passwordHash = await hashPassword(password);
+
+      // Update password and clear reset token
+      await storage.updateUserPassword(user.id, passwordHash);
+      await storage.updateUserResetToken(user.id, null, null);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      res.status(400).json({ error: error.message || "Reset failed" });
+    }
+  });
   app.get("/api/loads", async (_req, res) => {
     const loads = await storage.getAllLoads();
     res.json(loads);
