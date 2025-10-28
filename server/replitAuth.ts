@@ -23,7 +23,7 @@ const getOidcConfig = memoize(
 );
 
 export function getSession() {
-  const sessionTtl = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -63,7 +63,6 @@ async function upsertUser(
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-    status: "approved", // Auto-approve all new users
   });
 }
 
@@ -131,38 +130,13 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user?.expires_at) {
-    console.log("[AUTH] Not authenticated or no expires_at:", { 
-      isAuth: req.isAuthenticated(), 
-      hasUser: !!user,
-      hasExpires: !!user?.expires_at 
-    });
+  if (!req.isAuthenticated() || !user.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
-    // Check if user is approved
-    try {
-      const userId = user.claims.sub;
-      const dbUser = await storage.getUser(userId);
-      
-      if (!dbUser) {
-        return res.status(401).json({ message: "User not found" });
-      }
-      
-      if (dbUser.status !== "approved") {
-        return res.status(403).json({ 
-          message: "Account pending approval", 
-          status: dbUser.status 
-        });
-      }
-      
-      return next();
-    } catch (error) {
-      console.error("Error checking user approval status:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
+    return next();
   }
 
   const refreshToken = user.refresh_token;
@@ -175,44 +149,9 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
-    
-    // Also check approval status after token refresh
-    const userId = user.claims.sub;
-    const dbUser = await storage.getUser(userId);
-    
-    if (!dbUser || dbUser.status !== "approved") {
-      return res.status(403).json({ 
-        message: "Account pending approval", 
-        status: dbUser?.status 
-      });
-    }
-    
     return next();
   } catch (error) {
     res.status(401).json({ message: "Unauthorized" });
     return;
-  }
-};
-
-// Admin-only middleware
-export const isAdmin: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-  
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  
-  try {
-    const userId = user.claims.sub;
-    const dbUser = await storage.getUser(userId);
-    
-    if (!dbUser || dbUser.role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    
-    return next();
-  } catch (error) {
-    console.error("Error checking admin status:", error);
-    return res.status(500).json({ message: "Internal server error" });
   }
 };

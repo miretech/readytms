@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useLocation } from "wouter";
 import { Plus, Search, MoreVertical, Edit, Trash2, Receipt, Eye, Zap, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +57,7 @@ const settlementFormSchema = insertSettlementSchema.extend({
   periodEnd: z.string().min(1, "Period end is required"),
   totalRevenue: z.string().min(1, "Total revenue is required"),
   driverPay: z.string().min(1, "Driver pay is required"),
-  totalDeductions: z.string().optional(),
+  deductions: z.string().optional(),
   netPay: z.string().min(1, "Net pay is required"),
   status: z.string().min(1, "Status is required"),
   paidDate: z.string().optional(),
@@ -90,7 +89,7 @@ function SettlementDialog({
       totalMiles: undefined,
       totalRevenue: "",
       driverPay: "",
-      totalDeductions: "0",
+      deductions: "0",
       netPay: "",
       status: "Pending",
       paidDate: "",
@@ -109,7 +108,7 @@ function SettlementDialog({
         totalMiles: settlement.totalMiles || undefined,
         totalRevenue: settlement.totalRevenue.toString(),
         driverPay: settlement.driverPay.toString(),
-        totalDeductions: settlement.totalDeductions?.toString() || "0",
+        deductions: settlement.deductions?.toString() || "0",
         netPay: settlement.netPay.toString(),
         status: settlement.status,
         paidDate: settlement.paidDate ? new Date(settlement.paidDate).toISOString().split("T")[0] : "",
@@ -127,7 +126,7 @@ function SettlementDialog({
         totalMiles: undefined,
         totalRevenue: "",
         driverPay: "",
-        totalDeductions: "0",
+        deductions: "0",
         netPay: "",
         status: "Pending",
         paidDate: "",
@@ -139,10 +138,10 @@ function SettlementDialog({
 
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === "driverPay" || name === "totalDeductions") {
+      if (name === "driverPay" || name === "deductions") {
         const driverPay = parseFloat(value.driverPay || "0");
-        const totalDeductions = parseFloat(value.totalDeductions || "0");
-        const netPay = driverPay - totalDeductions;
+        const deductions = parseFloat(value.deductions || "0");
+        const netPay = driverPay - deductions;
         form.setValue("netPay", netPay.toFixed(2));
       }
     });
@@ -324,16 +323,16 @@ function SettlementDialog({
 
               <FormField
                 control={form.control}
-                name="totalDeductions"
+                name="deductions"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total Deductions</FormLabel>
+                    <FormLabel>Deductions</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
                         {...field}
-                        data-testid="input-total-deductions"
+                        data-testid="input-deductions"
                         placeholder="0.00"
                       />
                     </FormControl>
@@ -754,10 +753,9 @@ export default function Settlements() {
     setEditingSettlement(null);
   };
 
-  const [, setLocation] = useLocation();
-
   const handleViewDetails = (settlementId: string) => {
-    setLocation(`/settlements/${settlementId}`);
+    setSelectedSettlementId(settlementId);
+    setIsDetailsDialogOpen(true);
   };
 
   if (isLoading) {
@@ -873,8 +871,8 @@ export default function Settlements() {
                     <TableCell className="font-medium" data-testid={`text-driver-pay-${settlement.id}`}>
                       ${Number(settlement.driverPay).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
-                    <TableCell data-testid={`text-total-deductions-${settlement.id}`}>
-                      ${Number(settlement.totalDeductions || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <TableCell data-testid={`text-deductions-${settlement.id}`}>
+                      ${Number(settlement.deductions || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="font-semibold" data-testid={`text-net-pay-${settlement.id}`}>
                       ${Number(settlement.netPay).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

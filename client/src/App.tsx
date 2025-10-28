@@ -19,7 +19,6 @@ import Customers from "@/pages/customers";
 import Accounting from "@/pages/accounting";
 import Safety from "@/pages/safety";
 import Settlements from "@/pages/settlements";
-import SettlementDetail from "@/pages/settlement-detail";
 import RecurringExpenses from "@/pages/recurring-expenses";
 import Maintenance from "@/pages/maintenance";
 import Fuel from "@/pages/fuel";
@@ -28,9 +27,6 @@ import DriverPortal from "@/pages/driver-portal";
 import DriverSignup from "@/pages/driver-signup";
 import ShortPays from "@/pages/short-pays";
 import ChargeBacks from "@/pages/charge-backs";
-import AdminUsers from "@/pages/admin-users";
-import AdminActivity from "@/pages/admin-activity";
-import Settings from "@/pages/settings";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -63,11 +59,7 @@ function Router() {
       <Route path="/short-pays" component={ShortPays} />
       <Route path="/charge-backs" component={ChargeBacks} />
       <Route path="/settlements" component={Settlements} />
-      <Route path="/settlements/:id" component={SettlementDetail} />
       <Route path="/recurring-expenses" component={RecurringExpenses} />
-      <Route path="/admin/users" component={AdminUsers} />
-      <Route path="/admin/activity" component={AdminActivity} />
-      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -21,7 +21,7 @@ import {
   insertShortPaySchema,
   insertChargeBackSchema
 } from "@shared/schema";
-import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { z } from "zod";
@@ -698,48 +698,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  // Settlement Deductions
-  app.get("/api/settlements/:settlementId/deductions", async (req, res) => {
-    const deductions = await storage.getSettlementDeductions(req.params.settlementId);
-    res.json(deductions);
-  });
-
-  app.post("/api/settlements/:settlementId/deductions", async (req, res) => {
-    try {
-      const { insertSettlementDeductionSchema } = await import("@shared/schema");
-      const validatedData = insertSettlementDeductionSchema.parse({
-        ...req.body,
-        settlementId: req.params.settlementId,
-      });
-      const deduction = await storage.createSettlementDeduction(validatedData);
-      res.status(201).json(deduction);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid deduction data" });
-    }
-  });
-
-  app.patch("/api/settlement-deductions/:id", async (req, res) => {
-    try {
-      const { insertSettlementDeductionSchema } = await import("@shared/schema");
-      const validatedData = insertSettlementDeductionSchema.partial().parse(req.body);
-      const deduction = await storage.updateSettlementDeduction(req.params.id, validatedData);
-      if (!deduction) {
-        return res.status(404).json({ error: "Deduction not found" });
-      }
-      res.json(deduction);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid deduction data" });
-    }
-  });
-
-  app.delete("/api/settlement-deductions/:id", async (req, res) => {
-    const deleted = await storage.deleteSettlementDeduction(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: "Deduction not found" });
-    }
-    res.status(204).send();
-  });
-
   // Auto-generate settlement from loads
   app.post("/api/settlements/auto-generate", async (req, res) => {
     try {
@@ -789,7 +747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalMiles,
         totalRevenue: totalRevenue.toFixed(2),
         driverPay: driverPay.toFixed(2),
-        totalDeductions: deductions.toFixed(2),
+        deductions: deductions.toFixed(2),
         netPay: netPay.toFixed(2),
         status: "Pending",
       });
@@ -1287,7 +1245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Map form data to schema
-      const chargeBackData: any = {
+      const chargeBackData = {
         loadId: req.body.loadId,
         loadNumber: load.loadNumber,
         customerId: req.body.customerId,
@@ -1297,12 +1255,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         category: req.body.category || "other",
         status: req.body.status || "pending",
         submittedDate: req.body.chargeBackDate || new Date().toISOString().split("T")[0],
+        resolvedDate: req.body.resolutionDate || null,
+        resolution: req.body.resolution || null,
+        notes: req.body.notes || null,
       };
-      
-      // Only include optional fields if they have values
-      if (req.body.resolutionDate) chargeBackData.resolvedDate = req.body.resolutionDate;
-      if (req.body.resolution) chargeBackData.resolution = req.body.resolution;
-      if (req.body.notes) chargeBackData.notes = req.body.notes;
 
       const validatedData = insertChargeBackSchema.parse(chargeBackData);
       const chargeBack = await storage.createChargeBack(validatedData);
@@ -1364,99 +1320,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Charge back not found" });
     }
     res.status(204).send();
-  });
-
-  // Admin Routes - User Management
-  app.get("/api/admin/users", isAuthenticated, isAdmin, async (_req, res) => {
-    const users = await storage.getAllUsers();
-    res.json(users);
-  });
-
-  app.get("/api/admin/users/pending", isAuthenticated, isAdmin, async (_req, res) => {
-    const users = await storage.getPendingUsers();
-    res.json(users);
-  });
-
-  app.patch("/api/admin/users/:id/status", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { status } = req.body;
-      const adminUserId = req.user.claims.sub;
-      
-      if (!status || !["pending", "approved", "suspended"].includes(status)) {
-        return res.status(400).json({ error: "Invalid status" });
-      }
-      
-      const user = await storage.updateUserStatus(req.params.id, status, adminUserId);
-      
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      // Create notification for approved users
-      if (status === "approved") {
-        await storage.createNotification({
-          type: "success",
-          category: "user_approved",
-          title: "Account Approved",
-          message: "Your account has been approved and you can now access the system.",
-          recipientEmail: user.email || undefined,
-        });
-      }
-      
-      // Log activity
-      await storage.createActivityLog({
-        action: "user_status_changed",
-        entityType: "user",
-        entityId: req.params.id,
-        details: `User status changed to ${status} by admin`,
-        metadata: { userId: req.params.id, status, adminId: adminUserId },
-        status: "success",
-      });
-      
-      res.json(user);
-    } catch (error) {
-      console.error("User status update error:", error);
-      res.status(400).json({ error: "Failed to update user status" });
-    }
-  });
-
-  app.patch("/api/admin/users/:id/role", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { role } = req.body;
-      const adminUserId = req.user.claims.sub;
-      
-      if (!role || !["admin", "manager", "user"].includes(role)) {
-        return res.status(400).json({ error: "Invalid role" });
-      }
-      
-      const user = await storage.updateUserRole(req.params.id, role);
-      
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      // Log activity
-      await storage.createActivityLog({
-        action: "user_role_changed",
-        entityType: "user",
-        entityId: req.params.id,
-        details: `User role changed to ${role} by admin`,
-        metadata: { userId: req.params.id, role, adminId: adminUserId },
-        status: "success",
-      });
-      
-      res.json(user);
-    } catch (error) {
-      console.error("User role update error:", error);
-      res.status(400).json({ error: "Failed to update user role" });
-    }
-  });
-
-  // Admin Routes - Activity Tracking
-  app.get("/api/admin/activity", isAuthenticated, isAdmin, async (req, res) => {
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
-    const logs = await storage.getAllActivityLogs(limit);
-    res.json(logs);
   });
 
   const httpServer = createServer(app);

@@ -14,9 +14,7 @@ import {
   Calendar,
   AlertCircle,
   AlertTriangle,
-  Settings,
-  Shield,
-  Activity
+  Settings
 } from "lucide-react";
 import {
   Sidebar,
@@ -110,19 +108,6 @@ const menuItems = [
   },
 ];
 
-const adminMenuItems = [
-  {
-    title: "User Management",
-    url: "/admin/users",
-    icon: Shield,
-  },
-  {
-    title: "Activity Log",
-    url: "/admin/activity",
-    icon: Activity,
-  },
-];
-
 export function AppSidebar() {
   const [location] = useLocation();
 
@@ -145,28 +130,6 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === item.url}
-                    data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Administration</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild 

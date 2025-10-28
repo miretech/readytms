@@ -37,15 +37,7 @@ The system provides a comprehensive set of modules:
 - **Safety & Compliance**: Includes Inspections (Pre-Trip, DOT, etc.), Accidents & Incidents reporting, and Violations & Citations tracking.
 - **Accounting & Financial Management**: Financial Overview, Invoices (AR), Expense Management, and Payments & Cash Management.
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
-- **Driver Settlements**: Comprehensive driver settlement system with detailed deduction tracking and PDF export capabilities. Features include:
-  - **Enhanced Schema**: Settlements track factoring percentage, revenue after factoring, and total deductions with full type safety
-  - **Settlement Line Items**: Detailed load tracking with company name, description, quantity, rate, amount, and factored amount
-  - **Deduction Categories**: 13 comprehensive deduction categories (tolls, insurance weekly, trailer rental, dispatch percentage, fuel Fleet One, fuel Flying J, ELD fee, prepass fee, oil change, repair, tires, cash advance, factoring percentage, other)
-  - **Settlement Details Page**: Professional settlement detail view at `/settlements/:id` showing complete breakdown of loads, deductions, and financial summary
-  - **PDF Generation**: Download settlement statements as professional text-based PDFs using jsPDF and autoTable with selectable text, formatted tables, multi-page support, and pagination
-  - **Print Functionality**: Browser-based print capability with optimized print styles for paper output
-  - **Automated Calculations**: Auto-calculated totals for revenue, factored amounts, deductions, and net pay
-  - **CRUD Operations**: Full create, read, update, delete support for settlements, line items, and deductions via storage interface and RESTful API routes
+- **Driver Settlements**: Automated payroll calculations, deduction tracking, net pay, and settlement history.
 - **Maintenance Management**: Service record system, preventive maintenance scheduling, and overdue alerts.
 - **Fuel Tracking & Management**: Comprehensive fuel card account management with FleetOne (WEX) and Pilot Flying J integration. Features include fuel card account setup with portal links, manual fuel transaction entry, expense tracking by truck/driver/load, vendor tracking, and future-ready API integration framework. Direct portal links to https://manage.fleetone.com/ and https://customerportal.pilotflyingj.com/ for easy access to fuel card provider portals.
 - **Automation & Workflows**: Enterprise-grade automation engine that eliminates manual tasks and ensures consistent operations. Features include:
@@ -55,14 +47,6 @@ The system provides a comprehensive set of modules:
   - **Activity Logging**: Comprehensive audit trail of all automation actions for compliance and troubleshooting
   - **Configurable Settings**: Dashboard-managed automation settings with enable/disable toggles and customizable parameters
   - Database schema includes automation_settings, notifications, and activity_log tables with full CRUD API support
-- **Admin & User Management**: Complete user permission system with role-based access control. Features include:
-  - **User Approval Workflow**: New signups default to "pending" status and require admin approval before accessing the system
-  - **Role Management**: Three user roles (admin, manager, user) with admin-only access to system management features
-  - **User Status Control**: Admins can approve, suspend, or manage user accounts with real-time status updates
-  - **Signup Notifications**: Automated notifications alert admins when new users register, ensuring timely account reviews
-  - **Activity Tracking**: Comprehensive activity log captures all admin actions (approvals, role changes, suspensions) with metadata including action type, user, timestamp, and details
-  - **Admin Dashboard**: Dedicated admin pages for user management and activity monitoring with filtering by date, user, and action type
-  - **Security**: Backend middleware enforces approval status checks and role-based access control on all protected routes
 
 ### System Design Choices
 - **Development Approach**: Employs a schema-first design with all data models defined for type consistency, followed by horizontal layer implementation (schemas → storage → API → frontend).

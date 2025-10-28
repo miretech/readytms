@@ -27,8 +27,6 @@ import {
   type InsertSettlement,
   type SettlementLineItem,
   type InsertSettlementLineItem,
-  type SettlementDeduction,
-  type InsertSettlementDeduction,
   type RecurringExpense,
   type InsertRecurringExpense,
   type Maintenance,
@@ -63,7 +61,6 @@ import {
   violations,
   settlements,
   settlementLineItems,
-  settlementDeductions,
   recurringExpenses,
   maintenance,
   fuelCards,
@@ -81,10 +78,6 @@ import { eq, desc, and } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  getAllUsers(): Promise<User[]>;
-  getPendingUsers(): Promise<User[]>;
-  updateUserStatus(id: string, status: string, approvedById?: string): Promise<User | undefined>;
-  updateUserRole(id: string, role: string): Promise<User | undefined>;
   
   getAllLoads(): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
@@ -276,34 +269,6 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
-  }
-
-  async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
-  }
-
-  async getPendingUsers(): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.status, "pending")).orderBy(desc(users.createdAt));
-  }
-
-  async updateUserStatus(id: string, status: string, approvedById?: string): Promise<User | undefined> {
-    const updateData: any = {
-      status,
-      updatedAt: new Date(),
-    };
-    
-    if (status === "approved" && approvedById) {
-      updateData.approvedBy = approvedById;
-      updateData.approvedAt = new Date();
-    }
-    
-    const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
-    return user || undefined;
-  }
-
-  async updateUserRole(id: string, role: string): Promise<User | undefined> {
-    const [user] = await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, id)).returning();
-    return user || undefined;
   }
 
   async getAllLoads(): Promise<Load[]> {
@@ -837,47 +802,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSettlementLineItem(id: string): Promise<boolean> {
     const result = await db.delete(settlementLineItems).where(eq(settlementLineItems.id, id)).returning();
-    return result.length > 0;
-  }
-
-  // Settlement Deductions
-  async getSettlementDeductions(settlementId: string): Promise<SettlementDeduction[]> {
-    return await db.select().from(settlementDeductions).where(eq(settlementDeductions.settlementId, settlementId)).orderBy(settlementDeductions.category);
-  }
-
-  async createSettlementDeduction(deduction: InsertSettlementDeduction): Promise<SettlementDeduction> {
-    const values: any = { ...deduction };
-    if (deduction.periodStart) {
-      values.periodStart = new Date(deduction.periodStart);
-    }
-    if (deduction.periodEnd) {
-      values.periodEnd = new Date(deduction.periodEnd);
-    }
-    const [created] = await db
-      .insert(settlementDeductions)
-      .values(values)
-      .returning();
-    return created;
-  }
-
-  async updateSettlementDeduction(id: string, updateData: Partial<InsertSettlementDeduction>): Promise<SettlementDeduction | undefined> {
-    const values: any = { ...updateData };
-    if (updateData.periodStart) {
-      values.periodStart = new Date(updateData.periodStart);
-    }
-    if (updateData.periodEnd) {
-      values.periodEnd = new Date(updateData.periodEnd);
-    }
-    const [updated] = await db
-      .update(settlementDeductions)
-      .set(values)
-      .where(eq(settlementDeductions.id, id))
-      .returning();
-    return updated || undefined;
-  }
-
-  async deleteSettlementDeduction(id: string): Promise<boolean> {
-    const result = await db.delete(settlementDeductions).where(eq(settlementDeductions.id, id)).returning();
     return result.length > 0;
   }
 

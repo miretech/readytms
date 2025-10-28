@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, MoreVertical, Edit, Trash2, AlertCircle, Paperclip, ExternalLink } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -64,7 +64,6 @@ const maintenanceFormSchema = insertMaintenanceSchema.extend({
   nextServiceDate: z.string().optional(),
   invoiceNumber: z.string().optional(),
   notes: z.string().optional(),
-  attachmentUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 type MaintenanceFormValues = z.infer<typeof maintenanceFormSchema>;
@@ -98,7 +97,6 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
       status: "Scheduled",
       invoiceNumber: "",
       notes: "",
-      attachmentUrl: "",
     },
   });
 
@@ -119,7 +117,6 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
         status: maintenance.status,
         invoiceNumber: maintenance.invoiceNumber || "",
         notes: maintenance.notes || "",
-        attachmentUrl: maintenance.attachmentUrl || "",
       });
     } else {
       form.reset({
@@ -135,7 +132,6 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
         status: "Scheduled",
         invoiceNumber: "",
         notes: "",
-        attachmentUrl: "",
       });
     }
   }, [maintenance, form]);
@@ -424,27 +420,6 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="attachmentUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Invoice/Receipt URL</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="https://drive.google.com/file/..."
-                      {...field}
-                      data-testid="input-attachment-url"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                  <p className="text-sm text-muted-foreground">
-                    Paste a link to invoice or receipt (Google Drive, Dropbox, etc.)
-                  </p>
-                </FormItem>
-              )}
-            />
-
             <div className="flex justify-end gap-3">
               <Button
                 type="button"
@@ -636,7 +611,6 @@ export default function Maintenance() {
                   <TableHead>Mileage</TableHead>
                   <TableHead>Next Service</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Attachment</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -675,22 +649,6 @@ export default function Maintenance() {
                       )}
                     </TableCell>
                     <TableCell>{getStatusBadge(record.status)}</TableCell>
-                    <TableCell className="text-center">
-                      {record.attachmentUrl ? (
-                        <a
-                          href={record.attachmentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-primary hover-elevate active-elevate-2 rounded-md p-1"
-                          data-testid={`link-attachment-${record.id}`}
-                        >
-                          <Paperclip className="h-4 w-4" />
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
