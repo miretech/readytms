@@ -29,6 +29,7 @@ import ShortPays from "@/pages/short-pays";
 import ChargeBacks from "@/pages/charge-backs";
 import AdminUsers from "@/pages/admin-users";
 import AdminActivity from "@/pages/admin-activity";
+import Settings from "@/pages/settings";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/recurring-expenses" component={RecurringExpenses} />
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/activity" component={AdminActivity} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
