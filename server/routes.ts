@@ -698,6 +698,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Settlement Deductions
+  app.get("/api/settlements/:settlementId/deductions", async (req, res) => {
+    const deductions = await storage.getSettlementDeductions(req.params.settlementId);
+    res.json(deductions);
+  });
+
+  app.post("/api/settlements/:settlementId/deductions", async (req, res) => {
+    try {
+      const { insertSettlementDeductionSchema } = await import("@shared/schema");
+      const validatedData = insertSettlementDeductionSchema.parse({
+        ...req.body,
+        settlementId: req.params.settlementId,
+      });
+      const deduction = await storage.createSettlementDeduction(validatedData);
+      res.status(201).json(deduction);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid deduction data" });
+    }
+  });
+
+  app.patch("/api/settlement-deductions/:id", async (req, res) => {
+    try {
+      const { insertSettlementDeductionSchema } = await import("@shared/schema");
+      const validatedData = insertSettlementDeductionSchema.partial().parse(req.body);
+      const deduction = await storage.updateSettlementDeduction(req.params.id, validatedData);
+      if (!deduction) {
+        return res.status(404).json({ error: "Deduction not found" });
+      }
+      res.json(deduction);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid deduction data" });
+    }
+  });
+
+  app.delete("/api/settlement-deductions/:id", async (req, res) => {
+    const deleted = await storage.deleteSettlementDeduction(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Deduction not found" });
+    }
+    res.status(204).send();
+  });
+
   // Auto-generate settlement from loads
   app.post("/api/settlements/auto-generate", async (req, res) => {
     try {
@@ -747,7 +789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalMiles,
         totalRevenue: totalRevenue.toFixed(2),
         driverPay: driverPay.toFixed(2),
-        deductions: deductions.toFixed(2),
+        totalDeductions: deductions.toFixed(2),
         netPay: netPay.toFixed(2),
         status: "Pending",
       });

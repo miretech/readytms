@@ -27,6 +27,8 @@ import {
   type InsertSettlement,
   type SettlementLineItem,
   type InsertSettlementLineItem,
+  type SettlementDeduction,
+  type InsertSettlementDeduction,
   type RecurringExpense,
   type InsertRecurringExpense,
   type Maintenance,
@@ -61,6 +63,7 @@ import {
   violations,
   settlements,
   settlementLineItems,
+  settlementDeductions,
   recurringExpenses,
   maintenance,
   fuelCards,
@@ -834,6 +837,47 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSettlementLineItem(id: string): Promise<boolean> {
     const result = await db.delete(settlementLineItems).where(eq(settlementLineItems.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Settlement Deductions
+  async getSettlementDeductions(settlementId: string): Promise<SettlementDeduction[]> {
+    return await db.select().from(settlementDeductions).where(eq(settlementDeductions.settlementId, settlementId)).orderBy(settlementDeductions.category);
+  }
+
+  async createSettlementDeduction(deduction: InsertSettlementDeduction): Promise<SettlementDeduction> {
+    const values: any = { ...deduction };
+    if (deduction.periodStart) {
+      values.periodStart = new Date(deduction.periodStart);
+    }
+    if (deduction.periodEnd) {
+      values.periodEnd = new Date(deduction.periodEnd);
+    }
+    const [created] = await db
+      .insert(settlementDeductions)
+      .values(values)
+      .returning();
+    return created;
+  }
+
+  async updateSettlementDeduction(id: string, updateData: Partial<InsertSettlementDeduction>): Promise<SettlementDeduction | undefined> {
+    const values: any = { ...updateData };
+    if (updateData.periodStart) {
+      values.periodStart = new Date(updateData.periodStart);
+    }
+    if (updateData.periodEnd) {
+      values.periodEnd = new Date(updateData.periodEnd);
+    }
+    const [updated] = await db
+      .update(settlementDeductions)
+      .set(values)
+      .where(eq(settlementDeductions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSettlementDeduction(id: string): Promise<boolean> {
+    const result = await db.delete(settlementDeductions).where(eq(settlementDeductions.id, id)).returning();
     return result.length > 0;
   }
 
