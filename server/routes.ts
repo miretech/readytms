@@ -735,7 +735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodEnd,
         totalMiles,
         totalRevenue: totalRevenue.toFixed(2),
-        driverPay: driverPay.toFixed(2),
+        driverPayPercentage: (rateValue * 100).toFixed(2), // Convert to percentage
         deductions: deductions.toFixed(2),
         netPay: netPay.toFixed(2),
         status: "Pending",
