@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Truck, AlertCircle } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
@@ -33,6 +33,9 @@ export default function LoginPage() {
       setIsLoading(true);
       
       await apiRequest("POST", "/api/auth/login", data);
+
+      // Invalidate auth query to refresh user state
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
 
       // Redirect to dashboard on successful login
       setLocation("/");

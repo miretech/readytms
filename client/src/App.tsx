@@ -1,3 +1,4 @@
+import React from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -37,6 +38,13 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
+  // Use effect to handle redirect instead of side effect during render
+  React.useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation("/login");
+    }
+  }, [isLoading, user, setLocation]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -46,7 +54,6 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }
 
   if (!user) {
-    setLocation("/login");
     return null;
   }
 

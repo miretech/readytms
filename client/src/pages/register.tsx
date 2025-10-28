@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Truck, AlertCircle } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
@@ -35,6 +35,9 @@ export default function RegisterPage() {
       setIsLoading(true);
       
       await apiRequest("POST", "/api/auth/register", data);
+
+      // Invalidate auth query to refresh user state
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
 
       // Redirect to dashboard on successful registration
       setLocation("/");
