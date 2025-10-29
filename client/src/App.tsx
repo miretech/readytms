@@ -34,66 +34,45 @@ import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
-
-  // Use effect to handle redirect instead of side effect during render
-  React.useEffect(() => {
-    if (!isLoading && !user) {
-      setLocation("/login");
-    }
-  }, [isLoading, user, setLocation]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
+// Routes are now publicly accessible - no auth required
+function PublicRoute({ component: Component }: { component: React.ComponentType }) {
   return <Component />;
 }
 
 function Router() {
   return (
     <Switch>
-      {/* Public routes */}
+      {/* Auth routes - still available for optional login */}
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/driver-signup" component={DriverSignup} />
       
-      {/* Protected routes */}
-      <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
-      <Route path="/loads">{() => <ProtectedRoute component={Loads} />}</Route>
-      <Route path="/fleet">{() => <ProtectedRoute component={Fleet} />}</Route>
-      <Route path="/drivers">{() => <ProtectedRoute component={Drivers} />}</Route>
-      <Route path="/customers">{() => <ProtectedRoute component={Customers} />}</Route>
-      <Route path="/safety">{() => <ProtectedRoute component={Safety} />}</Route>
-      <Route path="/maintenance">{() => <ProtectedRoute component={Maintenance} />}</Route>
-      <Route path="/fuel">{() => <ProtectedRoute component={Fuel} />}</Route>
-      <Route path="/gps-tracking">{() => <ProtectedRoute component={GpsTracking} />}</Route>
-      <Route path="/driver-portal">{() => <ProtectedRoute component={DriverPortal} />}</Route>
-      <Route path="/accounting">{() => <ProtectedRoute component={Accounting} />}</Route>
-      <Route path="/short-pays">{() => <ProtectedRoute component={ShortPays} />}</Route>
-      <Route path="/charge-backs">{() => <ProtectedRoute component={ChargeBacks} />}</Route>
-      <Route path="/settlements">{() => <ProtectedRoute component={Settlements} />}</Route>
-      <Route path="/recurring-expenses">{() => <ProtectedRoute component={RecurringExpenses} />}</Route>
-      <Route path="/tasks">{() => <ProtectedRoute component={Tasks} />}</Route>
+      {/* All routes are now publicly accessible */}
+      <Route path="/">{() => <PublicRoute component={Dashboard} />}</Route>
+      <Route path="/loads">{() => <PublicRoute component={Loads} />}</Route>
+      <Route path="/fleet">{() => <PublicRoute component={Fleet} />}</Route>
+      <Route path="/drivers">{() => <PublicRoute component={Drivers} />}</Route>
+      <Route path="/customers">{() => <PublicRoute component={Customers} />}</Route>
+      <Route path="/safety">{() => <PublicRoute component={Safety} />}</Route>
+      <Route path="/maintenance">{() => <PublicRoute component={Maintenance} />}</Route>
+      <Route path="/fuel">{() => <PublicRoute component={Fuel} />}</Route>
+      <Route path="/gps-tracking">{() => <PublicRoute component={GpsTracking} />}</Route>
+      <Route path="/driver-portal">{() => <PublicRoute component={DriverPortal} />}</Route>
+      <Route path="/accounting">{() => <PublicRoute component={Accounting} />}</Route>
+      <Route path="/short-pays">{() => <PublicRoute component={ShortPays} />}</Route>
+      <Route path="/charge-backs">{() => <PublicRoute component={ChargeBacks} />}</Route>
+      <Route path="/settlements">{() => <PublicRoute component={Settlements} />}</Route>
+      <Route path="/recurring-expenses">{() => <PublicRoute component={RecurringExpenses} />}</Route>
+      <Route path="/tasks">{() => <PublicRoute component={Tasks} />}</Route>
       <Route component={NotFound} />
     </Switch>
   );
 }
 
 function AppContent() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [location] = useLocation();
   const isAuthPage = ["/login", "/register", "/forgot-password", "/reset-password", "/driver-signup"].includes(location);
 
@@ -102,7 +81,8 @@ function AppContent() {
     "--sidebar-width-icon": "3rem",
   };
 
-  if (isAuthPage || !user) {
+  // Show auth pages without sidebar
+  if (isAuthPage) {
     return (
       <>
         <Router />
@@ -111,6 +91,7 @@ function AppContent() {
     );
   }
 
+  // Show main app with sidebar (works with or without login)
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
@@ -119,18 +100,31 @@ function AppContent() {
           <header className="flex items-center justify-between border-b border-border p-4">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-4">
-              <div className="text-sm text-muted-foreground">
-                {user.firstName} {user.lastName}
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => logout()}
-                data-testid="button-logout"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
+              {user ? (
+                <>
+                  <div className="text-sm text-muted-foreground">
+                    {user.firstName} {user.lastName}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => logout()}
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.location.href = "/login"}
+                  data-testid="button-login-header"
+                >
+                  Login
+                </Button>
+              )}
               <ThemeToggle />
             </div>
           </header>
