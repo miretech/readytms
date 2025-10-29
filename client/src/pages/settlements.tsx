@@ -201,6 +201,24 @@ function SettlementDialog({
         // Total deductions = factoring + all other deductions
         const totalDeductions = factoringFee + tolls + fuel + advance + insurance + trailerFee + truckRepair + trailerRepair;
         
+        // Debug logging
+        console.log("Settlement Calculation:", {
+          totalRevenue,
+          driverPayPct,
+          driverPay,
+          factoringPct,
+          factoringFee,
+          tolls,
+          fuel,
+          advance,
+          insurance,
+          trailerFee,
+          truckRepair,
+          trailerRepair,
+          totalDeductions,
+          netPay: driverPay - totalDeductions
+        });
+        
         // Store total deductions
         form.setValue("deductions", totalDeductions.toFixed(2));
         
@@ -234,10 +252,11 @@ function SettlementDialog({
       });
       onOpenChange(false);
     },
-    onError: () => {
+    onError: (error: any) => {
+      const errorMessage = error?.message || `Failed to ${isEditing ? "update" : "create"} settlement. Please check all required fields.`;
       toast({
         title: "Error",
-        description: `Failed to ${isEditing ? "update" : "create"} settlement.`,
+        description: errorMessage,
         variant: "destructive",
       });
     },
