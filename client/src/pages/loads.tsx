@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -29,6 +29,8 @@ export default function Loads() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const { toast } = useToast();
 
   const { data: loads = [], isLoading } = useQuery<Load[]>({
@@ -60,6 +62,29 @@ export default function Loads() {
     load.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
     load.deliveryLocation.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredLoads.length / itemsPerPage);
+  
+  // Derive clamped page synchronously to prevent empty table on render
+  const clampedPage = totalPages === 0 ? 1 : Math.min(Math.max(currentPage, 1), totalPages);
+  
+  // Update state if clamped value differs (runs after render)
+  useEffect(() => {
+    if (currentPage !== clampedPage) {
+      setCurrentPage(clampedPage);
+    }
+  }, [currentPage, clampedPage]);
+  
+  const startIndex = (clampedPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLoads = filteredLoads.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search changes
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
   const handleEdit = (load: Load) => {
     setEditingLoad(load);
@@ -109,7 +134,7 @@ export default function Loads() {
             <Input
               placeholder="Search loads..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               className="pl-10"
               data-testid="input-search-loads"
             />
@@ -147,7 +172,7 @@ export default function Loads() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLoads.map((load) => (
+                {paginatedLoads.map((load) => (
                   <TableRow key={load.id} data-testid={`row-load-${load.id}`}>
                     <TableCell className="font-medium">{load.loadNumber}</TableCell>
                     <TableCell>
@@ -198,6 +223,63 @@ export default function Loads() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        )}
+
+        {filteredLoads.length > 0 && (
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredLoads.length)} of {filteredLoads.length} loads
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(clampedPage - 1)}
+                disabled={clampedPage === 1}
+                data-testid="button-prev-page"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let pageNumber;
+                  if (totalPages <= 5) {
+                    pageNumber = i + 1;
+                  } else if (clampedPage <= 3) {
+                    pageNumber = i + 1;
+                  } else if (clampedPage >= totalPages - 2) {
+                    pageNumber = totalPages - 4 + i;
+                  } else {
+                    pageNumber = clampedPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNumber}
+                      variant={clampedPage === pageNumber ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNumber)}
+                      data-testid={`button-page-${pageNumber}`}
+                      className="min-w-[2.5rem]"
+                    >
+                      {pageNumber}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(clampedPage + 1)}
+                disabled={clampedPage === totalPages}
+                data-testid="button-next-page"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
           </div>
         )}
       </Card>
