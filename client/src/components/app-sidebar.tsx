@@ -156,10 +156,10 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild data-testid="link-settings">
-              <Link href="/settings">
+            <SidebarMenuButton asChild data-testid="link-company-settings">
+              <Link href="/company-settings">
                 <Settings className="h-4 w-4" />
-                <span>Settings</span>
+                <span>Company Settings</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

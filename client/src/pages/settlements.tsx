@@ -1190,9 +1190,15 @@ export default function Settlements() {
     setIsDetailsDialogOpen(true);
   };
 
-  const handleDownloadPDF = (settlement: Settlement) => {
+  const handleDownloadPDF = async (settlement: Settlement) => {
+    // Fetch company settings
+    const companyRes = await fetch("/api/company-settings");
+    const companySettings = companyRes.ok ? await companyRes.json() : null;
+    
     const doc = new jsPDF();
     const driverName = getDriverName(settlement.driverId);
+    const pageHeight = doc.internal.pageSize.height;
+    const bottomMargin = 20;
     
     // Calculate values - Driver pay from GROSS revenue
     const totalRevenue = Number(settlement.totalRevenue);
@@ -1203,50 +1209,101 @@ export default function Settlements() {
     const driverPayPct = Number(settlement.driverPayPercentage);
     const driverPay = (totalRevenue * driverPayPct) / 100; // Driver pay from GROSS revenue
     
-    // Header
-    doc.setFontSize(20);
-    doc.text("Driver Settlement", 105, 20, { align: "center" });
+    // Helper function to check if we need a new page
+    const checkPageBreak = (currentY: number, spaceNeeded: number = 20) => {
+      if (currentY + spaceNeeded > pageHeight - bottomMargin) {
+        doc.addPage();
+        return 20; // Return new Y position at top of new page
+      }
+      return currentY;
+    };
+    
+    // Company Header - Use settings from database or defaults
+    const companyName = companySettings?.companyName || "READY CARRIER LLC";
+    const address = companySettings?.address || "2380 Wycliff Street Ste 200";
+    const cityStateZip = companySettings?.cityStateZip || "St Paul, MN 55114";
+    const phone = companySettings?.phone || "612-567-5034";
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(companyName.toUpperCase(), 105, 15, { align: "center" });
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(address, 105, 21, { align: "center" });
+    doc.text(cityStateZip, 105, 26, { align: "center" });
+    doc.text(`Phone: ${phone}`, 105, 31, { align: "center" });
+    
+    // Add company logo if available
+    if (companySettings?.logoUrl) {
+      try {
+        doc.addImage(companySettings.logoUrl, 'PNG', 15, 10, 30, 30);
+      } catch (error) {
+        console.error("Error adding logo to PDF:", error);
+      }
+    }
+    
+    // Settlement Title
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Driver Settlement", 105, 42, { align: "center" });
     
     doc.setFontSize(10);
-    doc.text(`Settlement #: ${settlement.settlementNumber}`, 20, 35);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 35);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Settlement #: ${settlement.settlementNumber}`, 20, 52);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 52);
     
     // Driver Info
+    let yPos = 65;
     doc.setFontSize(14);
-    doc.text("Driver Information", 20, 50);
+    doc.setFont("helvetica", "bold");
+    doc.text("Driver Information", 20, yPos);
     doc.setFontSize(10);
-    doc.text(`Driver: ${driverName}`, 20, 60);
-    doc.text(`Truck: ${settlement.truckNumber || "N/A"}`, 20, 67);
-    doc.text(`Period: ${new Date(settlement.periodStart).toLocaleDateString()} - ${new Date(settlement.periodEnd).toLocaleDateString()}`, 20, 74);
+    doc.setFont("helvetica", "normal");
+    yPos += 10;
+    doc.text(`Driver: ${driverName}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Truck: ${settlement.truckNumber || "N/A"}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Period: ${new Date(settlement.periodStart).toLocaleDateString()} - ${new Date(settlement.periodEnd).toLocaleDateString()}`, 20, yPos);
     
     // Revenue Section
+    yPos += 15;
+    yPos = checkPageBreak(yPos, 25);
     doc.setFontSize(14);
-    doc.text("Revenue", 20, 90);
+    doc.setFont("helvetica", "bold");
+    doc.text("Revenue", 20, yPos);
     doc.setFontSize(10);
-    doc.text(`Total Revenue:`, 20, 100);
-    doc.text(`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 100, { align: "right" });
-    doc.text(`Driver Pay (${driverPayPct.toFixed(2)}%):`, 20, 107);
-    doc.text(`$${driverPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 107, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    yPos += 10;
+    doc.text(`Total Revenue:`, 20, yPos);
+    doc.text(`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+    yPos += 7;
+    doc.text(`Driver Pay (${driverPayPct.toFixed(2)}%):`, 20, yPos);
+    doc.text(`$${driverPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
     
     // Dispatch Section
-    let yPos = 120;
+    yPos += 13;
+    yPos = checkPageBreak(yPos, 25);
     if (dispatchPct > 0) {
       doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
       doc.text("Dispatch", 20, yPos);
       doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
       yPos += 10;
       doc.text(`Dispatch Fee (${dispatchPct.toFixed(2)}%):`, 20, yPos);
       doc.text(`$${dispatchFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-      yPos += 15;
-    } else {
-      yPos += 5;
+      yPos += 13;
     }
     
     // Advance Section
+    yPos = checkPageBreak(yPos, 35);
     if (Number(settlement.advance || 0) > 0 || Number(settlement.advanceBalance || 0) > 0) {
       doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
       doc.text("Advance", 20, yPos);
       doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
       yPos += 10;
       doc.text(`Advance:`, 20, yPos);
       doc.text(`$${Number(settlement.advance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
@@ -1258,14 +1315,17 @@ export default function Settlements() {
         doc.text(`Advance Date:`, 20, yPos);
         doc.text(new Date(settlement.advanceDate).toLocaleDateString(), 150, yPos, { align: "right" });
       }
-      yPos += 15;
+      yPos += 13;
     }
     
     // Fuel Sections
+    yPos = checkPageBreak(yPos, 30);
     if (Number(settlement.fuelFlyingJ || 0) > 0 || Number(settlement.fuelFleetOne || 0) > 0) {
       doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
       doc.text("Fuel", 20, yPos);
       doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
       yPos += 10;
       if (Number(settlement.fuelFlyingJ || 0) > 0) {
         doc.text(`Fuel - Flying J:`, 20, yPos);
@@ -1277,13 +1337,16 @@ export default function Settlements() {
         doc.text(`$${Number(settlement.fuelFleetOne || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
         yPos += 7;
       }
-      yPos += 8;
+      yPos += 6;
     }
     
     // Other Deductions Section
+    yPos = checkPageBreak(yPos, 30);
     doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
     doc.text("Other Deductions", 20, yPos);
     doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
     yPos += 10;
     
     // Add dispatch, factoring fee, fuel sections, and all other deductions
@@ -1303,6 +1366,7 @@ export default function Settlements() {
     
     deductions.forEach(({ label, value }) => {
       if (value > 0) {
+        yPos = checkPageBreak(yPos, 10);
         doc.text(`${label}:`, 20, yPos);
         doc.text(`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
         yPos += 7;
@@ -1310,15 +1374,18 @@ export default function Settlements() {
     });
     
     // Total Deductions - ALL deductions including factoring
+    yPos = checkPageBreak(yPos, 15);
     const totalDeductions = deductions.reduce((sum, { value }) => sum + value, 0);
     doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
     yPos += 5;
     doc.text(`Total Deductions:`, 20, yPos);
     doc.text(`$${totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
     
     // Net Pay = driver pay - total deductions
+    yPos = checkPageBreak(yPos, 15);
     const correctNetPay = driverPay - totalDeductions;
-    yPos += 12;
+    yPos += 10;
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text(`Net Pay:`, 20, yPos);
@@ -1326,26 +1393,35 @@ export default function Settlements() {
     
     // Payment Info
     if (settlement.status === "Paid" && settlement.paidDate) {
+      yPos = checkPageBreak(yPos, 25);
       yPos += 15;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.text(`Payment Status: ${settlement.status}`, 20, yPos);
-      doc.text(`Paid Date: ${new Date(settlement.paidDate).toLocaleDateString()}`, 20, yPos + 7);
+      yPos += 7;
+      doc.text(`Paid Date: ${new Date(settlement.paidDate).toLocaleDateString()}`, 20, yPos);
       if (settlement.paymentMethod) {
-        doc.text(`Payment Method: ${settlement.paymentMethod}`, 20, yPos + 14);
+        yPos += 7;
+        doc.text(`Payment Method: ${settlement.paymentMethod}`, 20, yPos);
       }
     }
     
     // Notes
     if (settlement.notes) {
-      yPos += 25;
+      yPos += 20;
+      yPos = checkPageBreak(yPos, 25);
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text("Notes:", 20, yPos);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
+      yPos += 7;
       const lines = doc.splitTextToSize(settlement.notes, 170);
-      doc.text(lines, 20, yPos + 7);
+      lines.forEach((line: string, index: number) => {
+        yPos = checkPageBreak(yPos, 10);
+        doc.text(line, 20, yPos);
+        if (index < lines.length - 1) yPos += 7;
+      });
     }
     
     // Save PDF

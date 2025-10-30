@@ -49,6 +49,8 @@ import {
   type InsertChargeBack,
   type Task,
   type InsertTask,
+  type CompanySettings,
+  type InsertCompanySettings,
   users,
   loads,
   trucks,
@@ -73,7 +75,8 @@ import {
   activityLog,
   shortPays,
   chargeBacks,
-  tasks
+  tasks,
+  companySettings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -265,6 +268,10 @@ export interface IStorage {
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, task: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<boolean>;
+
+  // Company Settings
+  getCompanySettings(): Promise<CompanySettings | undefined>;
+  updateCompanySettings(settings: Partial<InsertCompanySettings>): Promise<CompanySettings | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1393,6 +1400,32 @@ export class DatabaseStorage implements IStorage {
   async deleteTask(id: string): Promise<boolean> {
     const result = await db.delete(tasks).where(eq(tasks.id, id));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Company Settings Implementation
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    const [settings] = await db.select().from(companySettings).limit(1);
+    return settings || undefined;
+  }
+
+  async updateCompanySettings(updateData: Partial<InsertCompanySettings>): Promise<CompanySettings | undefined> {
+    const existingSettings = await this.getCompanySettings();
+    
+    if (existingSettings) {
+      const [updated] = await db
+        .update(companySettings)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(companySettings.id, existingSettings.id))
+        .returning();
+      return updated || undefined;
+    } else {
+      // Create new settings if none exist
+      const [created] = await db
+        .insert(companySettings)
+        .values(updateData as InsertCompanySettings)
+        .returning();
+      return created;
+    }
   }
 }
 

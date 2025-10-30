@@ -28,6 +28,7 @@ import DriverSignup from "@/pages/driver-signup";
 import ShortPays from "@/pages/short-pays";
 import ChargeBacks from "@/pages/charge-backs";
 import Tasks from "@/pages/tasks";
+import CompanySettings from "@/pages/company-settings";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import ForgotPasswordPage from "@/pages/forgot-password";
@@ -66,6 +67,7 @@ function Router() {
       <Route path="/settlements">{() => <PublicRoute component={Settlements} />}</Route>
       <Route path="/recurring-expenses">{() => <PublicRoute component={RecurringExpenses} />}</Route>
       <Route path="/tasks">{() => <PublicRoute component={Tasks} />}</Route>
+      <Route path="/company-settings">{() => <PublicRoute component={CompanySettings} />}</Route>
       <Route component={NotFound} />
     </Switch>
   );

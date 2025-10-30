@@ -1620,6 +1620,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Company Settings Routes
+  app.get("/api/company-settings", async (_req, res) => {
+    const settings = await storage.getCompanySettings();
+    if (!settings) {
+      return res.status(404).json({ error: "Company settings not found" });
+    }
+    res.json(settings);
+  });
+
+  app.patch("/api/company-settings", async (req, res) => {
+    try {
+      const { insertCompanySettingsSchema } = await import("@shared/schema");
+      const validatedData = insertCompanySettingsSchema.partial().parse(req.body);
+      const settings = await storage.updateCompanySettings(validatedData);
+      if (!settings) {
+        return res.status(404).json({ error: "Failed to update company settings" });
+      }
+      res.json(settings);
+    } catch (error: any) {
+      console.error("Company settings update error:", error);
+      res.status(400).json({ error: "Invalid settings data", details: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

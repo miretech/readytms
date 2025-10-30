@@ -735,3 +735,22 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
+
+// Company Settings - Store company branding and information for PDFs
+export const companySettings = pgTable("company_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name").notNull().default("Ready Carrier LLC"),
+  address: text("address").notNull().default("2380 Wycliff Street Ste 200"),
+  cityStateZip: text("city_state_zip").notNull().default("St Paul, MN 55114"),
+  phone: text("phone").notNull().default("612-567-5034"),
+  logoUrl: text("logo_url"), // URL or base64 data of company logo
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;
