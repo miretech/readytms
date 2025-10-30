@@ -461,6 +461,24 @@ export class DatabaseStorage implements IStorage {
       values.medicalCardExpiration = null;
     }
     
+    if (insertDriver.medicalCardIssuedDate && insertDriver.medicalCardIssuedDate.trim() !== "") {
+      values.medicalCardIssuedDate = new Date(insertDriver.medicalCardIssuedDate);
+    } else {
+      values.medicalCardIssuedDate = null;
+    }
+    
+    if (insertDriver.dateHired && insertDriver.dateHired.trim() !== "") {
+      values.dateHired = new Date(insertDriver.dateHired);
+    } else {
+      values.dateHired = null;
+    }
+    
+    if (insertDriver.dateTerminated && insertDriver.dateTerminated.trim() !== "") {
+      values.dateTerminated = new Date(insertDriver.dateTerminated);
+    } else {
+      values.dateTerminated = null;
+    }
+    
     const [driver] = await db
       .insert(drivers)
       .values(values)
@@ -484,6 +502,30 @@ export class DatabaseStorage implements IStorage {
         values.medicalCardExpiration = new Date(updateData.medicalCardExpiration);
       } else {
         values.medicalCardExpiration = null;
+      }
+    }
+    
+    if (updateData.medicalCardIssuedDate !== undefined) {
+      if (updateData.medicalCardIssuedDate && updateData.medicalCardIssuedDate.trim() !== "") {
+        values.medicalCardIssuedDate = new Date(updateData.medicalCardIssuedDate);
+      } else {
+        values.medicalCardIssuedDate = null;
+      }
+    }
+    
+    if (updateData.dateHired !== undefined) {
+      if (updateData.dateHired && updateData.dateHired.trim() !== "") {
+        values.dateHired = new Date(updateData.dateHired);
+      } else {
+        values.dateHired = null;
+      }
+    }
+    
+    if (updateData.dateTerminated !== undefined) {
+      if (updateData.dateTerminated && updateData.dateTerminated.trim() !== "") {
+        values.dateTerminated = new Date(updateData.dateTerminated);
+      } else {
+        values.dateTerminated = null;
       }
     }
     

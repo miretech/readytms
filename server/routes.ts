@@ -355,25 +355,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/drivers/:id", async (req, res) => {
     try {
-      console.log("PATCH /api/drivers request body:", JSON.stringify(req.body, null, 2));
       const validatedData = insertDriverSchema.partial().parse(req.body);
-      console.log("Validated data:", JSON.stringify(validatedData, null, 2));
       const driver = await storage.updateDriver(req.params.id, validatedData);
       if (!driver) {
         return res.status(404).json({ error: "Driver not found" });
       }
       res.json(driver);
     } catch (error: any) {
-      console.error("Driver update validation error:", error);
-      console.error("Error stack:", error.stack);
-      if (error.errors) {
-        console.error("Zod validation errors:", JSON.stringify(error.errors, null, 2));
-      }
-      res.status(400).json({ 
-        error: "Invalid driver data", 
-        details: error.message,
-        validationErrors: error.errors 
-      });
+      console.error("Driver update error:", error);
+      res.status(400).json({ error: "Invalid driver data", details: error.message });
     }
   });
 
