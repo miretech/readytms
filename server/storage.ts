@@ -831,6 +831,7 @@ export class DatabaseStorage implements IStorage {
         periodStart: new Date(insertSettlement.periodStart),
         periodEnd: new Date(insertSettlement.periodEnd),
         paidDate: insertSettlement.paidDate ? new Date(insertSettlement.paidDate) : undefined,
+        advanceDate: insertSettlement.advanceDate ? new Date(insertSettlement.advanceDate) : undefined,
       })
       .returning();
     return settlement;
@@ -846,6 +847,9 @@ export class DatabaseStorage implements IStorage {
     }
     if (updateData.paidDate) {
       values.paidDate = new Date(updateData.paidDate);
+    }
+    if (updateData.advanceDate) {
+      values.advanceDate = new Date(updateData.advanceDate);
     }
     const [settlement] = await db
       .update(settlements)

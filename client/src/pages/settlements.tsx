@@ -59,9 +59,14 @@ const settlementFormSchema = insertSettlementSchema.extend({
   periodEnd: z.string().min(1, "Period end is required"),
   totalRevenue: z.string().min(1, "Total revenue is required"),
   driverPayPercentage: z.string().min(1, "Driver pay percentage is required"),
+  dispatchPercentage: z.string().optional(),
+  advance: z.string().optional(),
+  advanceBalance: z.string().optional(),
+  advanceDate: z.string().optional(),
+  fuelFlyingJ: z.string().optional(),
+  fuelFleetOne: z.string().optional(),
   tolls: z.string().optional(),
   fuel: z.string().optional(),
-  advance: z.string().optional(),
   factoringFeePercentage: z.string().optional(),
   insurance: z.string().optional(),
   trailerFee: z.string().optional(),
@@ -100,9 +105,14 @@ function SettlementDialog({
       totalMiles: undefined,
       totalRevenue: "",
       driverPayPercentage: "",
+      dispatchPercentage: "0",
+      advance: "0",
+      advanceBalance: "0",
+      advanceDate: "",
+      fuelFlyingJ: "0",
+      fuelFleetOne: "0",
       tolls: "0",
       fuel: "0",
-      advance: "0",
       factoringFeePercentage: "0",
       insurance: "0",
       trailerFee: "0",
@@ -128,9 +138,14 @@ function SettlementDialog({
         totalMiles: settlement.totalMiles || undefined,
         totalRevenue: settlement.totalRevenue.toString(),
         driverPayPercentage: settlement.driverPayPercentage.toString(),
+        dispatchPercentage: settlement.dispatchPercentage?.toString() || "0",
+        advance: settlement.advance?.toString() || "0",
+        advanceBalance: settlement.advanceBalance?.toString() || "0",
+        advanceDate: settlement.advanceDate ? new Date(settlement.advanceDate).toISOString().split("T")[0] : "",
+        fuelFlyingJ: settlement.fuelFlyingJ?.toString() || "0",
+        fuelFleetOne: settlement.fuelFleetOne?.toString() || "0",
         tolls: settlement.tolls?.toString() || "0",
         fuel: settlement.fuel?.toString() || "0",
-        advance: settlement.advance?.toString() || "0",
         factoringFeePercentage: settlement.factoringFeePercentage?.toString() || "0",
         insurance: settlement.insurance?.toString() || "0",
         trailerFee: settlement.trailerFee?.toString() || "0",
@@ -155,9 +170,14 @@ function SettlementDialog({
         totalMiles: undefined,
         totalRevenue: "",
         driverPayPercentage: "",
+        dispatchPercentage: "0",
+        advance: "0",
+        advanceBalance: "0",
+        advanceDate: "",
+        fuelFlyingJ: "0",
+        fuelFleetOne: "0",
         tolls: "0",
         fuel: "0",
-        advance: "0",
         factoringFeePercentage: "0",
         insurance: "0",
         trailerFee: "0",
@@ -176,40 +196,50 @@ function SettlementDialog({
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       // Calculate total deductions and net pay when any relevant field changes
-      const relevantFields = ["driverPayPercentage", "totalRevenue", "factoringFeePercentage", "tolls", "fuel", "advance", "insurance", "trailerFee", "truckRepair", "trailerRepair"];
+      const relevantFields = ["driverPayPercentage", "dispatchPercentage", "totalRevenue", "factoringFeePercentage", "tolls", "fuel", "fuelFlyingJ", "fuelFleetOne", "advance", "insurance", "trailerFee", "truckRepair", "trailerRepair"];
       
       if (relevantFields.includes(name || "")) {
         const totalRevenue = parseFloat(value.totalRevenue || "0");
         const driverPayPct = parseFloat(value.driverPayPercentage || "0");
+        const dispatchPct = parseFloat(value.dispatchPercentage || "0");
         const factoringPct = parseFloat(value.factoringFeePercentage || "0");
         
         // Calculate driver pay from GROSS revenue
         const driverPay = (totalRevenue * driverPayPct) / 100;
         
+        // Calculate dispatch fee from percentage
+        const dispatchFee = (totalRevenue * dispatchPct) / 100;
+        
         // Calculate factoring fee from percentage
         const factoringFee = (totalRevenue * factoringPct) / 100;
         
-        // Sum all deductions INCLUDING factoring
+        // Sum all deductions INCLUDING dispatch, factoring, and fuel sections
         const tolls = parseFloat(value.tolls || "0");
         const fuel = parseFloat(value.fuel || "0");
+        const fuelFlyingJ = parseFloat(value.fuelFlyingJ || "0");
+        const fuelFleetOne = parseFloat(value.fuelFleetOne || "0");
         const advance = parseFloat(value.advance || "0");
         const insurance = parseFloat(value.insurance || "0");
         const trailerFee = parseFloat(value.trailerFee || "0");
         const truckRepair = parseFloat(value.truckRepair || "0");
         const trailerRepair = parseFloat(value.trailerRepair || "0");
         
-        // Total deductions = factoring + all other deductions
-        const totalDeductions = factoringFee + tolls + fuel + advance + insurance + trailerFee + truckRepair + trailerRepair;
+        // Total deductions = dispatch + factoring + fuel sections + all other deductions
+        const totalDeductions = dispatchFee + factoringFee + tolls + fuel + fuelFlyingJ + fuelFleetOne + advance + insurance + trailerFee + truckRepair + trailerRepair;
         
         // Debug logging
         console.log("Settlement Calculation:", {
           totalRevenue,
           driverPayPct,
           driverPay,
+          dispatchPct,
+          dispatchFee,
           factoringPct,
           factoringFee,
           tolls,
           fuel,
+          fuelFlyingJ,
+          fuelFleetOne,
           advance,
           insurance,
           trailerFee,
@@ -420,7 +450,141 @@ function SettlementDialog({
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">Deductions</h3>
+              <h3 className="text-sm font-medium">Dispatch</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="dispatchPercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dispatch Percentage (%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-dispatch-percentage"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Advance</h3>
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="advance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Advance ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-advance"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="advanceBalance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Advance Balance ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-advance-balance"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="advanceDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Advance Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-advance-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Fuel - Flying J</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="fuelFlyingJ"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fuel Flying J ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-fuel-flying-j"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Fuel - Fleet One</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="fuelFleetOne"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fuel Fleet One ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-fuel-fleet-one"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Other Deductions</h3>
               <div className="grid gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
@@ -467,33 +631,13 @@ function SettlementDialog({
                   name="fuel"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fuel ($)</FormLabel>
+                      <FormLabel>Fuel (Other) ($)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
                           step="0.01"
                           {...field}
                           data-testid="input-fuel"
-                          placeholder="0.00"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="advance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Advance ($)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          data-testid="input-advance"
                           placeholder="0.00"
                         />
                       </FormControl>
@@ -1030,6 +1174,8 @@ export default function Settlements() {
     
     // Calculate values - Driver pay from GROSS revenue
     const totalRevenue = Number(settlement.totalRevenue);
+    const dispatchPct = Number(settlement.dispatchPercentage || 0);
+    const dispatchFee = (totalRevenue * dispatchPct) / 100;
     const factoringPct = Number(settlement.factoringFeePercentage || 0);
     const factoringFee = (totalRevenue * factoringPct) / 100;
     const driverPayPct = Number(settlement.driverPayPercentage);
@@ -1060,17 +1206,72 @@ export default function Settlements() {
     doc.text(`Driver Pay (${driverPayPct.toFixed(2)}%):`, 20, 107);
     doc.text(`$${driverPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 107, { align: "right" });
     
-    // Deductions Section
-    doc.setFontSize(14);
-    doc.text("Deductions", 20, 125);
-    doc.setFontSize(10);
-    let yPos = 135;
+    // Dispatch Section
+    let yPos = 120;
+    if (dispatchPct > 0) {
+      doc.setFontSize(14);
+      doc.text("Dispatch", 20, yPos);
+      doc.setFontSize(10);
+      yPos += 10;
+      doc.text(`Dispatch Fee (${dispatchPct.toFixed(2)}%):`, 20, yPos);
+      doc.text(`$${dispatchFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+      yPos += 15;
+    } else {
+      yPos += 5;
+    }
     
-    // Add factoring fee first, then all other deductions
+    // Advance Section
+    if (Number(settlement.advance || 0) > 0 || Number(settlement.advanceBalance || 0) > 0) {
+      doc.setFontSize(14);
+      doc.text("Advance", 20, yPos);
+      doc.setFontSize(10);
+      yPos += 10;
+      doc.text(`Advance:`, 20, yPos);
+      doc.text(`$${Number(settlement.advance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+      yPos += 7;
+      doc.text(`Advance Balance:`, 20, yPos);
+      doc.text(`$${Number(settlement.advanceBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+      if (settlement.advanceDate) {
+        yPos += 7;
+        doc.text(`Advance Date:`, 20, yPos);
+        doc.text(new Date(settlement.advanceDate).toLocaleDateString(), 150, yPos, { align: "right" });
+      }
+      yPos += 15;
+    }
+    
+    // Fuel Sections
+    if (Number(settlement.fuelFlyingJ || 0) > 0 || Number(settlement.fuelFleetOne || 0) > 0) {
+      doc.setFontSize(14);
+      doc.text("Fuel", 20, yPos);
+      doc.setFontSize(10);
+      yPos += 10;
+      if (Number(settlement.fuelFlyingJ || 0) > 0) {
+        doc.text(`Fuel - Flying J:`, 20, yPos);
+        doc.text(`$${Number(settlement.fuelFlyingJ || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+        yPos += 7;
+      }
+      if (Number(settlement.fuelFleetOne || 0) > 0) {
+        doc.text(`Fuel - Fleet One:`, 20, yPos);
+        doc.text(`$${Number(settlement.fuelFleetOne || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+        yPos += 7;
+      }
+      yPos += 8;
+    }
+    
+    // Other Deductions Section
+    doc.setFontSize(14);
+    doc.text("Other Deductions", 20, yPos);
+    doc.setFontSize(10);
+    yPos += 10;
+    
+    // Add dispatch, factoring fee, fuel sections, and all other deductions
     const deductions = [
+      { label: `Dispatch Fee (${dispatchPct.toFixed(2)}%)`, value: dispatchFee },
       { label: `Factoring Fee (${factoringPct.toFixed(2)}%)`, value: factoringFee },
+      { label: "Fuel - Flying J", value: Number(settlement.fuelFlyingJ || 0) },
+      { label: "Fuel - Fleet One", value: Number(settlement.fuelFleetOne || 0) },
       { label: "Tolls", value: Number(settlement.tolls || 0) },
-      { label: "Fuel", value: Number(settlement.fuel || 0) },
+      { label: "Fuel (Other)", value: Number(settlement.fuel || 0) },
       { label: "Advance", value: Number(settlement.advance || 0) },
       { label: "Insurance", value: Number(settlement.insurance || 0) },
       { label: "Trailer Fee", value: Number(settlement.trailerFee || 0) },

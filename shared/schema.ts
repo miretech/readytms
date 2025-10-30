@@ -362,10 +362,18 @@ export const settlements = pgTable("settlements", {
   totalMiles: integer("total_miles"),
   totalRevenue: decimal("total_revenue", { precision: 10, scale: 2 }).notNull(),
   driverPayPercentage: decimal("driver_pay_percentage", { precision: 5, scale: 2 }).notNull(),
-  // Individual deduction fields
+  // Dispatch section
+  dispatchPercentage: decimal("dispatch_percentage", { precision: 5, scale: 2 }).default("0"),
+  // Advance section
+  advance: decimal("advance", { precision: 10, scale: 2 }).default("0"),
+  advanceBalance: decimal("advance_balance", { precision: 10, scale: 2 }).default("0"),
+  advanceDate: timestamp("advance_date"),
+  // Fuel sections
+  fuelFlyingJ: decimal("fuel_flying_j", { precision: 10, scale: 2 }).default("0"),
+  fuelFleetOne: decimal("fuel_fleet_one", { precision: 10, scale: 2 }).default("0"),
+  // Other deduction fields
   tolls: decimal("tolls", { precision: 10, scale: 2 }).default("0"),
   fuel: decimal("fuel", { precision: 10, scale: 2 }).default("0"),
-  advance: decimal("advance", { precision: 10, scale: 2 }).default("0"),
   factoringFeePercentage: decimal("factoring_fee_percentage", { precision: 5, scale: 2 }).default("0"),
   insurance: decimal("insurance", { precision: 10, scale: 2 }).default("0"),
   trailerFee: decimal("trailer_fee", { precision: 10, scale: 2 }).default("0"),
@@ -388,9 +396,14 @@ export const insertSettlementSchema = createInsertSchema(settlements).omit({
   periodEnd: z.string(),
   totalRevenue: z.string(),
   driverPayPercentage: z.string(),
+  dispatchPercentage: z.string().optional(),
+  advance: z.string().optional(),
+  advanceBalance: z.string().optional(),
+  advanceDate: z.string().optional(),
+  fuelFlyingJ: z.string().optional(),
+  fuelFleetOne: z.string().optional(),
   tolls: z.string().optional(),
   fuel: z.string().optional(),
-  advance: z.string().optional(),
   factoringFeePercentage: z.string().optional(),
   insurance: z.string().optional(),
   trailerFee: z.string().optional(),
