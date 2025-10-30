@@ -361,8 +361,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Driver not found" });
       }
       res.json(driver);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid driver data" });
+    } catch (error: any) {
+      console.error("Driver update validation error:", error);
+      res.status(400).json({ error: "Invalid driver data", details: error.message });
     }
   });
 
