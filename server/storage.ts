@@ -87,9 +87,6 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   createUser(user: Partial<UpsertUser>): Promise<User>;
   updateUser(id: string, user: Partial<UpsertUser>): Promise<User | undefined>;
-  updateUserPassword(id: string, passwordHash: string): Promise<void>;
-  updateUserResetToken(id: string, resetToken: string | null, resetTokenExpires: Date | null): Promise<void>;
-  updateUserLastLogin(id: string): Promise<void>;
   
   getAllLoads(): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
@@ -337,27 +334,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
-  }
-
-  async updateUserPassword(id: string, passwordHash: string): Promise<void> {
-    await db
-      .update(users)
-      .set({ passwordHash, updatedAt: new Date() })
-      .where(eq(users.id, id));
-  }
-
-  async updateUserResetToken(id: string, resetToken: string | null, resetTokenExpires: Date | null): Promise<void> {
-    await db
-      .update(users)
-      .set({ resetToken, resetTokenExpires, updatedAt: new Date() })
-      .where(eq(users.id, id));
-  }
-
-  async updateUserLastLogin(id: string): Promise<void> {
-    await db
-      .update(users)
-      .set({ lastLoginAt: new Date(), updatedAt: new Date() })
-      .where(eq(users.id, id));
   }
 
   async getAllLoads(): Promise<Load[]> {
