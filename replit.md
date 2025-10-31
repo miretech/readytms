@@ -53,22 +53,23 @@ The system provides a comprehensive set of modules:
 
 ### System Design Choices
 - **Development Approach**: Employs a schema-first design with all data models defined for type consistency, followed by horizontal layer implementation (schemas → storage → API → frontend).
-- **Authentication & Security**: Custom email/password authentication with bcrypt password hashing (cost factor 12), session-based authentication with secure HTTP-only cookies, PostgreSQL-backed session persistence (connect-pg-simple with manually created session table), and frontend auth guards using React context and TanStack Query. Routes: POST /api/auth/register, /api/auth/login, /api/auth/logout, /api/auth/forgot-password, /api/auth/reset-password, and GET /api/auth/me. Protected routes use ProtectedRoute component with useEffect-based redirects. Password reset tokens are hashed with crypto before storage. Session SECRET must be overridden with high-entropy value in production.
+- **Authentication & Security**: **Replit Auth (OpenID Connect)** with support for Google, GitHub, Apple, and email-password login. Authentication is **OPTIONAL** - all features are accessible without login. Session-based authentication with secure HTTP-only cookies (sameSite: "lax" for CSRF protection), PostgreSQL-backed session persistence (connect-pg-simple with manually created sessions table). Frontend auth guards using React context and TanStack Query. Auth routes: GET /api/login (initiates OIDC flow), GET /api/callback (OIDC callback), GET /api/logout (clears session), GET /api/auth/user (returns current user). User records are created/updated via upsertUser based on OIDC claims (sub, email, first_name, last_name, profile_image_url). Session SECRET must be overridden with high-entropy value in production.
 - **Data Layer**: PostgreSQL with Drizzle ORM, proper foreign key relationships, data normalization, and Drizzle Kit for migrations. Date fields properly handle empty strings by converting to null for optional timestamps.
 - **API Design**: RESTful endpoint structure with Zod validation on request bodies, consistent response formats, and proper HTTP status codes. GPS tracking endpoints support mobile app integration.
 - **Performance**: Utilizes TanStack Query for caching with query invalidation after login/register, database indexing, and optimized SQL queries.
 - **Compliance Monitoring**: Automated expiration tracking for CDL licenses and medical cards with visual status indicators (Expired/Expiring Soon/Valid) using date-fns calculations.
 
 ## External Dependencies
-- **Database**: PostgreSQL (Neon-backed on Replit) with manually created session table for connect-pg-simple
-- **Authentication**: Custom email/password with bcrypt for password hashing
-- **Session Management**: Express-session with connect-pg-simple (PostgreSQL store), manually created session table to avoid index conflicts
+- **Database**: PostgreSQL (Neon-backed on Replit) with manually created sessions table for connect-pg-simple
+- **Authentication**: Replit Auth (OpenID Connect) with Passport.js, supports Google/GitHub/Apple/email-password
+- **Session Management**: Express-session with connect-pg-simple (PostgreSQL store), sessions table manually created at server startup to avoid index conflicts
 - **UI Components**: Shadcn UI, Radix primitives
 - **Icons**: Lucide React
 - **Date Handling**: date-fns
-- **Password Security**: bcrypt (cost factor ≥12)
 
 ## Production Notes
 - **SESSION_SECRET**: Override default with high-entropy value (32+ random characters) in production environment
-- **Email Delivery**: Forgot/reset password flows currently log tokens to console in development. Integrate email service (e.g., SendGrid, AWS SES) before production deployment
-- **Session Table**: The session table schema is manually created at server startup. Do not use `createTableIfMissing: true` to avoid index creation conflicts
+- **REPL_ID**: Required environment variable for Replit Auth (automatically provided by Replit platform)
+- **ISSUER_URL**: Defaults to https://replit.com/oidc for production, can be overridden for testing
+- **Session Table**: The sessions table is automatically created at server startup using CREATE TABLE IF NOT EXISTS. Do not use `createTableIfMissing: true` in session store config to avoid index creation conflicts
+- **Authentication Migration**: Migrated from custom email/password to Replit Auth (Oct 2025). All existing user accounts were cleared during migration and users must re-authenticate using Replit Auth

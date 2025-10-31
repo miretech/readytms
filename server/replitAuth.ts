@@ -7,6 +7,8 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 const getOidcConfig = memoize(
   async () => {
@@ -17,6 +19,31 @@ const getOidcConfig = memoize(
   },
   { maxAge: 3600 * 1000 }
 );
+
+// Initialize session table
+async function initSessionTable() {
+  try {
+    // Create session table if it doesn't exist (manual creation to avoid index conflicts)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS sessions (
+        sid VARCHAR NOT NULL COLLATE "default",
+        sess JSON NOT NULL,
+        expire TIMESTAMP(6) NOT NULL,
+        PRIMARY KEY (sid)
+      )
+    `);
+    
+    // Create index if not exists
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions (expire)
+    `);
+    
+    console.log('Session table initialized successfully');
+  } catch (error) {
+    console.error('Error initializing session table:', error);
+    throw error;
+  }
+}
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -34,7 +61,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax", // CSRF protection
       maxAge: sessionTtl,
     },
   });
@@ -63,6 +91,9 @@ async function upsertUser(
 }
 
 export async function setupAuth(app: Express) {
+  // Initialize session table before using session middleware
+  await initSessionTable();
+  
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());

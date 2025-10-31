@@ -1,38 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeAutomationSettings } from "./automation";
-import { db } from "./db";
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
-
-// Session configuration
-const PgSession = connectPgSimple(session);
-const sessionStore = new PgSession({
-  conObject: {
-    connectionString: process.env.DATABASE_URL,
-  },
-  createTableIfMissing: false, // Table created manually to avoid index conflicts
-});
-
-app.use(
-  session({
-    store: sessionStore,
-    secret: process.env.SESSION_SECRET || "ready-tms-dev-secret-change-in-prod",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    },
-  })
-);
 
 app.use((req, res, next) => {
   const start = Date.now();
