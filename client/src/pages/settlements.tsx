@@ -64,11 +64,19 @@ const settlementFormSchema = insertSettlementSchema.extend({
   advanceBalance: z.string().optional(),
   advanceDate: z.string().optional(),
   fuelFlyingJ: z.string().optional(),
+  fuelFlyingJStartDate: z.string().optional(),
+  fuelFlyingJEndDate: z.string().optional(),
   fuelFleetOne: z.string().optional(),
+  fuelFleetOneStartDate: z.string().optional(),
+  fuelFleetOneEndDate: z.string().optional(),
   tolls: z.string().optional(),
+  tollsStartDate: z.string().optional(),
+  tollsEndDate: z.string().optional(),
   fuel: z.string().optional(),
   factoringFeePercentage: z.string().optional(),
   insurance: z.string().optional(),
+  insuranceStartDate: z.string().optional(),
+  insuranceEndDate: z.string().optional(),
   trailerFee: z.string().optional(),
   truckRepair: z.string().optional(),
   trailerRepair: z.string().optional(),
@@ -110,11 +118,19 @@ function SettlementDialog({
       advanceBalance: "0",
       advanceDate: "",
       fuelFlyingJ: "0",
+      fuelFlyingJStartDate: "",
+      fuelFlyingJEndDate: "",
       fuelFleetOne: "0",
+      fuelFleetOneStartDate: "",
+      fuelFleetOneEndDate: "",
       tolls: "0",
+      tollsStartDate: "",
+      tollsEndDate: "",
       fuel: "0",
       factoringFeePercentage: "0",
       insurance: "0",
+      insuranceStartDate: "",
+      insuranceEndDate: "",
       trailerFee: "0",
       truckRepair: "0",
       trailerRepair: "0",
@@ -143,11 +159,19 @@ function SettlementDialog({
         advanceBalance: settlement.advanceBalance?.toString() || "0",
         advanceDate: settlement.advanceDate ? new Date(settlement.advanceDate).toISOString().split("T")[0] : "",
         fuelFlyingJ: settlement.fuelFlyingJ?.toString() || "0",
+        fuelFlyingJStartDate: settlement.fuelFlyingJStartDate ? new Date(settlement.fuelFlyingJStartDate).toISOString().split("T")[0] : "",
+        fuelFlyingJEndDate: settlement.fuelFlyingJEndDate ? new Date(settlement.fuelFlyingJEndDate).toISOString().split("T")[0] : "",
         fuelFleetOne: settlement.fuelFleetOne?.toString() || "0",
+        fuelFleetOneStartDate: settlement.fuelFleetOneStartDate ? new Date(settlement.fuelFleetOneStartDate).toISOString().split("T")[0] : "",
+        fuelFleetOneEndDate: settlement.fuelFleetOneEndDate ? new Date(settlement.fuelFleetOneEndDate).toISOString().split("T")[0] : "",
         tolls: settlement.tolls?.toString() || "0",
+        tollsStartDate: settlement.tollsStartDate ? new Date(settlement.tollsStartDate).toISOString().split("T")[0] : "",
+        tollsEndDate: settlement.tollsEndDate ? new Date(settlement.tollsEndDate).toISOString().split("T")[0] : "",
         fuel: settlement.fuel?.toString() || "0",
         factoringFeePercentage: settlement.factoringFeePercentage?.toString() || "0",
         insurance: settlement.insurance?.toString() || "0",
+        insuranceStartDate: settlement.insuranceStartDate ? new Date(settlement.insuranceStartDate).toISOString().split("T")[0] : "",
+        insuranceEndDate: settlement.insuranceEndDate ? new Date(settlement.insuranceEndDate).toISOString().split("T")[0] : "",
         trailerFee: settlement.trailerFee?.toString() || "0",
         truckRepair: settlement.truckRepair?.toString() || "0",
         trailerRepair: settlement.trailerRepair?.toString() || "0",
@@ -276,15 +300,23 @@ function SettlementDialog({
         advanceBalance: parseFloat(values.advanceBalance || "0"),
         advanceDate: values.advanceDate || undefined,
         fuelFlyingJ: parseFloat(values.fuelFlyingJ || "0"),
+        fuelFlyingJStartDate: values.fuelFlyingJStartDate || undefined,
+        fuelFlyingJEndDate: values.fuelFlyingJEndDate || undefined,
         fuelFleetOne: parseFloat(values.fuelFleetOne || "0"),
+        fuelFleetOneStartDate: values.fuelFleetOneStartDate || undefined,
+        fuelFleetOneEndDate: values.fuelFleetOneEndDate || undefined,
         tolls: parseFloat(values.tolls || "0"),
+        tollsStartDate: values.tollsStartDate || undefined,
+        tollsEndDate: values.tollsEndDate || undefined,
         fuel: parseFloat(values.fuel || "0"),
         factoringFeePercentage: parseFloat(values.factoringFeePercentage || "0"),
         insurance: parseFloat(values.insurance || "0"),
+        insuranceStartDate: values.insuranceStartDate || undefined,
+        insuranceEndDate: values.insuranceEndDate || undefined,
         trailerFee: parseFloat(values.trailerFee || "0"),
         truckRepair: parseFloat(values.truckRepair || "0"),
         trailerRepair: parseFloat(values.trailerRepair || "0"),
-        deductions: parseFloat(values.deductions),
+        deductions: parseFloat(values.deductions || "0"),
         netPay: parseFloat(values.netPay),
         status: values.status,
         paidDate: values.paidDate || undefined,
@@ -557,13 +589,13 @@ function SettlementDialog({
 
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Fuel - Flying J</h3>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="fuelFlyingJ"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fuel Flying J ($)</FormLabel>
+                      <FormLabel>Amount ($)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -577,18 +609,44 @@ function SettlementDialog({
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="fuelFlyingJStartDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-fuel-flying-j-start-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fuelFlyingJEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-fuel-flying-j-end-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Fuel - Fleet One</h3>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="fuelFleetOne"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fuel Fleet One ($)</FormLabel>
+                      <FormLabel>Amount ($)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -597,6 +655,134 @@ function SettlementDialog({
                           data-testid="input-fuel-fleet-one"
                           placeholder="0.00"
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fuelFleetOneStartDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-fuel-fleet-one-start-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fuelFleetOneEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-fuel-fleet-one-end-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Tolls</h3>
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="tolls"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Amount ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-tolls"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tollsStartDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-tolls-start-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tollsEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-tolls-end-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Insurance</h3>
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="insurance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Amount ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-insurance"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="insuranceStartDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-insurance-start-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="insuranceEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-insurance-end-date" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -630,26 +816,6 @@ function SettlementDialog({
 
                 <FormField
                   control={form.control}
-                  name="tolls"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tolls ($)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          data-testid="input-tolls"
-                          placeholder="0.00"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
                   name="fuel"
                   render={({ field }) => (
                     <FormItem>
@@ -660,26 +826,6 @@ function SettlementDialog({
                           step="0.01"
                           {...field}
                           data-testid="input-fuel"
-                          placeholder="0.00"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="insurance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Insurance ($)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          data-testid="input-insurance"
                           placeholder="0.00"
                         />
                       </FormControl>
@@ -1331,10 +1477,72 @@ export default function Settlements() {
         doc.text(`Fuel - Flying J:`, 20, yPos);
         doc.text(`$${Number(settlement.fuelFlyingJ || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
         yPos += 7;
+        if (settlement.fuelFlyingJStartDate || settlement.fuelFlyingJEndDate) {
+          doc.setFontSize(8);
+          const startDate = settlement.fuelFlyingJStartDate ? new Date(settlement.fuelFlyingJStartDate).toLocaleDateString() : "N/A";
+          const endDate = settlement.fuelFlyingJEndDate ? new Date(settlement.fuelFlyingJEndDate).toLocaleDateString() : "N/A";
+          doc.text(`  Period: ${startDate} - ${endDate}`, 20, yPos);
+          doc.setFontSize(10);
+          yPos += 7;
+        }
       }
       if (Number(settlement.fuelFleetOne || 0) > 0) {
         doc.text(`Fuel - Fleet One:`, 20, yPos);
         doc.text(`$${Number(settlement.fuelFleetOne || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+        yPos += 7;
+        if (settlement.fuelFleetOneStartDate || settlement.fuelFleetOneEndDate) {
+          doc.setFontSize(8);
+          const startDate = settlement.fuelFleetOneStartDate ? new Date(settlement.fuelFleetOneStartDate).toLocaleDateString() : "N/A";
+          const endDate = settlement.fuelFleetOneEndDate ? new Date(settlement.fuelFleetOneEndDate).toLocaleDateString() : "N/A";
+          doc.text(`  Period: ${startDate} - ${endDate}`, 20, yPos);
+          doc.setFontSize(10);
+          yPos += 7;
+        }
+      }
+      yPos += 6;
+    }
+    
+    // Tolls Section (with dates)
+    yPos = checkPageBreak(yPos, 30);
+    if (Number(settlement.tolls || 0) > 0) {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Tolls", 20, yPos);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      yPos += 10;
+      doc.text(`Tolls:`, 20, yPos);
+      doc.text(`$${Number(settlement.tolls || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+      yPos += 7;
+      if (settlement.tollsStartDate || settlement.tollsEndDate) {
+        doc.setFontSize(8);
+        const startDate = settlement.tollsStartDate ? new Date(settlement.tollsStartDate).toLocaleDateString() : "N/A";
+        const endDate = settlement.tollsEndDate ? new Date(settlement.tollsEndDate).toLocaleDateString() : "N/A";
+        doc.text(`  Period: ${startDate} - ${endDate}`, 20, yPos);
+        doc.setFontSize(10);
+        yPos += 7;
+      }
+      yPos += 6;
+    }
+    
+    // Insurance Section (with dates)
+    yPos = checkPageBreak(yPos, 30);
+    if (Number(settlement.insurance || 0) > 0) {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Insurance", 20, yPos);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      yPos += 10;
+      doc.text(`Insurance:`, 20, yPos);
+      doc.text(`$${Number(settlement.insurance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+      yPos += 7;
+      if (settlement.insuranceStartDate || settlement.insuranceEndDate) {
+        doc.setFontSize(8);
+        const startDate = settlement.insuranceStartDate ? new Date(settlement.insuranceStartDate).toLocaleDateString() : "N/A";
+        const endDate = settlement.insuranceEndDate ? new Date(settlement.insuranceEndDate).toLocaleDateString() : "N/A";
+        doc.text(`  Period: ${startDate} - ${endDate}`, 20, yPos);
+        doc.setFontSize(10);
         yPos += 7;
       }
       yPos += 6;
