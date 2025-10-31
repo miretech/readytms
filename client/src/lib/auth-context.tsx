@@ -1,15 +1,7 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { queryClient, apiRequest } from "./queryClient";
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  isAdmin: boolean;
-}
+import { queryClient } from "./queryClient";
+import type { User } from "@shared/schema";
 
 interface AuthContextType {
   user: User | null;
@@ -20,16 +12,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [, setLocation] = useLocation();
-
   const { data: user, isLoading } = useQuery<User | null>({
-    queryKey: ["/api/auth/me"],
+    queryKey: ["/api/auth/user"],
     retry: false,
-    // Return null on 401 instead of throwing
+    // Return null on 401/404 instead of throwing
     queryFn: async () => {
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
-        if (res.status === 401) {
+        const res = await fetch("/api/auth/user", { credentials: "include" });
+        if (res.status === 401 || res.status === 404) {
           return null;
         }
         if (!res.ok) {
@@ -44,11 +34,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout", {});
+      // Redirect to Replit Auth logout endpoint
+      window.location.href = "/api/logout";
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/api/auth/me"], null);
-      setLocation("/login");
+      queryClient.setQueryData(["/api/auth/user"], null);
     },
   });
 

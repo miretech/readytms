@@ -29,10 +29,6 @@ import ShortPays from "@/pages/short-pays";
 import ChargeBacks from "@/pages/charge-backs";
 import Tasks from "@/pages/tasks";
 import CompanySettings from "@/pages/company-settings";
-import LoginPage from "@/pages/login";
-import RegisterPage from "@/pages/register";
-import ForgotPasswordPage from "@/pages/forgot-password";
-import ResetPasswordPage from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
 
 // Routes are now publicly accessible - no auth required
@@ -43,14 +39,10 @@ function PublicRoute({ component: Component }: { component: React.ComponentType 
 function Router() {
   return (
     <Switch>
-      {/* Auth routes - still available for optional login */}
-      <Route path="/login" component={LoginPage} />
-      <Route path="/register" component={RegisterPage} />
-      <Route path="/forgot-password" component={ForgotPasswordPage} />
-      <Route path="/reset-password" component={ResetPasswordPage} />
+      {/* Driver self-registration route - publicly accessible */}
       <Route path="/driver-signup" component={DriverSignup} />
       
-      {/* All routes are now publicly accessible */}
+      {/* All routes are publicly accessible */}
       <Route path="/">{() => <PublicRoute component={Dashboard} />}</Route>
       <Route path="/loads">{() => <PublicRoute component={Loads} />}</Route>
       <Route path="/fleet">{() => <PublicRoute component={Fleet} />}</Route>
@@ -76,7 +68,7 @@ function Router() {
 function AppContent() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const isAuthPage = ["/login", "/register", "/forgot-password", "/reset-password", "/driver-signup"].includes(location);
+  const isAuthPage = ["/driver-signup"].includes(location);
 
   const style = {
     "--sidebar-width": "16rem",
@@ -121,7 +113,7 @@ function AppContent() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => window.location.href = "/login"}
+                  onClick={() => window.location.href = "/api/login"}
                   data-testid="button-login-header"
                 >
                   Login
