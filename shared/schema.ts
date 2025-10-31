@@ -14,55 +14,21 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table with authentication
+// User storage table for Replit Auth
+// IMPORTANT: Keep default() on id for migration compatibility from old UUID-based system
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").notNull().unique(),
-  passwordHash: text("password_hash"),
+  email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   isAdmin: text("is_admin").notNull().default("false"),
-  resetToken: text("reset_token"),
-  resetTokenExpires: timestamp("reset_token_expires"),
-  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-
-export const registerSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-});
-
-export const forgotPasswordSchema = z.object({
-  email: z.string().email("Invalid email address"),
-});
-
-export const resetPasswordSchema = z.object({
-  token: z.string().min(1, "Reset token is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
-export type LoginInput = z.infer<typeof loginSchema>;
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export const trucks = pgTable("trucks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
