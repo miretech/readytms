@@ -1,24 +1,38 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Navigation, Clock, Truck as TruckIcon, User, RefreshCw, Search } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { 
+  MapPin, 
+  Navigation, 
+  Clock, 
+  User, 
+  RefreshCw, 
+  Search, 
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  Truck as TruckIcon
+} from "lucide-react";
 import type { GpsLocation, Driver, Truck } from "@shared/schema";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function GpsTracking() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "driver" | "truck">("all");
+  const { toast } = useToast();
 
   const { data: locations = [], isLoading: locationsLoading, refetch } = useQuery<GpsLocation[]>({
     queryKey: ["/api/gps/latest"],
   });
 
-  const { data: drivers = [] } = useQuery<Driver[]>({
+  const { data: drivers = [], isLoading: driversLoading } = useQuery<Driver[]>({
     queryKey: ["/api/drivers"],
   });
 
@@ -26,37 +40,59 @@ export default function GpsTracking() {
     queryKey: ["/api/trucks"],
   });
 
-  const getDriverName = (driverId: string | null) => {
-    if (!driverId) return "N/A";
-    const driver = drivers.find((d) => d.id === driverId);
-    return driver?.name || "Unknown Driver";
+  const toggleGpsMutation = useMutation({
+    mutationFn: async ({ driverId, enabled }: { driverId: string; enabled: boolean }) => {
+      return await apiRequest("PATCH", `/api/drivers/${driverId}/gps`, {
+        gpsEnabled: enabled,
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/drivers"] });
+      toast({
+        title: "GPS Tracking Updated",
+        description: data.message,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update GPS tracking status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const getDriverLocation = (driverId: string) => {
+    return locations.find(loc => loc.driverId === driverId);
   };
 
   const getTruckNumber = (truckId: string | null) => {
     if (!truckId) return "N/A";
     const truck = trucks.find((t) => t.id === truckId);
-    return truck?.truckNumber || "Unknown Truck";
+    return truck?.truckNumber || "Unknown";
   };
 
-  const filteredLocations = locations.filter((location) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      (location.driverId && getDriverName(location.driverId).toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (location.truckId && getTruckNumber(location.truckId).toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesFilter =
-      filterType === "all" ||
-      (filterType === "driver" && location.driverId) ||
-      (filterType === "truck" && location.truckId);
-
-    return matchesSearch && matchesFilter;
-  });
+  const filteredDrivers = drivers.filter((driver) =>
+    searchTerm === "" ||
+    driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    driver.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    driver.licenseNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const getGoogleMapsLink = (lat: string, lon: string) => {
     return `https://www.google.com/maps?q=${lat},${lon}`;
   };
 
-  if (locationsLoading) {
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(n => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  if (locationsLoading || driversLoading) {
     return (
       <div className="flex flex-col gap-6 p-6">
         <div>
@@ -72,182 +108,219 @@ export default function GpsTracking() {
     <div className="flex flex-col gap-6 p-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground" data-testid="text-page-title">GPS Tracking</h1>
-        <p className="text-muted-foreground">Real-time driver and truck location tracking</p>
+        <p className="text-muted-foreground">Monitor and manage driver GPS tracking</p>
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
           <div>
-            <CardTitle>Live Locations</CardTitle>
-            <CardDescription>Latest GPS coordinates from drivers and trucks</CardDescription>
+            <CardTitle>Driver GPS Status</CardTitle>
+            <CardDescription>Enable/disable GPS tracking and view driver locations</CardDescription>
           </div>
           <Button
             variant="outline"
             size="icon"
-            onClick={() => refetch()}
+            onClick={() => {
+              refetch();
+              queryClient.invalidateQueries({ queryKey: ["/api/drivers"] });
+            }}
             data-testid="button-refresh"
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by driver or truck..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-                data-testid="input-search"
-              />
-            </div>
-            <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
-              <SelectTrigger className="w-[180px]" data-testid="select-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
-                <SelectItem value="driver">Drivers Only</SelectItem>
-                <SelectItem value="truck">Trucks Only</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email, or license..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+              data-testid="input-search"
+            />
           </div>
 
-          {filteredLocations.length === 0 ? (
+          {filteredDrivers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <MapPin className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2" data-testid="text-no-locations">
-                No GPS locations yet
+              <User className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2" data-testid="text-no-drivers">
+                No drivers found
               </h3>
               <p className="text-muted-foreground max-w-md">
-                GPS location data will appear here when drivers or trucks transmit their coordinates
+                {searchTerm ? "Try adjusting your search" : "Add drivers to start GPS tracking"}
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredLocations.map((location) => (
-                <Card key={location.id} className="hover-elevate">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {location.driverId && (
-                            <Badge variant="default" className="gap-1" data-testid={`badge-driver-${location.id}`}>
-                              <User className="h-3 w-3" />
-                              {getDriverName(location.driverId)}
-                            </Badge>
-                          )}
-                          {location.truckId && (
-                            <Badge variant="secondary" className="gap-1" data-testid={`badge-truck-${location.id}`}>
-                              <TruckIcon className="h-3 w-3" />
-                              {getTruckNumber(location.truckId)}
-                            </Badge>
-                          )}
-                        </div>
+            <div className="space-y-3">
+              {filteredDrivers.map((driver) => {
+                const location = getDriverLocation(driver.id);
+                const isGpsEnabled = driver.gpsEnabled === "true";
+                const hasRecentLocation = location && driver.lastGpsUpdate;
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Coordinates:</span>
-                            <a
-                              href={getGoogleMapsLink(location.latitude, location.longitude)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline"
-                              data-testid={`link-maps-${location.id}`}
-                            >
-                              {parseFloat(location.latitude).toFixed(5)}, {parseFloat(location.longitude).toFixed(5)}
-                            </a>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Time:</span>
-                            <span className="text-foreground" data-testid={`text-timestamp-${location.id}`}>
-                              {format(new Date(location.timestamp), "MMM d, yyyy h:mm a")}
-                            </span>
+                return (
+                  <Card key={driver.id} className="hover-elevate" data-testid={`card-driver-${driver.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col gap-4">
+                        {/* Driver Header */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 flex-1">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                {getInitials(driver.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-foreground truncate" data-testid={`text-driver-name-${driver.id}`}>
+                                  {driver.name}
+                                </h3>
+                                <Badge variant={driver.status === "Active" ? "default" : "secondary"} className="text-xs">
+                                  {driver.status}
+                                </Badge>
+                              </div>
+                              
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                <span className="truncate">{driver.email}</span>
+                                <span>CDL: {driver.licenseNumber}</span>
+                                {driver.assignedTruckId && (
+                                  <span className="flex items-center gap-1">
+                                    <TruckIcon className="h-3 w-3" />
+                                    {getTruckNumber(driver.assignedTruckId)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
 
-                          {location.speed && (
-                            <div className="flex items-center gap-2">
-                              <Navigation className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-muted-foreground">Speed:</span>
-                              <span className="text-foreground" data-testid={`text-speed-${location.id}`}>
-                                {parseFloat(location.speed).toFixed(0)} mph
-                              </span>
+                          {/* GPS Toggle */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-col items-end gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium" data-testid={`text-gps-label-${driver.id}`}>
+                                  GPS Tracking
+                                </span>
+                                <Switch
+                                  checked={isGpsEnabled}
+                                  onCheckedChange={(checked) => {
+                                    toggleGpsMutation.mutate({
+                                      driverId: driver.id,
+                                      enabled: checked,
+                                    });
+                                  }}
+                                  disabled={toggleGpsMutation.isPending}
+                                  data-testid={`switch-gps-${driver.id}`}
+                                />
+                              </div>
+                              <Badge
+                                variant={isGpsEnabled ? "default" : "outline"}
+                                className="text-xs gap-1"
+                                data-testid={`badge-status-${driver.id}`}
+                              >
+                                {isGpsEnabled ? (
+                                  <>
+                                    <Activity className="h-3 w-3" />
+                                    Enabled
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertCircle className="h-3 w-3" />
+                                    Disabled
+                                  </>
+                                )}
+                              </Badge>
                             </div>
-                          )}
-
-                          {location.heading !== null && location.heading !== undefined && (
-                            <div className="flex items-center gap-2">
-                              <Navigation className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-muted-foreground">Heading:</span>
-                              <span className="text-foreground">{location.heading}°</span>
-                            </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          asChild
-                        >
-                          <a
-                            href={getGoogleMapsLink(location.latitude, location.longitude)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            data-testid={`button-view-map-${location.id}`}
-                          >
-                            <MapPin className="h-4 w-4 mr-2" />
-                            View on Map
-                          </a>
-                        </Button>
+                        {/* Location Info (if GPS enabled) */}
+                        {isGpsEnabled && (
+                          <div className="border-t pt-3 space-y-2">
+                            {hasRecentLocation ? (
+                              <>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                  <div className="flex items-start gap-2">
+                                    <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-muted-foreground text-xs mb-1">Current Location:</p>
+                                      <a
+                                        href={getGoogleMapsLink(location!.latitude, location!.longitude)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline font-mono text-xs truncate block"
+                                        data-testid={`link-maps-${driver.id}`}
+                                      >
+                                        {parseFloat(location!.latitude).toFixed(5)}, {parseFloat(location!.longitude).toFixed(5)}
+                                      </a>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-start gap-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <p className="text-muted-foreground text-xs mb-1">Last Update:</p>
+                                      <p className="text-foreground text-xs" data-testid={`text-last-update-${driver.id}`}>
+                                        {formatDistanceToNow(new Date(driver.lastGpsUpdate!), { addSuffix: true })}
+                                      </p>
+                                      <p className="text-muted-foreground text-xs">
+                                        {format(new Date(driver.lastGpsUpdate!), "MMM d, h:mm a")}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {location!.speed && (
+                                    <div className="flex items-start gap-2">
+                                      <Navigation className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                      <div>
+                                        <p className="text-muted-foreground text-xs mb-1">Speed:</p>
+                                        <p className="text-foreground text-xs">{location!.speed} mph</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-2">
+                                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                                    GPS Active - Location sharing enabled
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+                                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-foreground">
+                                    Waiting for driver to share location
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    GPS tracking is enabled. Driver needs to log in to the Driver Portal and turn on duty status to share location.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* GPS Disabled Message */}
+                        {!isGpsEnabled && (
+                          <div className="border-t pt-3">
+                            <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-md">
+                              <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <p className="text-sm text-muted-foreground">
+                                GPS tracking is disabled for this driver. Enable it to start receiving location updates.
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Integration Information</CardTitle>
-          <CardDescription>How to send GPS data to the system</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg bg-muted p-4 space-y-2">
-            <h4 className="font-semibold text-foreground">API Endpoint</h4>
-            <code className="text-sm text-muted-foreground">POST /api/gps</code>
-            
-            <h4 className="font-semibold text-foreground mt-4">Required Fields</h4>
-            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-              <li><code>latitude</code> - Decimal latitude (e.g., "40.7128")</li>
-              <li><code>longitude</code> - Decimal longitude (e.g., "-74.0060")</li>
-              <li><code>timestamp</code> - ISO 8601 timestamp</li>
-              <li><code>driverId</code> or <code>truckId</code> - At least one required</li>
-            </ul>
-
-            <h4 className="font-semibold text-foreground mt-4">Optional Fields</h4>
-            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-              <li><code>speed</code> - Speed in mph (e.g., "65.5")</li>
-              <li><code>heading</code> - Direction in degrees (0-359)</li>
-              <li><code>accuracy</code> - GPS accuracy in meters</li>
-              <li><code>loadId</code> - Associated load ID</li>
-            </ul>
-          </div>
-
-          <div className="text-sm text-muted-foreground">
-            <p>
-              Mobile apps, GPS devices, or fleet telematics systems can POST location data to this endpoint.
-              Integrate with services like Geotab, Samsara, or custom GPS hardware.
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
