@@ -198,7 +198,7 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
                   <FormItem>
                     <FormLabel>Broker (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Broker name" data-testid="input-customer-broker" />
+                      <Input {...field} value={field.value || ""} placeholder="Broker name" data-testid="input-customer-broker" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

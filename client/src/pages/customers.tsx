@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, Mail, Phone, MapPin } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Mail, Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -25,10 +25,13 @@ import type { Customer } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+const ITEMS_PER_PAGE = 10;
+
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
@@ -58,8 +61,21 @@ export default function Customers() {
   const filteredCustomers = customers.filter((customer) =>
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.phone.toLowerCase().includes(searchQuery.toLowerCase())
+    customer.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (customer.broker && customer.broker.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
@@ -120,7 +136,7 @@ export default function Customers() {
             <Input
               placeholder="Search customers..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10"
               data-testid="input-search-customers"
             />
@@ -153,11 +169,12 @@ export default function Customers() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Broker</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer) => (
+                {paginatedCustomers.map((customer) => (
                   <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>
@@ -182,6 +199,9 @@ export default function Customers() {
                       <Badge variant={getTypeBadgeVariant(customer.type)} data-testid={`badge-type-${customer.id}`}>
                         {customer.type.charAt(0).toUpperCase() + customer.type.slice(1)}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{customer.broker || "-"}</span>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -217,6 +237,51 @@ export default function Customers() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {filteredCustomers.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredCustomers.length)} of {filteredCustomers.length} customers
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                data-testid="button-previous-page"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className="w-9"
+                    data-testid={`button-page-${page}`}
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                data-testid="button-next-page"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
           </div>
         )}
       </Card>
