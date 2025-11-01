@@ -105,6 +105,29 @@ export default function DriverPortal() {
     },
   });
 
+  // Update load status mutation
+  const updateLoadStatus = useMutation({
+    mutationFn: async ({ loadId, status }: { loadId: string; status: string }) => {
+      return await apiRequest("PATCH", `/api/loads/${loadId}`, { status });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/loads"] });
+      const statusText = variables.status === "picked-up" ? "Picked Up" : 
+                         variables.status === "delivered" ? "Delivered" : variables.status;
+      toast({
+        title: "Load Updated",
+        description: `Load marked as ${statusText}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update load status",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Get loads assigned to this driver
   const { data: loads = [], isLoading: loadsLoading } = useQuery<Load[]>({
     queryKey: ["/api/loads"],
@@ -538,6 +561,35 @@ export default function DriverPortal() {
                   </div>
                 </>
               )}
+
+              <Separator />
+
+              {/* Pickup/Delivery Action Buttons */}
+              <div className="space-y-2">
+                {currentLoad.status === "assigned" && (
+                  <Button
+                    onClick={() => updateLoadStatus.mutate({ loadId: currentLoad.id, status: "picked-up" })}
+                    disabled={updateLoadStatus.isPending}
+                    className="w-full"
+                    data-testid="button-mark-picked-up"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    {updateLoadStatus.isPending ? "Updating..." : "Mark as Picked Up"}
+                  </Button>
+                )}
+
+                {(currentLoad.status === "picked-up" || currentLoad.status === "in-transit") && (
+                  <Button
+                    onClick={() => updateLoadStatus.mutate({ loadId: currentLoad.id, status: "delivered" })}
+                    disabled={updateLoadStatus.isPending}
+                    className="w-full"
+                    data-testid="button-mark-delivered"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    {updateLoadStatus.isPending ? "Updating..." : "Mark as Delivered"}
+                  </Button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
