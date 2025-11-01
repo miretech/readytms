@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Camera, Upload, MapPin, Package, CheckCircle2, FileText, X } from "lucide-react";
+import { Camera, Upload, MapPin, Package, CheckCircle2, FileText, X, LogIn } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 import type { Load } from "@shared/schema";
 
 export default function DriverPOD() {
   const { toast } = useToast();
+  const { user, isLoading: authLoading } = useAuth();
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
   const [podFiles, setPodFiles] = useState<Array<{ filename: string; data: string; type: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -17,6 +19,7 @@ export default function DriverPOD() {
 
   const { data: loads = [], isLoading } = useQuery<Load[]>({
     queryKey: ["/api/driver/loads"],
+    enabled: !!user, // Only fetch if user is logged in
   });
 
   const uploadMutation = useMutation({
@@ -127,7 +130,43 @@ export default function DriverPOD() {
     load.status.toLowerCase() !== 'cancelled'
   );
 
-  if (isLoading) {
+  // Show login screen if not authenticated
+  if (!user && !authLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="bg-primary text-primary-foreground p-4 sticky top-0 z-10 shadow-md">
+          <h1 className="text-xl font-bold">Driver POD Upload</h1>
+          <p className="text-sm opacity-90">Proof of Delivery Portal</p>
+        </div>
+        <div className="p-4 flex items-center justify-center min-h-[calc(100vh-80px)]">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Login Required</CardTitle>
+              <CardDescription>
+                Please log in with your driver account to access your assigned loads and upload PODs.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => window.location.href = "/api/login"}
+                className="w-full h-12"
+                size="lg"
+                data-testid="button-login"
+              >
+                <LogIn className="mr-2 h-5 w-5" />
+                Log In with Replit Auth
+              </Button>
+              <p className="text-xs text-muted-foreground mt-4 text-center">
+                Use your driver email address to log in
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || authLoading) {
     return (
       <div className="min-h-screen bg-background p-4 flex items-center justify-center">
         <div className="text-center">
