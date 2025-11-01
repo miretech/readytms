@@ -1484,7 +1484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send GPS reminders to drivers who haven't shared location in 24 hours
-  app.post("/api/gps/send-reminders", async (req, res) => {
+  app.post("/api/gps/send-reminders", isAdmin, async (req, res) => {
     try {
       const drivers = await storage.getAllDrivers();
       const now = new Date();
