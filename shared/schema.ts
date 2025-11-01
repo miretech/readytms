@@ -34,6 +34,19 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+// Password reset tokens table
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").notNull(),
+  token: varchar("token").notNull().unique(),
+  userType: text("user_type").notNull(), // "admin" or "driver"
+  expiresAt: timestamp("expires_at").notNull(),
+  used: text("used").notNull().default("false"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
 export const trucks = pgTable("trucks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   truckNumber: text("truck_number").notNull().unique(),
