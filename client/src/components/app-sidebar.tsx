@@ -15,7 +15,8 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckSquare,
-  Settings
+  Settings,
+  UserCheck
 } from "lucide-react";
 import {
   Sidebar,
@@ -155,6 +156,14 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild data-testid="link-admin-approvals">
+              <Link href="/admin/approvals">
+                <UserCheck className="h-4 w-4" />
+                <span>Admin Approvals</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild data-testid="link-company-settings">
               <Link href="/company-settings">

@@ -64,6 +64,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email already exists" });
       }
 
+      // Check if this is the first admin user
+      const approvedAdmins = await storage.getApprovedAdmins();
+      const isFirstAdmin = approvedAdmins.length === 0;
+
       const hashedPassword = await bcrypt.hash(password, 12);
       const user = await storage.createUser({
         email,
@@ -71,9 +75,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: firstName || null,
         lastName: lastName || null,
         isAdmin: "true",
+        approved: isFirstAdmin ? "true" : "false", // First admin is auto-approved
+        approvedBy: isFirstAdmin ? null : null,
+        approvedAt: isFirstAdmin ? new Date() : null,
       });
 
-      res.status(201).json({ message: "Admin registered successfully", user: { id: user.id, email: user.email } });
+      if (isFirstAdmin) {
+        res.status(201).json({ 
+          message: "Admin registered successfully. You can now login.", 
+          user: { id: user.id, email: user.email },
+          approved: true
+        });
+      } else {
+        // Send email notification to existing admins
+        try {
+          await storage.sendAdminApprovalNotification(user.email, approvedAdmins);
+        } catch (emailError) {
+          console.error("Failed to send approval notification:", emailError);
+          // Don't fail registration if email fails
+        }
+
+        res.status(201).json({ 
+          message: "Registration pending approval. Existing admins have been notified.", 
+          user: { id: user.id, email: user.email },
+          approved: false,
+          pendingApproval: true
+        });
+      }
     } catch (error) {
       console.error("Registration error:", error);
       res.status(500).json({ message: "Registration failed" });
@@ -137,6 +165,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Logged out successfully" });
     });
   });
+
+  // Admin Approval Routes
+  app.get("/api/admin/pending", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const pendingAdmins = await storage.getPendingAdmins();
+      // Remove passwords from response
+      const sanitized = pendingAdmins.map(({ password, ...user }) => user);
+      res.json(sanitized);
+    } catch (error) {
+      console.error("Error fetching pending admins:", error);
+      res.status(500).json({ message: "Failed to fetch pending admins" });
+    }
+  });
+
+  app.post("/api/admin/approve/:userId", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const approvedBy = req.user.id; // Current admin user ID
+
+      const user = await storage.approveAdmin(userId, approvedBy);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Send approval email to the approved user
+      try {
+        await storage.sendAdminApprovedEmail(user.email);
+      } catch (emailError) {
+        console.error("Failed to send approval email:", emailError);
+        // Don't fail approval if email fails
+      }
+
+      res.json({ message: "Admin approved successfully", user: { id: user.id, email: user.email } });
+    } catch (error) {
+      console.error("Error approving admin:", error);
+      res.status(500).json({ message: "Failed to approve admin" });
+    }
+  });
+
+  app.post("/api/admin/reject/:userId", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.rejectAdmin(userId);
+      res.json({ message: "Admin registration rejected" });
+    } catch (error) {
+      console.error("Error rejecting admin:", error);
+      res.status(500).json({ message: "Failed to reject admin" });
+    }
+  });
+
   app.get("/api/loads", async (_req, res) => {
     const loads = await storage.getAllLoads();
     res.json(loads);

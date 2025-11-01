@@ -24,6 +24,9 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   isAdmin: text("is_admin").notNull().default("false"),
+  approved: text("approved").notNull().default("false"), // Admin approval status
+  approvedBy: varchar("approved_by"), // ID of admin who approved this account
+  approvedAt: timestamp("approved_at"), // When the account was approved
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

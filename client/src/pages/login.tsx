@@ -57,11 +57,18 @@ export default function Login() {
     mutationFn: async (values: LoginFormValues) => {
       return await apiRequest("POST", "/api/admin/register", values);
     },
-    onSuccess: () => {
-      toast({
-        title: "Registration Successful",
-        description: "You can now log in with your credentials.",
-      });
+    onSuccess: (data: any) => {
+      if (data.pendingApproval) {
+        toast({
+          title: "Registration Pending Approval",
+          description: "Your registration has been submitted. An existing admin will review and approve your account. You'll be notified via email once approved.",
+        });
+      } else {
+        toast({
+          title: "Registration Successful",
+          description: "You can now log in with your credentials.",
+        });
+      }
       setShowRegister(false);
     },
     onError: (error: any) => {

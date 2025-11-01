@@ -83,6 +83,11 @@ export async function setupAuth(app: Express) {
           return done(null, false, { message: 'Unauthorized: Admin access required' });
         }
 
+        // Check if the account is approved
+        if (user.approved !== 'true') {
+          return done(null, false, { message: 'Your account is pending approval. An existing admin must approve your registration.' });
+        }
+
         const isValid = await bcrypt.compare(password, user.password);
         if (!isValid) {
           return done(null, false, { message: 'Invalid email or password' });

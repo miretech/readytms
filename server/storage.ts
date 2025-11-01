@@ -87,6 +87,12 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   createUser(user: Partial<UpsertUser>): Promise<User>;
   updateUser(id: string, user: Partial<UpsertUser>): Promise<User | undefined>;
+  getApprovedAdmins(): Promise<User[]>;
+  getPendingAdmins(): Promise<User[]>;
+  approveAdmin(userId: string, approvedBy: string): Promise<User | undefined>;
+  rejectAdmin(userId: string): Promise<boolean>;
+  sendAdminApprovalNotification(newUserEmail: string, approvedAdmins: User[]): Promise<void>;
+  sendAdminApprovedEmail(email: string): Promise<void>;
   
   getAllLoads(): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
@@ -334,6 +340,52 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
+  }
+
+  async getApprovedAdmins(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(and(eq(users.isAdmin, "true"), eq(users.approved, "true")));
+  }
+
+  async getPendingAdmins(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(and(eq(users.isAdmin, "true"), eq(users.approved, "false")))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async approveAdmin(userId: string, approvedBy: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        approved: "true",
+        approvedBy,
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async rejectAdmin(userId: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, userId));
+    return true;
+  }
+
+  async sendAdminApprovalNotification(newUserEmail: string, approvedAdmins: User[]): Promise<void> {
+    // Email sending functionality - will be implemented after Resend integration setup
+    console.log(`Admin approval notification would be sent to ${approvedAdmins.length} admins for new user: ${newUserEmail}`);
+    // TODO: Integrate with Resend to send actual emails
+  }
+
+  async sendAdminApprovedEmail(email: string): Promise<void> {
+    // Email sending functionality - will be implemented after Resend integration setup
+    console.log(`Admin approved notification would be sent to: ${email}`);
+    // TODO: Integrate with Resend to send actual emails
   }
 
   async getAllLoads(): Promise<Load[]> {
