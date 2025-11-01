@@ -26,6 +26,7 @@ import passport from "passport";
 import bcrypt from "bcrypt";
 import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
+import { sendGPSEnabledNotification, sendGPSReminderNotification } from "./notifications";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1403,6 +1404,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Driver not found" });
       }
 
+      // Send notification when GPS is enabled
+      if (gpsEnabled && driver.gpsNotificationsEnabled === "true") {
+        sendGPSEnabledNotification(driver).catch(error => {
+          console.error("Failed to send GPS enabled notification:", error);
+        });
+      }
+
       res.json({
         message: `GPS tracking ${gpsEnabled ? "enabled" : "disabled"} for ${driver.name}`,
         driver,
@@ -1473,6 +1481,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Notification not found" });
     }
     res.status(204).send();
+  });
+
+  // Send GPS reminders to drivers who haven't shared location in 24 hours
+  app.post("/api/gps/send-reminders", async (req, res) => {
+    try {
+      const drivers = await storage.getAllDrivers();
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      
+      const remindersToSend = drivers.filter(driver => {
+        // Only send reminders to drivers with GPS enabled and notifications enabled
+        if (driver.gpsEnabled !== "true" || driver.gpsNotificationsEnabled !== "true") {
+          return false;
+        }
+        
+        // Check if they haven't shared location in 24 hours
+        if (!driver.lastGpsUpdate) {
+          return true; // Never shared location
+        }
+        
+        const lastUpdate = new Date(driver.lastGpsUpdate);
+        if (lastUpdate < twentyFourHoursAgo) {
+          return true; // Haven't shared in 24 hours
+        }
+        
+        return false;
+      });
+      
+      // Send reminders
+      const results = await Promise.allSettled(
+        remindersToSend.map(async (driver) => {
+          await sendGPSReminderNotification(driver);
+          // Update the last notification sent timestamp
+          await storage.updateDriver(driver.id, {
+            lastGpsNotificationSent: new Date(),
+          });
+        })
+      );
+      
+      const successful = results.filter(r => r.status === "fulfilled").length;
+      const failed = results.filter(r => r.status === "rejected").length;
+      
+      res.json({
+        message: "GPS reminders sent",
+        total: remindersToSend.length,
+        successful,
+        failed,
+      });
+    } catch (error: any) {
+      console.error("GPS reminder error:", error);
+      res.status(500).json({ error: "Failed to send GPS reminders" });
+    }
   });
 
   app.get("/api/automation/settings", async (_req, res) => {
