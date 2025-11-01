@@ -148,7 +148,7 @@ export default function DriverPOD() {
             </CardHeader>
             <CardContent>
               <Button 
-                onClick={() => window.location.href = "/api/login"}
+                onClick={() => window.location.href = "/api/login?returnTo=/driver-pod"}
                 className="w-full h-12"
                 size="lg"
                 data-testid="button-login"

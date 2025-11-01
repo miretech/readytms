@@ -10,6 +10,13 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 
+// Extend session type to include returnTo
+declare module "express-session" {
+  interface SessionData {
+    returnTo?: string;
+  }
+}
+
 const getOidcConfig = memoize(
   async () => {
     return await client.discovery(
@@ -137,6 +144,13 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);
+    
+    // Store return URL in session if provided
+    const returnTo = req.query.returnTo as string;
+    if (returnTo && returnTo.startsWith('/')) {
+      req.session.returnTo = returnTo;
+    }
+    
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
@@ -146,9 +160,17 @@ export async function setupAuth(app: Express) {
   app.get("/api/callback", (req, res, next) => {
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
-    })(req, res, next);
+    })(req, res, (err: any) => {
+      if (err) {
+        return next(err);
+      }
+      
+      // Redirect to stored return URL or default to "/"
+      const returnTo = req.session.returnTo || "/";
+      delete req.session.returnTo; // Clean up session
+      res.redirect(returnTo);
+    });
   });
 
   app.get("/api/logout", (req, res) => {
