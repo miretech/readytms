@@ -107,6 +107,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Driver POD Upload Routes
+  app.get("/api/driver/loads", async (req: any, res) => {
+    try {
+      // Get driver by email if authenticated, or allow unauthenticated access
+      let driverEmail: string | null = null;
+      
+      if (req.user && req.user.claims && req.user.claims.email) {
+        driverEmail = req.user.claims.email;
+      }
+      
+      // Get all drivers to find the current driver
+      const drivers = await storage.getAllDrivers();
+      
+      if (driverEmail) {
+        const driver = drivers.find(d => d.email === driverEmail);
+        if (driver) {
+          // Get loads assigned to this driver
+          const allLoads = await storage.getAllLoads();
+          const driverLoads = allLoads.filter(load => load.assignedDriverId === driver.id);
+          return res.json(driverLoads);
+        }
+      }
+      
+      // If no driver found or not authenticated, return all loads
+      const allLoads = await storage.getAllLoads();
+      res.json(allLoads);
+    } catch (error) {
+      console.error("Error fetching driver loads:", error);
+      res.status(500).json({ error: "Failed to fetch loads" });
+    }
+  });
+
+  app.post("/api/driver/loads/:id/pod", async (req, res) => {
+    try {
+      const loadId = req.params.id;
+      const { podAttachments } = req.body;
+      
+      if (!podAttachments || !Array.isArray(podAttachments)) {
+        return res.status(400).json({ error: "POD attachments are required" });
+      }
+      
+      // Add uploadedAt timestamp to each attachment
+      const timestampedAttachments = podAttachments.map(att => ({
+        ...att,
+        uploadedAt: new Date().toISOString(),
+      }));
+      
+      // Get existing load
+      const existingLoad = await storage.getLoad(loadId);
+      if (!existingLoad) {
+        return res.status(404).json({ error: "Load not found" });
+      }
+      
+      // Merge with existing POD attachments if any
+      const existingPODs = (existingLoad.podAttachments as any) || [];
+      const allPODs = [...existingPODs, ...timestampedAttachments];
+      
+      // Update load with POD attachments
+      const updatedLoad = await storage.updateLoad(loadId, {
+        podAttachments: allPODs,
+        status: "delivered", // Automatically mark as delivered when POD uploaded
+      });
+      
+      if (!updatedLoad) {
+        return res.status(404).json({ error: "Load not found" });
+      }
+      
+      // Trigger automation: Auto-generate invoice
+      await autoGenerateInvoice(updatedLoad);
+      
+      res.json(updatedLoad);
+    } catch (error) {
+      console.error("Error uploading POD:", error);
+      res.status(400).json({ 
+        error: "Failed to upload POD",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   app.get("/api/trucks", async (_req, res) => {
     const trucks = await storage.getAllTrucks();
     res.json(trucks);
