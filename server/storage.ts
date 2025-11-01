@@ -399,17 +399,22 @@ export class DatabaseStorage implements IStorage {
 
   async requestPasswordReset(email: string, userType: "admin" | "driver"): Promise<{ success: boolean; message?: string }> {
     try {
+      console.log(`[Password Reset] Request for ${userType}: ${email}`);
+      
       // Check if user/driver exists
       let userExists = false;
       if (userType === "admin") {
         const user = await this.getUserByEmail(email);
         userExists = !!user;
+        console.log(`[Password Reset] Admin user exists: ${userExists}`);
       } else {
         const driver = await this.getDriverByEmail(email);
         userExists = !!driver;
+        console.log(`[Password Reset] Driver exists: ${userExists}`);
       }
 
       if (!userExists) {
+        console.log(`[Password Reset] User not found for email: ${email}`);
         // Don't reveal if email exists or not
         return { success: false, message: "User not found" };
       }
@@ -424,6 +429,7 @@ export class DatabaseStorage implements IStorage {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 1);
 
+      console.log(`[Password Reset] Saving token to database for ${email}`);
       // Save hashed token to database
       await db.insert(passwordResetTokens).values({
         email,
@@ -436,7 +442,10 @@ export class DatabaseStorage implements IStorage {
       // Send reset email with raw token (user needs this to reset password)
       const resetUrl = `${process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000'}/reset-password?token=${rawToken}&type=${userType}`;
       
-      await resend.emails.send({
+      console.log(`[Password Reset] Attempting to send email to: ${email}`);
+      console.log(`[Password Reset] Reset URL: ${resetUrl}`);
+      
+      const emailResult = await resend.emails.send({
         from: 'Ready TMS <noreply@resend.dev>',
         to: email,
         subject: 'Password Reset Request - Ready TMS',
@@ -456,9 +465,10 @@ export class DatabaseStorage implements IStorage {
         `,
       });
 
+      console.log(`[Password Reset] Email sent successfully!`, emailResult);
       return { success: true };
     } catch (error) {
-      console.error("Password reset request error:", error);
+      console.error("[Password Reset] ERROR:", error);
       return { success: false, message: "Failed to send reset email" };
     }
   }
