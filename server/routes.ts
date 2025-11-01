@@ -166,6 +166,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Password Reset - Request reset email
+  app.post("/api/auth/request-password-reset", async (req, res) => {
+    try {
+      const { email, userType } = req.body;
+      
+      if (!email || !userType) {
+        return res.status(400).json({ message: "Email and user type are required" });
+      }
+
+      if (userType !== "admin" && userType !== "driver") {
+        return res.status(400).json({ message: "Invalid user type" });
+      }
+
+      // Generate reset token and send email
+      const result = await storage.requestPasswordReset(email, userType);
+      
+      if (!result.success) {
+        // Don't reveal if email exists or not for security
+        return res.json({ message: "If the email exists, a password reset link has been sent." });
+      }
+
+      res.json({ message: "Password reset link has been sent to your email." });
+    } catch (error) {
+      console.error("Password reset request error:", error);
+      // Don't reveal internal errors
+      res.json({ message: "If the email exists, a password reset link has been sent." });
+    }
+  });
+
+  // Password Reset - Verify token and reset password
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token and password are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const result = await storage.resetPassword(token, password);
+      
+      if (!result.success) {
+        return res.status(400).json({ message: result.message || "Invalid or expired reset token" });
+      }
+
+      res.json({ message: "Password reset successful. You can now log in with your new password." });
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
   // Admin Approval Routes
   app.get("/api/admin/pending", isAuthenticated, isAdmin, async (req, res) => {
     try {
