@@ -876,7 +876,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const record = await storage.createMaintenance(validatedData);
       res.status(201).json(record);
     } catch (error) {
-      res.status(400).json({ error: "Invalid maintenance data" });
+      console.error("Maintenance creation error:", error);
+      res.status(400).json({ 
+        error: "Invalid maintenance data",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
@@ -889,7 +893,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(record);
     } catch (error) {
-      res.status(400).json({ error: "Invalid maintenance data" });
+      console.error("Maintenance update error:", error);
+      res.status(400).json({ 
+        error: "Invalid maintenance data",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
