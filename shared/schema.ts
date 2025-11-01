@@ -90,8 +90,7 @@ export const customers = pgTable("customers", {
   email: text("email").notNull(),
   phone: text("phone").notNull(),
   address: text("address").notNull(),
-  type: text("type").notNull(),
-  broker: text("broker"),
+  type: text("type").notNull(), // Can be "shipper", "receiver", or "broker"
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({

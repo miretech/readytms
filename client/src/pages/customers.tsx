@@ -62,7 +62,7 @@ export default function Customers() {
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (customer.broker && customer.broker.toLowerCase().includes(searchQuery.toLowerCase()))
+    customer.type.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Pagination logic
@@ -169,7 +169,6 @@ export default function Customers() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Broker</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -199,9 +198,6 @@ export default function Customers() {
                       <Badge variant={getTypeBadgeVariant(customer.type)} data-testid={`badge-type-${customer.id}`}>
                         {customer.type.charAt(0).toUpperCase() + customer.type.slice(1)}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{customer.broker || "-"}</span>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
