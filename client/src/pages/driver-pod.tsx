@@ -235,13 +235,16 @@ export default function DriverPOD() {
                   />
 
                   <div className="text-right">
-                    <a
-                      href="/reset-password?type=driver"
-                      className="text-sm text-primary hover:underline"
-                      data-testid="link-forgot-password-driver"
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="p-0 h-auto text-sm"
+                      onClick={() => window.location.href = "/reset-password?type=driver"}
+                      data-testid="button-forgot-password-driver"
                     >
                       Forgot password?
-                    </a>
+                    </Button>
                   </div>
 
                   <Button

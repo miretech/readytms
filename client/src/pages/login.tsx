@@ -160,13 +160,16 @@ export default function Login() {
 
               {!showRegister && (
                 <div className="text-right">
-                  <a
-                    href="/reset-password"
-                    className="text-sm text-primary hover:underline"
-                    data-testid="link-forgot-password"
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="p-0 h-auto text-sm"
+                    onClick={() => window.location.href = "/reset-password"}
+                    data-testid="button-forgot-password"
                   >
                     Forgot password?
-                  </a>
+                  </Button>
                 </div>
               )}
 
