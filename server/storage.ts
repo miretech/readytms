@@ -51,6 +51,7 @@ import {
   type InsertTask,
   type CompanySettings,
   type InsertCompanySettings,
+  type PasswordResetToken,
   users,
   loads,
   trucks,
@@ -76,10 +77,16 @@ import {
   shortPays,
   chargeBacks,
   tasks,
-  companySettings
+  companySettings,
+  passwordResetTokens
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, lt } from "drizzle-orm";
+import { Resend } from "resend";
+import bcrypt from "bcrypt";
+import crypto from "crypto";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -93,6 +100,8 @@ export interface IStorage {
   rejectAdmin(userId: string): Promise<boolean>;
   sendAdminApprovalNotification(newUserEmail: string, approvedAdmins: User[]): Promise<void>;
   sendAdminApprovedEmail(email: string): Promise<void>;
+  requestPasswordReset(email: string, userType: "admin" | "driver"): Promise<{ success: boolean; message?: string }>;
+  resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message?: string }>;
   
   getAllLoads(): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
@@ -386,6 +395,118 @@ export class DatabaseStorage implements IStorage {
     // Email sending functionality - will be implemented after Resend integration setup
     console.log(`Admin approved notification would be sent to: ${email}`);
     // TODO: Integrate with Resend to send actual emails
+  }
+
+  async requestPasswordReset(email: string, userType: "admin" | "driver"): Promise<{ success: boolean; message?: string }> {
+    try {
+      // Check if user/driver exists
+      let userExists = false;
+      if (userType === "admin") {
+        const user = await this.getUserByEmail(email);
+        userExists = !!user;
+      } else {
+        const driver = await this.getDriverByEmail(email);
+        userExists = !!driver;
+      }
+
+      if (!userExists) {
+        // Don't reveal if email exists or not
+        return { success: false, message: "User not found" };
+      }
+
+      // Generate secure random token
+      const token = crypto.randomBytes(32).toString('hex');
+      
+      // Token expires in 1 hour
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1);
+
+      // Save token to database
+      await db.insert(passwordResetTokens).values({
+        email,
+        token,
+        userType,
+        expiresAt,
+        used: "false",
+      });
+
+      // Send reset email
+      const resetUrl = `${process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000'}/reset-password?token=${token}&type=${userType}`;
+      
+      await resend.emails.send({
+        from: 'Ready TMS <noreply@resend.dev>',
+        to: email,
+        subject: 'Password Reset Request - Ready TMS',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Password Reset Request</h2>
+            <p>You requested to reset your password for your ${userType === 'admin' ? 'Admin' : 'Driver'} account at Ready TMS.</p>
+            <p>Click the link below to reset your password:</p>
+            <p><a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Reset Password</a></p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all;">${resetUrl}</p>
+            <p>This link will expire in 1 hour.</p>
+            <p>If you didn't request this password reset, you can safely ignore this email.</p>
+            <hr style="margin: 24px 0;">
+            <p style="color: #666; font-size: 12px;">Ready TMS - Transportation Management System</p>
+          </div>
+        `,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("Password reset request error:", error);
+      return { success: false, message: "Failed to send reset email" };
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      // Find the token
+      const [resetToken] = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(and(
+          eq(passwordResetTokens.token, token),
+          eq(passwordResetTokens.used, "false")
+        ));
+
+      if (!resetToken) {
+        return { success: false, message: "Invalid or expired reset token" };
+      }
+
+      // Check if token is expired
+      if (new Date() > new Date(resetToken.expiresAt)) {
+        return { success: false, message: "Reset token has expired" };
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+      // Update password based on user type
+      if (resetToken.userType === "admin") {
+        await db
+          .update(users)
+          .set({ password: hashedPassword, updatedAt: new Date() })
+          .where(eq(users.email, resetToken.email));
+      } else {
+        await db
+          .update(drivers)
+          .set({ password: hashedPassword })
+          .where(eq(drivers.email, resetToken.email));
+      }
+
+      // Mark token as used
+      await db
+        .update(passwordResetTokens)
+        .set({ used: "true" })
+        .where(eq(passwordResetTokens.id, resetToken.id));
+
+      return { success: true };
+    } catch (error) {
+      console.error("Password reset error:", error);
+      return { success: false, message: "Failed to reset password" };
+    }
   }
 
   async getAllLoads(): Promise<Load[]> {
