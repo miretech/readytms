@@ -162,9 +162,9 @@ export default function Login() {
                 <div className="text-right">
                   <Button
                     type="button"
-                    variant="link"
+                    variant="ghost"
                     size="sm"
-                    className="p-0 h-auto text-sm"
+                    className="h-auto text-sm px-0 hover:underline"
                     onClick={() => window.location.href = "/reset-password"}
                     data-testid="button-forgot-password"
                   >
