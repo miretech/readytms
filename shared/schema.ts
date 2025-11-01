@@ -117,7 +117,8 @@ export const loads = pgTable("loads", {
   commodity: text("commodity"),
   notes: text("notes"),
   invoiceAttachment: text("invoice_attachment"), // Base64 encoded invoice document
-  podAttachment: text("pod_attachment"), // Base64 encoded proof of delivery document
+  podAttachment: text("pod_attachment"), // Base64 encoded proof of delivery document - DEPRECATED
+  podAttachments: jsonb("pod_attachments"), // Array of {filename: string, data: string (base64), type: string, uploadedAt: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -129,6 +130,12 @@ export const insertLoadSchema = createInsertSchema(loads).omit({
   deliveryDate: z.string(),
   rate: z.string(),
   expenses: z.string().optional(),
+  podAttachments: z.array(z.object({
+    filename: z.string(),
+    data: z.string(),
+    type: z.string(),
+    uploadedAt: z.string(),
+  })).optional(),
 });
 
 export type InsertLoad = z.infer<typeof insertLoadSchema>;
