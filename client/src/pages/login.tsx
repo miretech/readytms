@@ -158,6 +158,18 @@ export default function Login() {
                 )}
               />
 
+              {!showRegister && (
+                <div className="text-right">
+                  <a
+                    href="/reset-password"
+                    className="text-sm text-primary hover:underline"
+                    data-testid="link-forgot-password"
+                  >
+                    Forgot password?
+                  </a>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 className="w-full"

@@ -234,6 +234,16 @@ export default function DriverPOD() {
                     )}
                   />
 
+                  <div className="text-right">
+                    <a
+                      href="/reset-password?type=driver"
+                      className="text-sm text-primary hover:underline"
+                      data-testid="link-forgot-password-driver"
+                    >
+                      Forgot password?
+                    </a>
+                  </div>
+
                   <Button
                     type="submit"
                     className="w-full"

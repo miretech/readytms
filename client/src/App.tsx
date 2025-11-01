@@ -32,6 +32,7 @@ import Tasks from "@/pages/tasks";
 import CompanySettings from "@/pages/company-settings";
 import AdminApprovals from "@/pages/admin-approvals";
 import Login from "@/pages/login";
+import ResetPassword from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
 
 // Protected routes require authentication
@@ -68,6 +69,7 @@ function Router() {
     <Switch>
       {/* Public routes */}
       <Route path="/login" component={Login} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/driver-signup" component={DriverSignup} />
       <Route path="/driver-pod" component={DriverPOD} />
       
@@ -98,7 +100,7 @@ function Router() {
 function AppContent() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const isPublicPage = ["/login", "/driver-signup", "/driver-pod"].includes(location);
+  const isPublicPage = ["/login", "/reset-password", "/driver-signup", "/driver-pod"].includes(location);
 
   const style = {
     "--sidebar-width": "16rem",
