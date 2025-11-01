@@ -30,40 +30,64 @@ import ShortPays from "@/pages/short-pays";
 import ChargeBacks from "@/pages/charge-backs";
 import Tasks from "@/pages/tasks";
 import CompanySettings from "@/pages/company-settings";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
-// Routes are now publicly accessible - no auth required
-function PublicRoute({ component: Component }: { component: React.ComponentType }) {
+// Protected routes require authentication
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  
+  React.useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation("/login");
+    }
+  }, [user, isLoading, setLocation]);
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return null;
+  }
+  
   return <Component />;
 }
 
 function Router() {
   return (
     <Switch>
-      {/* Driver self-registration route - publicly accessible */}
+      {/* Public routes */}
+      <Route path="/login" component={Login} />
       <Route path="/driver-signup" component={DriverSignup} />
-      
-      {/* Driver POD upload portal - mobile-friendly, no sidebar */}
       <Route path="/driver-pod" component={DriverPOD} />
       
-      {/* All routes are publicly accessible */}
-      <Route path="/">{() => <PublicRoute component={Dashboard} />}</Route>
-      <Route path="/loads">{() => <PublicRoute component={Loads} />}</Route>
-      <Route path="/fleet">{() => <PublicRoute component={Fleet} />}</Route>
-      <Route path="/drivers">{() => <PublicRoute component={Drivers} />}</Route>
-      <Route path="/customers">{() => <PublicRoute component={Customers} />}</Route>
-      <Route path="/safety">{() => <PublicRoute component={Safety} />}</Route>
-      <Route path="/maintenance">{() => <PublicRoute component={Maintenance} />}</Route>
-      <Route path="/fuel">{() => <PublicRoute component={Fuel} />}</Route>
-      <Route path="/gps-tracking">{() => <PublicRoute component={GpsTracking} />}</Route>
-      <Route path="/driver-portal">{() => <PublicRoute component={DriverPortal} />}</Route>
-      <Route path="/accounting">{() => <PublicRoute component={Accounting} />}</Route>
-      <Route path="/short-pays">{() => <PublicRoute component={ShortPays} />}</Route>
-      <Route path="/charge-backs">{() => <PublicRoute component={ChargeBacks} />}</Route>
-      <Route path="/settlements">{() => <PublicRoute component={Settlements} />}</Route>
-      <Route path="/recurring-expenses">{() => <PublicRoute component={RecurringExpenses} />}</Route>
-      <Route path="/tasks">{() => <PublicRoute component={Tasks} />}</Route>
-      <Route path="/company-settings">{() => <PublicRoute component={CompanySettings} />}</Route>
+      {/* Protected admin routes */}
+      <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
+      <Route path="/loads">{() => <ProtectedRoute component={Loads} />}</Route>
+      <Route path="/fleet">{() => <ProtectedRoute component={Fleet} />}</Route>
+      <Route path="/drivers">{() => <ProtectedRoute component={Drivers} />}</Route>
+      <Route path="/customers">{() => <ProtectedRoute component={Customers} />}</Route>
+      <Route path="/safety">{() => <ProtectedRoute component={Safety} />}</Route>
+      <Route path="/maintenance">{() => <ProtectedRoute component={Maintenance} />}</Route>
+      <Route path="/fuel">{() => <ProtectedRoute component={Fuel} />}</Route>
+      <Route path="/gps-tracking">{() => <ProtectedRoute component={GpsTracking} />}</Route>
+      <Route path="/driver-portal">{() => <ProtectedRoute component={DriverPortal} />}</Route>
+      <Route path="/accounting">{() => <ProtectedRoute component={Accounting} />}</Route>
+      <Route path="/short-pays">{() => <ProtectedRoute component={ShortPays} />}</Route>
+      <Route path="/charge-backs">{() => <ProtectedRoute component={ChargeBacks} />}</Route>
+      <Route path="/settlements">{() => <ProtectedRoute component={Settlements} />}</Route>
+      <Route path="/recurring-expenses">{() => <ProtectedRoute component={RecurringExpenses} />}</Route>
+      <Route path="/tasks">{() => <ProtectedRoute component={Tasks} />}</Route>
+      <Route path="/company-settings">{() => <ProtectedRoute component={CompanySettings} />}</Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -72,15 +96,15 @@ function Router() {
 function AppContent() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const isAuthPage = ["/driver-signup", "/driver-pod"].includes(location);
+  const isPublicPage = ["/login", "/driver-signup", "/driver-pod"].includes(location);
 
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
-  // Show auth pages without sidebar
-  if (isAuthPage) {
+  // Show public pages without sidebar
+  if (isPublicPage) {
     return (
       <>
         <Router />
@@ -113,16 +137,7 @@ function AppContent() {
                     Logout
                   </Button>
                 </>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.location.href = "/api/login"}
-                  data-testid="button-login-header"
-                >
-                  Login
-                </Button>
-              )}
+              ) : null}
               <ThemeToggle />
             </div>
           </header>

@@ -21,30 +21,121 @@ import {
   insertShortPaySchema,
   insertChargeBackSchema
 } from "@shared/schema";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, isAdmin, isDriver } from "./auth";
+import passport from "passport";
+import bcrypt from "bcrypt";
 import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up Replit Auth middleware
+  // Set up email/password Auth middleware
   await setupAuth(app);
 
-  // Replit Auth user endpoint
+  // Admin login
+  app.post("/api/admin/login", (req, res, next) => {
+    passport.authenticate('admin-local', (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Internal server error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info.message || "Invalid credentials" });
+      }
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        return res.json({ message: "Login successful", user: { id: user.id, email: user.email, type: user.type } });
+      });
+    })(req, res, next);
+  });
+
+  // Admin register
+  app.post("/api/admin/register", async (req, res) => {
+    try {
+      const { email, password, firstName, lastName } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const user = await storage.createUser({
+        email,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        isAdmin: "true",
+      });
+
+      res.status(201).json({ message: "Admin registered successfully", user: { id: user.id, email: user.email } });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  // Driver login
+  app.post("/api/driver/login", (req, res, next) => {
+    passport.authenticate('driver-local', (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Internal server error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info.message || "Invalid credentials" });
+      }
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        return res.json({ message: "Login successful", user: { id: user.id, email: user.email, type: user.type } });
+      });
+    })(req, res, next);
+  });
+
+  // Get current user (works for both admin and driver)
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const sessionUser = req.user;
       
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      if (sessionUser.type === 'admin') {
+        const user = await storage.getUser(sessionUser.id);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        // Remove password from response
+        const { password, ...userWithoutPassword } = user;
+        return res.json({ ...userWithoutPassword, type: 'admin' });
+      } else if (sessionUser.type === 'driver') {
+        const driver = await storage.getDriver(sessionUser.id);
+        if (!driver) {
+          return res.status(404).json({ message: "Driver not found" });
+        }
+        // Remove password from response
+        const { password, ...driverWithoutPassword } = driver;
+        return res.json({ ...driverWithoutPassword, type: 'driver' });
       }
       
-      res.json(user);
+      res.status(404).json({ message: "User not found" });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
     }
+  });
+
+  // Logout
+  app.post("/api/logout", (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
   });
   app.get("/api/loads", async (_req, res) => {
     const loads = await storage.getAllLoads();

@@ -141,24 +141,28 @@ export default function DriverPOD() {
         <div className="p-4 flex items-center justify-center min-h-[calc(100vh-80px)]">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Login Required</CardTitle>
+              <CardTitle>Driver Login Required</CardTitle>
               <CardDescription>
-                Please log in with your driver account to access your assigned loads and upload PODs.
+                Drivers must contact admin to set up their account and password before using this portal.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button 
-                onClick={() => window.location.href = "/api/login?returnTo=/driver-pod"}
-                className="w-full h-12"
-                size="lg"
-                data-testid="button-login"
-              >
-                <LogIn className="mr-2 h-5 w-5" />
-                Log In with Replit Auth
-              </Button>
-              <p className="text-xs text-muted-foreground mt-4 text-center">
-                Use your driver email address to log in
-              </p>
+              <div className="text-center space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  This portal requires driver credentials set up by your administrator.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  For admin access, please visit:
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.href = "/login"}
+                  className="w-full"
+                  data-testid="button-admin-login"
+                >
+                  Go to Admin Login
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

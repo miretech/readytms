@@ -14,11 +14,12 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table for Replit Auth
+// User storage table for email/password authentication
 // IMPORTANT: Keep default() on id for migration compatibility from old UUID-based system
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
+  email: varchar("email").unique().notNull(),
+  password: varchar("password").notNull(), // Bcrypt hashed password
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
@@ -53,6 +54,7 @@ export const drivers = pgTable("drivers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  password: text("password"), // Bcrypt hashed password (optional for drivers created by admin)
   phone: text("phone").notNull(),
   address: text("address"),
   licenseNumber: text("license_number").notNull().unique(),
