@@ -91,6 +91,7 @@ export const customers = pgTable("customers", {
   phone: text("phone").notNull(),
   address: text("address").notNull(),
   type: text("type").notNull(),
+  broker: text("broker"),
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({

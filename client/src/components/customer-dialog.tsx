@@ -60,6 +60,7 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
       phone: "",
       address: "",
       type: "shipper",
+      broker: "",
     },
   });
 
@@ -71,6 +72,7 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
         phone: customer.phone,
         address: customer.address,
         type: customer.type,
+        broker: customer.broker || "",
       });
     } else {
       form.reset({
@@ -79,6 +81,7 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
         phone: "",
         address: "",
         type: "shipper",
+        broker: "",
       });
     }
   }, [customer, form]);
@@ -183,6 +186,20 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
                         <SelectItem value="receiver">Receiver</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="broker"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Broker (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Broker name" data-testid="input-customer-broker" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
