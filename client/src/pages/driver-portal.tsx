@@ -30,6 +30,7 @@ export default function DriverPortal() {
   const [lastLocation, setLastLocation] = useState<{ lat: number; lon: number; time: Date } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [notificationsGranted, setNotificationsGranted] = useState(false);
   
   // Use ref to track latest duty state (prevents stale closure issues)
   const isOnDutyRef = useRef(isOnDuty);
@@ -38,6 +39,32 @@ export default function DriverPortal() {
   useEffect(() => {
     isOnDutyRef.current = isOnDuty;
   }, [isOnDuty]);
+
+  // Request notification permissions on mount
+  useEffect(() => {
+    if ("Notification" in window) {
+      if (Notification.permission === "granted") {
+        setNotificationsGranted(true);
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            setNotificationsGranted(true);
+          }
+        });
+      }
+    }
+  }, []);
+
+  // Show browser notification helper function
+  const showBrowserNotification = useCallback((title: string, body: string) => {
+    if (notificationsGranted && "Notification" in window && Notification.permission === "granted") {
+      new Notification(title, {
+        body,
+        icon: "/favicon.ico",
+        badge: "/favicon.ico",
+      });
+    }
+  }, [notificationsGranted]);
 
   // Get current user
   const { data: user, isLoading: userLoading } = useQuery<any>({
@@ -246,6 +273,36 @@ export default function DriverPortal() {
 
     return () => clearInterval(interval);
   }, [isOnDuty, sendLocationUpdate]);
+
+  // Check for GPS reminder notifications (every 30 minutes)
+  useEffect(() => {
+    if (!currentDriver || currentDriver.gpsEnabled !== "true") return;
+
+    const checkGPSStatus = () => {
+      // If driver is not on duty and GPS is enabled, show reminder
+      if (!isOnDuty && currentDriver.gpsEnabled === "true") {
+        const lastUpdate = currentDriver.lastGpsUpdate ? new Date(currentDriver.lastGpsUpdate) : null;
+        const now = new Date();
+        const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+        
+        // Show reminder if no update in last 6 hours (or never updated)
+        if (!lastUpdate || lastUpdate < sixHoursAgo) {
+          showBrowserNotification(
+            "GPS Tracking Reminder",
+            "Please toggle 'On Duty' to share your location with dispatch."
+          );
+        }
+      }
+    };
+
+    // Check immediately on mount if driver has GPS enabled
+    checkGPSStatus();
+
+    // Then check every 30 minutes
+    const interval = setInterval(checkGPSStatus, 30 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [currentDriver, isOnDuty, showBrowserNotification]);
 
   if (!user) {
     return (

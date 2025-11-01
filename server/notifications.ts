@@ -1,7 +1,6 @@
 import { Resend } from 'resend';
 import type { Driver } from '@shared/schema';
-
-const SDK = require('@ringcentral/sdk').SDK;
+import { SDK } from '@ringcentral/sdk';
 
 // Initialize Resend for email notifications
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
