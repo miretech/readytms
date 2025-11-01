@@ -24,6 +24,7 @@ import Maintenance from "@/pages/maintenance";
 import Fuel from "@/pages/fuel";
 import GpsTracking from "@/pages/gps-tracking";
 import DriverPortal from "@/pages/driver-portal";
+import DriverPOD from "@/pages/driver-pod";
 import DriverSignup from "@/pages/driver-signup";
 import ShortPays from "@/pages/short-pays";
 import ChargeBacks from "@/pages/charge-backs";
@@ -41,6 +42,9 @@ function Router() {
     <Switch>
       {/* Driver self-registration route - publicly accessible */}
       <Route path="/driver-signup" component={DriverSignup} />
+      
+      {/* Driver POD upload portal - mobile-friendly, no sidebar */}
+      <Route path="/driver-pod" component={DriverPOD} />
       
       {/* All routes are publicly accessible */}
       <Route path="/">{() => <PublicRoute component={Dashboard} />}</Route>
@@ -68,7 +72,7 @@ function Router() {
 function AppContent() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const isAuthPage = ["/driver-signup"].includes(location);
+  const isAuthPage = ["/driver-signup", "/driver-pod"].includes(location);
 
   const style = {
     "--sidebar-width": "16rem",
