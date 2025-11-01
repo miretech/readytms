@@ -255,16 +255,17 @@ export default function DriverPOD() {
                 </form>
               </Form>
 
-              <div className="mt-4 pt-4 border-t text-center">
-                <p className="text-xs text-muted-foreground mb-2">
-                  Don't have driver credentials?
+              <div className="mt-4 pt-4 border-t text-center space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Don't have an account?{" "}
+                  <a
+                    href="/driver-signup"
+                    className="text-primary hover:underline font-medium"
+                    data-testid="link-driver-signup"
+                  >
+                    Register here
+                  </a>
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Contact your dispatcher to set up your account
-                </p>
-              </div>
-
-              <div className="mt-4 text-center">
                 <Button
                   variant="outline"
                   size="sm"

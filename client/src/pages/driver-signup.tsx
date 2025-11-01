@@ -21,6 +21,7 @@ import {
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   licenseNumber: z.string().min(5, "CDL license number is required"),
   licenseExpiration: z.string().optional(),
@@ -40,6 +41,7 @@ export default function DriverSignup() {
     defaultValues: {
       name: "",
       email: "",
+      password: "",
       phone: "",
       licenseNumber: "",
       licenseExpiration: "",
@@ -75,9 +77,9 @@ export default function DriverSignup() {
         description: "Your driver account has been created. Please log in to continue.",
       });
 
-      // Redirect to login after 2 seconds
+      // Redirect to driver login after 2 seconds
       setTimeout(() => {
-        setLocation("/api/login");
+        setLocation("/driver-pod");
       }, 2000);
     } catch (error: any) {
       toast({
@@ -125,26 +127,45 @@ export default function DriverSignup() {
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="driver@example.com"
-                          {...field}
-                          data-testid="input-email"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="driver@example.com"
+                        {...field}
+                        data-testid="input-email"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Enter a secure password"
+                        {...field}
+                        data-testid="input-password"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="phone"
@@ -163,9 +184,7 @@ export default function DriverSignup() {
                     </FormItem>
                   )}
                 />
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="licenseNumber"
@@ -183,25 +202,25 @@ export default function DriverSignup() {
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="licenseExpiration"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CDL Expiration Date</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          data-testid="input-license-expiration"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
+
+              <FormField
+                control={form.control}
+                name="licenseExpiration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CDL Expiration Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        data-testid="input-license-expiration"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
@@ -255,7 +274,7 @@ export default function DriverSignup() {
                 <p className="text-sm text-muted-foreground text-center">
                   Already have an account?{" "}
                   <a
-                    href="/api/login"
+                    href="/driver-pod"
                     className="text-primary hover:underline font-medium"
                     data-testid="link-login"
                   >

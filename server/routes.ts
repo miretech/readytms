@@ -474,6 +474,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "A driver with this CDL license number already exists" });
       }
       
+      // Hash password if provided
+      if (validatedData.password) {
+        validatedData.password = await bcrypt.hash(validatedData.password, 12);
+      }
+      
       const driver = await storage.createDriver(validatedData);
       res.status(201).json({ 
         message: "Driver account created successfully",
