@@ -29,6 +29,11 @@ The system provides a comprehensive set of modules:
 - **Driver Self-Registration**: Public-facing driver signup at `/driver-signup` for self-onboarding.
 - **Driver Portal**: Mobile-friendly web portal for drivers to share GPS location, toggle duty status, view assignments, and upload PODs.
 - **Driver POD Upload Portal**: Secure, mobile-optimized web app at `/driver-pod` for drivers to upload Proof of Delivery documents with camera integration and multi-file support.
+- **GPS Notification System**: Multi-channel notification system for GPS tracking reminders:
+  - Email notifications when admin enables GPS tracking for a driver
+  - Daily reminder emails for drivers who haven't shared location in 24 hours
+  - Browser push notifications in driver portal for real-time alerts
+  - SMS notifications via RingCentral (pending credentials setup)
 - **Safety & Compliance**: Includes Inspections, Accidents & Incidents reporting, and Violations & Citations tracking.
 - **Accounting & Financial Management**: Financial Overview, Invoices (AR), Expense Management, and Payments & Cash Management.
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
@@ -41,7 +46,8 @@ The system provides a comprehensive set of modules:
 
 ### System Design Choices
 - **Development Approach**: Schema-first design with data models defined for type consistency, followed by horizontal layer implementation.
-- **Authentication & Security**: Traditional Email/Password Authentication using Passport Local Strategy with separate strategies for admin and driver login. Passwords hashed using bcrypt. Session-based authentication with secure HTTP-only cookies and PostgreSQL-backed session persistence. Admin approval system for new admin registrations with email notifications via Resend integration.
+- **Authentication & Security**: Traditional Email/Password Authentication using Passport Local Strategy with separate strategies for admin and driver login. Passwords hashed using bcrypt with SHA-256 hashed password reset tokens. Session-based authentication with secure HTTP-only cookies and PostgreSQL-backed session persistence. Admin approval system for new admin registrations with email notifications via Resend integration. Email-based password reset with one-hour token expiration and one-time use tokens.
+- **Notification System**: Multi-channel notification infrastructure using Resend for email notifications and RingCentral SDK for SMS (when credentials are provided). Supports automated GPS tracking reminders, document expiration alerts, and system notifications.
 - **Data Layer**: PostgreSQL with Drizzle ORM, proper foreign key relationships, data normalization, and Drizzle Kit for migrations.
 - **API Design**: RESTful endpoint structure with Zod validation, consistent response formats, and proper HTTP status codes.
 - **Performance**: Utilizes TanStack Query for caching, database indexing, and optimized SQL queries.
@@ -52,6 +58,11 @@ The system provides a comprehensive set of modules:
 - **Authentication**: Passport.js with passport-local strategy
 - **Password Hashing**: bcrypt
 - **Session Management**: Express-session with connect-pg-simple
+- **Email Service**: Resend API for transactional emails (password reset, GPS notifications)
+- **SMS Service**: RingCentral SDK (pending credential setup - requires RC_SERVER_URL, RC_APP_CLIENT_ID, RC_APP_CLIENT_SECRET, RC_USER_JWT, RC_PHONE_NUMBER)
 - **UI Components**: Shadcn UI, Radix primitives
 - **Icons**: Lucide React
 - **Date Handling**: date-fns
+
+## Pending Integrations
+- **RingCentral SMS**: User will provide credentials at a later time. System is designed to gracefully handle SMS when credentials become available. Required secrets: RC_SERVER_URL, RC_APP_CLIENT_ID, RC_APP_CLIENT_SECRET, RC_USER_JWT, RC_PHONE_NUMBER
