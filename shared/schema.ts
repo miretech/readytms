@@ -466,6 +466,7 @@ export const maintenance = pgTable("maintenance", {
   status: text("status").notNull(),
   invoiceNumber: text("invoice_number"),
   notes: text("notes"),
+  attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
