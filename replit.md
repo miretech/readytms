@@ -17,7 +17,7 @@ Ready TMS is a comprehensive, enterprise-level Transportation Management System 
 The system features a professional UI built with Shadcn UI and Radix primitives, styled with Tailwind CSS. It uses a consistent design system with a primary blue color scheme, specific colors for success, warning, and danger states, and the Inter font family. It supports both light and dark modes, detecting system preferences. Common UI patterns include searchable tables with status badges and action buttons, form-based dialogs with validation, helpful empty states, skeleton loaders for loading states, and toast notifications for user feedback.
 
 ### Technical Implementations
-The application is a full-stack web application. The frontend is built with React 18 and TypeScript, using Wouter for routing, TanStack Query v5 for state management, React Hook Form with Zod for form validation, and date-fns for date handling. The backend uses Express.js with a PostgreSQL database (Neon-backed on Replit) and Drizzle ORM for type-safe queries. Authentication uses custom email/password authentication with bcrypt (cost factor 12), Express sessions backed by a PostgreSQL store (connect-pg-simple), and protected routes with auth guards. End-to-end type safety is maintained using shared schemas.
+The application is a full-stack web application. The frontend is built with React 18 and TypeScript, using Wouter for routing, TanStack Query v5 for state management, React Hook Form with Zod for form validation, and date-fns for date handling. The backend uses Express.js with a PostgreSQL database (Neon-backed on Replit) and Drizzle ORM for type-safe queries. Authentication uses traditional email/password authentication with Passport Local Strategy and bcrypt password hashing (cost factor 12), Express sessions backed by a PostgreSQL store (connect-pg-simple), and protected routes with auth guards that redirect unauthenticated users to /login. End-to-end type safety is maintained using shared schemas.
 
 ### Feature Specifications
 The system provides a comprehensive set of modules:
@@ -36,7 +36,7 @@ The system provides a comprehensive set of modules:
 - **Driver Self-Registration**: Public-facing driver signup page at `/driver-signup` where new drivers can create their own accounts. Drivers fill out a registration form with their name, email, phone, CDL license information, and medical card details. The system validates that email addresses and license numbers are unique before creating accounts. After successful registration, drivers are redirected to log in and can immediately access the Driver Portal. This eliminates the need for admin-created driver accounts and allows drivers to self-onboard.
 - **Driver Portal**: Mobile-friendly web portal for drivers to share their GPS location using their phone's browser. Features include On Duty/Off Duty toggle, automatic location updates every 3 minutes when on duty, manual "Share Location Now" button, current load assignment display, and real-time tracking status. Drivers are matched to their profile via email authentication, and location data includes truck and load assignments. No app download required - works in any phone browser.
 - **Driver POD Upload Portal (Nov 2025)**: Secure, mobile-optimized web app at `/driver-pod` for drivers to upload Proof of Delivery documents from their phones. Features include:
-  - **Authentication Required**: Drivers must log in with Replit Auth to access their assigned loads
+  - **Authentication Required**: Drivers must contact admin to set up their account and password before accessing the portal
   - **Mobile-First Design**: Full-screen interface optimized for phone use, works in any browser without app download
   - **Camera Integration**: Direct camera access to photograph PODs (shipping papers, signatures, cargo)
   - **Multi-File Support**: Upload multiple photos/PDFs per load with preview and removal
@@ -63,7 +63,7 @@ The system provides a comprehensive set of modules:
 
 ### System Design Choices
 - **Development Approach**: Employs a schema-first design with all data models defined for type consistency, followed by horizontal layer implementation (schemas → storage → API → frontend).
-- **Authentication & Security**: **Replit Auth (OpenID Connect)** with support for Google, GitHub, Apple, and email-password login. Authentication is **OPTIONAL** - all features are accessible without login. Session-based authentication with secure HTTP-only cookies (sameSite: "lax" for CSRF protection), PostgreSQL-backed session persistence (connect-pg-simple with manually created sessions table). Frontend auth guards using React context and TanStack Query. Auth routes: GET /api/login (initiates OIDC flow), GET /api/callback (OIDC callback), GET /api/logout (clears session), GET /api/auth/user (returns current user). User records are created/updated via upsertUser based on OIDC claims (sub, email, first_name, last_name, profile_image_url). Session SECRET must be overridden with high-entropy value in production.
+- **Authentication & Security**: **Traditional Email/Password Authentication** using Passport Local Strategy with separate strategies for admin and driver login. Admin accounts are managed via the /login page (with registration capability), while driver accounts are created by admins and require password setup. Passwords are hashed using bcrypt (cost factor 12). Session-based authentication with secure HTTP-only cookies (sameSite: "lax" for CSRF protection), PostgreSQL-backed session persistence (connect-pg-simple with manually created sessions table). Frontend auth guards using React context and TanStack Query redirect unauthenticated users to /login. Auth routes: POST /api/admin/login, POST /api/admin/register, POST /api/driver/login, POST /api/logout, GET /api/auth/user (returns current user with type field indicating 'admin' or 'driver'). Session SECRET must be overridden with high-entropy value in production.
 - **Data Layer**: PostgreSQL with Drizzle ORM, proper foreign key relationships, data normalization, and Drizzle Kit for migrations. Date fields properly handle empty strings by converting to null for optional timestamps.
 - **API Design**: RESTful endpoint structure with Zod validation on request bodies, consistent response formats, and proper HTTP status codes. GPS tracking endpoints support mobile app integration.
 - **Performance**: Utilizes TanStack Query for caching with query invalidation after login/register, database indexing, and optimized SQL queries.
@@ -71,7 +71,8 @@ The system provides a comprehensive set of modules:
 
 ## External Dependencies
 - **Database**: PostgreSQL (Neon-backed on Replit) with manually created sessions table for connect-pg-simple
-- **Authentication**: Replit Auth (OpenID Connect) with Passport.js, supports Google/GitHub/Apple/email-password
+- **Authentication**: Passport.js with passport-local strategy for email/password authentication
+- **Password Hashing**: bcrypt (cost factor 12)
 - **Session Management**: Express-session with connect-pg-simple (PostgreSQL store), sessions table manually created at server startup to avoid index conflicts
 - **UI Components**: Shadcn UI, Radix primitives
 - **Icons**: Lucide React
@@ -79,7 +80,6 @@ The system provides a comprehensive set of modules:
 
 ## Production Notes
 - **SESSION_SECRET**: Override default with high-entropy value (32+ random characters) in production environment
-- **REPL_ID**: Required environment variable for Replit Auth (automatically provided by Replit platform)
-- **ISSUER_URL**: Defaults to https://replit.com/oidc for production, can be overridden for testing
 - **Session Table**: The sessions table is automatically created at server startup using CREATE TABLE IF NOT EXISTS. Do not use `createTableIfMissing: true` in session store config to avoid index creation conflicts
-- **Authentication Migration**: Migrated from custom email/password to Replit Auth (Oct 2025). All existing user accounts were cleared during migration and users must re-authenticate using Replit Auth
+- **Authentication System**: Traditional email/password authentication with separate admin and driver login flows. Admin login at /login, driver accounts managed by admins. Passwords stored as bcrypt hashes in users and drivers tables.
+- **First-Time Setup**: Create first admin account by visiting /login and clicking "Need an account? Click here" to register. All subsequent admin accounts can be created the same way or through the admin interface.

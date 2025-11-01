@@ -37,6 +37,7 @@ const formSchema = insertDriverSchema.extend({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(1, "Phone number is required"),
+  password: z.string().optional(),
   licenseNumber: z.string().min(1, "License number is required"),
   status: z.string().min(1, "Status is required"),
 });
@@ -66,6 +67,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       name: "",
       email: "",
       phone: "",
+      password: "",
       address: "",
       licenseNumber: "",
       licenseExpiration: "",
@@ -90,6 +92,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         name: driver.name,
         email: driver.email,
         phone: driver.phone,
+        password: "", // Don't show existing password for security
         address: driver.address || "",
         licenseNumber: driver.licenseNumber,
         licenseExpiration: driver.licenseExpiration ? new Date(driver.licenseExpiration).toISOString().split('T')[0] : "",
@@ -113,6 +116,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         name: "",
         email: "",
         phone: "",
+        password: "",
         address: "",
         licenseNumber: "",
         licenseExpiration: "",
@@ -186,7 +190,13 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
   };
 
   const onSubmit = (values: FormValues) => {
-    mutation.mutate(values);
+    // Remove password if it's empty (for edit mode)
+    if (isEditing && !values.password) {
+      const { password, ...rest } = values;
+      mutation.mutate(rest as FormValues);
+    } else {
+      mutation.mutate(values);
+    }
   };
 
   return (
@@ -239,6 +249,20 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="(555) 123-4567" data-testid="input-driver-phone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{isEditing ? "New Password (leave blank to keep current)" : "Password"}</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="password" placeholder="••••••••" data-testid="input-driver-password" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

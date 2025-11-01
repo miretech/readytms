@@ -1,13 +1,23 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Camera, Upload, MapPin, Package, CheckCircle2, FileText, X, LogIn } from "lucide-react";
+import { Camera, Upload, MapPin, Package, CheckCircle2, FileText, X, LogIn, Mail, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { Load } from "@shared/schema";
+
+const driverLoginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
+});
 
 export default function DriverPOD() {
   const { toast } = useToast();
@@ -130,6 +140,35 @@ export default function DriverPOD() {
     load.status.toLowerCase() !== 'cancelled'
   );
 
+  // Driver login form
+  const loginForm = useForm<z.infer<typeof driverLoginSchema>>({
+    resolver: zodResolver(driverLoginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async (values: z.infer<typeof driverLoginSchema>) => {
+      return await apiRequest("POST", "/api/driver/login", values);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "Welcome!",
+        description: "You've successfully logged in.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid driver credentials",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Show login screen if not authenticated
   if (!user && !authLoading) {
     return (
@@ -141,26 +180,98 @@ export default function DriverPOD() {
         <div className="p-4 flex items-center justify-center min-h-[calc(100vh-80px)]">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Driver Login Required</CardTitle>
+              <CardTitle>Driver Login</CardTitle>
               <CardDescription>
-                Drivers must contact admin to set up their account and password before using this portal.
+                Enter your driver credentials to access your assigned loads and upload PODs.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  This portal requires driver credentials set up by your administrator.
+              <Form {...loginForm}>
+                <form onSubmit={loginForm.handleSubmit((values) => loginMutation.mutate(values))} className="space-y-4">
+                  <FormField
+                    control={loginForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="email"
+                              placeholder="driver@example.com"
+                              className="pl-10"
+                              data-testid="input-driver-email"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={loginForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="password"
+                              placeholder="••••••••"
+                              className="pl-10"
+                              data-testid="input-driver-password"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loginMutation.isPending}
+                    data-testid="button-driver-login"
+                  >
+                    {loginMutation.isPending ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Logging in...
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="mr-2 h-4 w-4" />
+                        Driver Login
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </Form>
+
+              <div className="mt-4 pt-4 border-t text-center">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Don't have driver credentials?
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  For admin access, please visit:
+                <p className="text-xs text-muted-foreground">
+                  Contact your dispatcher to set up your account
                 </p>
+              </div>
+
+              <div className="mt-4 text-center">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => window.location.href = "/login"}
-                  className="w-full"
                   data-testid="button-admin-login"
                 >
-                  Go to Admin Login
+                  Admin Login
                 </Button>
               </div>
             </CardContent>

@@ -198,18 +198,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  // Driver POD Upload Routes - Require authentication
-  app.get("/api/driver/loads", isAuthenticated, async (req: any, res) => {
+  // Driver POD Upload Routes - Require driver authentication
+  app.get("/api/driver/loads", isAuthenticated, isDriver, async (req: any, res) => {
     try {
-      const driverEmail = req.user.claims.email;
+      const sessionUser = req.user;
       
-      if (!driverEmail) {
-        return res.status(401).json({ error: "Driver email not found" });
+      if (!sessionUser || sessionUser.type !== 'driver') {
+        return res.status(403).json({ error: "Driver access required" });
       }
       
-      // Get all drivers to find the current driver
-      const drivers = await storage.getAllDrivers();
-      const driver = drivers.find(d => d.email === driverEmail);
+      // Get the driver from the database
+      const driver = await storage.getDriver(sessionUser.id);
       
       if (!driver) {
         return res.status(404).json({ error: "Driver not found" });
@@ -225,14 +224,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/driver/loads/:id/pod", isAuthenticated, async (req: any, res) => {
+  app.post("/api/driver/loads/:id/pod", isAuthenticated, isDriver, async (req: any, res) => {
     try {
       const loadId = req.params.id;
       const { podAttachments } = req.body;
-      const driverEmail = req.user.claims.email;
+      const sessionUser = req.user;
       
-      if (!driverEmail) {
-        return res.status(401).json({ error: "Driver email not found" });
+      if (!sessionUser || sessionUser.type !== 'driver') {
+        return res.status(403).json({ error: "Driver access required" });
       }
       
       if (!podAttachments || !Array.isArray(podAttachments)) {
@@ -272,8 +271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Verify the load is assigned to the authenticated driver
-      const drivers = await storage.getAllDrivers();
-      const driver = drivers.find(d => d.email === driverEmail);
+      const driver = await storage.getDriver(sessionUser.id);
       
       if (!driver) {
         return res.status(404).json({ error: "Driver not found" });
@@ -412,6 +410,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/drivers", async (req, res) => {
     try {
       const validatedData = insertDriverSchema.parse(req.body);
+      
+      // If password is provided, hash it
+      if (validatedData.password) {
+        validatedData.password = await bcrypt.hash(validatedData.password, 12);
+      }
+      
       const driver = await storage.createDriver(validatedData);
       res.status(201).json(driver);
     } catch (error: any) {
@@ -423,6 +427,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/drivers/:id", async (req, res) => {
     try {
       const validatedData = insertDriverSchema.partial().parse(req.body);
+      
+      // If password is being updated, hash it
+      if (validatedData.password) {
+        validatedData.password = await bcrypt.hash(validatedData.password, 12);
+      }
+      
       const driver = await storage.updateDriver(req.params.id, validatedData);
       if (!driver) {
         return res.status(404).json({ error: "Driver not found" });
