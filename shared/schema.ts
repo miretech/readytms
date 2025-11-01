@@ -74,6 +74,8 @@ export const drivers = pgTable("drivers", {
   dateHired: timestamp("date_hired"),
   dateTerminated: timestamp("date_terminated"),
   assignedTruckId: varchar("assigned_truck_id"),
+  gpsEnabled: text("gps_enabled").notNull().default("false"), // Admin-controlled GPS tracking
+  lastGpsUpdate: timestamp("last_gps_update"), // Last time driver shared GPS location
 });
 
 export const insertDriverSchema = createInsertSchema(drivers).omit({

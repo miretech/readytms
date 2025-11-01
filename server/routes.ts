@@ -1332,6 +1332,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(locations);
   });
 
+  // Admin: Enable/Disable GPS tracking for a driver
+  app.patch("/api/drivers/:id/gps", async (req, res) => {
+    try {
+      const { gpsEnabled } = req.body;
+      if (typeof gpsEnabled !== "boolean") {
+        return res.status(400).json({ error: "gpsEnabled must be a boolean" });
+      }
+
+      const driver = await storage.updateDriver(req.params.id, {
+        gpsEnabled: gpsEnabled ? "true" : "false",
+      });
+
+      if (!driver) {
+        return res.status(404).json({ error: "Driver not found" });
+      }
+
+      res.json({
+        message: `GPS tracking ${gpsEnabled ? "enabled" : "disabled"} for ${driver.name}`,
+        driver,
+      });
+    } catch (error: any) {
+      console.error("GPS toggle error:", error);
+      res.status(500).json({ error: "Failed to update GPS tracking status" });
+    }
+  });
+
   app.get("/api/gps/driver/:driverId", async (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
     const locations = await storage.getGpsLocationsByDriver(req.params.driverId, limit);
@@ -1353,6 +1379,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertGpsLocationSchema.parse(req.body);
       const location = await storage.createGpsLocation(validatedData);
+      
+      // Update driver's last GPS update timestamp
+      if (validatedData.driverId) {
+        await storage.updateDriver(validatedData.driverId, {
+          lastGpsUpdate: new Date(),
+        });
+      }
+      
       res.status(201).json(location);
     } catch (error) {
       res.status(400).json({ error: "Invalid GPS location data" });
