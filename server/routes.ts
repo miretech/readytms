@@ -107,45 +107,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  // Driver POD Upload Routes
-  app.get("/api/driver/loads", async (req: any, res) => {
+  // Driver POD Upload Routes - Require authentication
+  app.get("/api/driver/loads", isAuthenticated, async (req: any, res) => {
     try {
-      // Get driver by email if authenticated, or allow unauthenticated access
-      let driverEmail: string | null = null;
+      const driverEmail = req.user.claims.email;
       
-      if (req.user && req.user.claims && req.user.claims.email) {
-        driverEmail = req.user.claims.email;
+      if (!driverEmail) {
+        return res.status(401).json({ error: "Driver email not found" });
       }
       
       // Get all drivers to find the current driver
       const drivers = await storage.getAllDrivers();
+      const driver = drivers.find(d => d.email === driverEmail);
       
-      if (driverEmail) {
-        const driver = drivers.find(d => d.email === driverEmail);
-        if (driver) {
-          // Get loads assigned to this driver
-          const allLoads = await storage.getAllLoads();
-          const driverLoads = allLoads.filter(load => load.assignedDriverId === driver.id);
-          return res.json(driverLoads);
-        }
+      if (!driver) {
+        return res.status(404).json({ error: "Driver not found" });
       }
       
-      // If no driver found or not authenticated, return all loads
+      // Get loads assigned to this driver only
       const allLoads = await storage.getAllLoads();
-      res.json(allLoads);
+      const driverLoads = allLoads.filter(load => load.assignedDriverId === driver.id);
+      res.json(driverLoads);
     } catch (error) {
       console.error("Error fetching driver loads:", error);
       res.status(500).json({ error: "Failed to fetch loads" });
     }
   });
 
-  app.post("/api/driver/loads/:id/pod", async (req, res) => {
+  app.post("/api/driver/loads/:id/pod", isAuthenticated, async (req: any, res) => {
     try {
       const loadId = req.params.id;
       const { podAttachments } = req.body;
+      const driverEmail = req.user.claims.email;
+      
+      if (!driverEmail) {
+        return res.status(401).json({ error: "Driver email not found" });
+      }
       
       if (!podAttachments || !Array.isArray(podAttachments)) {
         return res.status(400).json({ error: "POD attachments are required" });
+      }
+      
+      // Validate attachment schema
+      const podSchema = z.array(z.object({
+        filename: z.string(),
+        data: z.string(),
+        type: z.string(),
+      }));
+      
+      try {
+        podSchema.parse(podAttachments);
+      } catch (validationError) {
+        return res.status(400).json({ error: "Invalid attachment format" });
+      }
+      
+      // Limit: max 10 POD attachments per upload
+      if (podAttachments.length > 10) {
+        return res.status(400).json({ error: "Maximum 10 POD attachments allowed per upload" });
+      }
+      
+      // Limit: max 10MB per attachment (base64 is ~1.37x original size, so ~7.3MB original)
+      const maxSize = 10 * 1024 * 1024; // 10MB in base64
+      for (const att of podAttachments) {
+        if (att.data.length > maxSize) {
+          return res.status(400).json({ error: `Attachment ${att.filename} exceeds 10MB limit` });
+        }
+      }
+      
+      // Get existing load
+      const existingLoad = await storage.getLoad(loadId);
+      if (!existingLoad) {
+        return res.status(404).json({ error: "Load not found" });
+      }
+      
+      // Verify the load is assigned to the authenticated driver
+      const drivers = await storage.getAllDrivers();
+      const driver = drivers.find(d => d.email === driverEmail);
+      
+      if (!driver) {
+        return res.status(404).json({ error: "Driver not found" });
+      }
+      
+      if (existingLoad.assignedDriverId !== driver.id) {
+        return res.status(403).json({ error: "This load is not assigned to you" });
       }
       
       // Add uploadedAt timestamp to each attachment
@@ -154,15 +198,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedAt: new Date().toISOString(),
       }));
       
-      // Get existing load
-      const existingLoad = await storage.getLoad(loadId);
-      if (!existingLoad) {
-        return res.status(404).json({ error: "Load not found" });
-      }
-      
       // Merge with existing POD attachments if any
       const existingPODs = (existingLoad.podAttachments as any) || [];
       const allPODs = [...existingPODs, ...timestampedAttachments];
+      
+      // Limit: max 50 total POD attachments per load
+      if (allPODs.length > 50) {
+        return res.status(400).json({ error: "Maximum 50 total POD attachments allowed per load" });
+      }
       
       // Update load with POD attachments
       const updatedLoad = await storage.updateLoad(loadId, {
