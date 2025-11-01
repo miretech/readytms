@@ -477,6 +477,11 @@ export const insertMaintenanceSchema = createInsertSchema(maintenance).omit({
   serviceDate: z.string(),
   nextServiceDate: z.string().optional(),
   cost: z.string(),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    data: z.string(),
+    type: z.string(),
+  })).optional(),
 });
 
 export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
