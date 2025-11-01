@@ -35,6 +35,16 @@ The system provides a comprehensive set of modules:
 - **GPS Driver Tracking**: Real-time location tracking with API endpoints for GPS data submission from mobile apps, live location display with coordinates and Google Maps links, search and filter capabilities, and speed/heading tracking.
 - **Driver Self-Registration**: Public-facing driver signup page at `/driver-signup` where new drivers can create their own accounts. Drivers fill out a registration form with their name, email, phone, CDL license information, and medical card details. The system validates that email addresses and license numbers are unique before creating accounts. After successful registration, drivers are redirected to log in and can immediately access the Driver Portal. This eliminates the need for admin-created driver accounts and allows drivers to self-onboard.
 - **Driver Portal**: Mobile-friendly web portal for drivers to share their GPS location using their phone's browser. Features include On Duty/Off Duty toggle, automatic location updates every 3 minutes when on duty, manual "Share Location Now" button, current load assignment display, and real-time tracking status. Drivers are matched to their profile via email authentication, and location data includes truck and load assignments. No app download required - works in any phone browser.
+- **Driver POD Upload Portal (Nov 2025)**: Secure, mobile-optimized web app at `/driver-pod` for drivers to upload Proof of Delivery documents from their phones. Features include:
+  - **Authentication Required**: Drivers must log in with Replit Auth to access their assigned loads
+  - **Mobile-First Design**: Full-screen interface optimized for phone use, works in any browser without app download
+  - **Camera Integration**: Direct camera access to photograph PODs (shipping papers, signatures, cargo)
+  - **Multi-File Support**: Upload multiple photos/PDFs per load with preview and removal
+  - **Security**: Drivers can only view and upload PODs to loads assigned to them
+  - **Auto-Delivery**: Uploading POD automatically marks load as delivered and triggers invoice generation
+  - **Validation**: Server-side limits (max 10 files per upload, 10MB per file, 50 total per load)
+  - **POD Storage**: Attachments stored in jsonb field with metadata (filename, type, uploadedAt timestamp)
+  - **API Endpoints**: GET /api/driver/loads (returns driver's assigned loads), POST /api/driver/loads/:id/pod (uploads POD with authorization check)
 - **Safety & Compliance**: Includes Inspections (Pre-Trip, DOT, etc.), Accidents & Incidents reporting, and Violations & Citations tracking.
 - **Accounting & Financial Management**: Financial Overview, Invoices (AR), Expense Management, and Payments & Cash Management.
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
