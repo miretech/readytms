@@ -414,24 +414,27 @@ export class DatabaseStorage implements IStorage {
         return { success: false, message: "User not found" };
       }
 
-      // Generate secure random token
-      const token = crypto.randomBytes(32).toString('hex');
+      // Generate secure random token (this will be sent in the email)
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      
+      // Hash the token before storing in database (SHA-256)
+      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
       
       // Token expires in 1 hour
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 1);
 
-      // Save token to database
+      // Save hashed token to database
       await db.insert(passwordResetTokens).values({
         email,
-        token,
+        token: hashedToken,
         userType,
         expiresAt,
         used: "false",
       });
 
-      // Send reset email
-      const resetUrl = `${process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000'}/reset-password?token=${token}&type=${userType}`;
+      // Send reset email with raw token (user needs this to reset password)
+      const resetUrl = `${process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000'}/reset-password?token=${rawToken}&type=${userType}`;
       
       await resend.emails.send({
         from: 'Ready TMS <noreply@resend.dev>',
@@ -462,12 +465,15 @@ export class DatabaseStorage implements IStorage {
 
   async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message?: string }> {
     try {
-      // Find the token
+      // Hash the incoming token to compare with stored hashed token
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+      
+      // Find the token by hashed value
       const [resetToken] = await db
         .select()
         .from(passwordResetTokens)
         .where(and(
-          eq(passwordResetTokens.token, token),
+          eq(passwordResetTokens.token, hashedToken),
           eq(passwordResetTokens.used, "false")
         ));
 
