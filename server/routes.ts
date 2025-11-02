@@ -26,7 +26,7 @@ import passport from "passport";
 import bcrypt from "bcrypt";
 import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
-import { sendGPSEnabledNotification, sendGPSReminderNotification } from "./notifications";
+import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -779,6 +779,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Invoice not found" });
     }
     res.status(204).send();
+  });
+
+  // Factoring Email Route
+  app.post("/api/accounting/factoring-email", async (req, res) => {
+    try {
+      const schema = z.object({
+        to: z.string().email(),
+        from: z.string().email().optional(),
+        subject: z.string().min(1),
+        message: z.string().min(1),
+        invoiceId: z.string(),
+        loadId: z.string().optional(),
+        invoicePdf: z.string().optional(), // base64 encoded PDF
+        attachPods: z.boolean().default(false),
+      });
+
+      const validatedData = schema.parse(req.body);
+
+      // Fetch invoice data
+      const invoice = await storage.getInvoice(validatedData.invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      // Prepare attachments array
+      const attachments: Array<{ filename: string; content: Buffer | string; type?: string }> = [];
+
+      // Add invoice PDF if provided
+      if (validatedData.invoicePdf) {
+        const pdfBuffer = Buffer.from(validatedData.invoicePdf, 'base64');
+        attachments.push({
+          filename: `Invoice-${invoice.invoiceNumber}.pdf`,
+          content: pdfBuffer,
+          type: 'application/pdf',
+        });
+      }
+
+      // Add POD attachments if requested and loadId provided
+      if (validatedData.attachPods && validatedData.loadId) {
+        const load = await storage.getLoad(validatedData.loadId);
+        if (load && load.podAttachments) {
+          const pods = Array.isArray(load.podAttachments) ? load.podAttachments : [];
+          pods.forEach((pod: any, index: number) => {
+            if (pod.data) {
+              // Remove data URI prefix if present
+              const base64Data = pod.data.includes(',') 
+                ? pod.data.split(',')[1] 
+                : pod.data;
+              const podBuffer = Buffer.from(base64Data, 'base64');
+              attachments.push({
+                filename: pod.filename || `POD-${index + 1}.${pod.type?.split('/')[1] || 'pdf'}`,
+                content: podBuffer,
+                type: pod.type || 'application/pdf',
+              });
+            }
+          });
+        }
+      }
+
+      // Send email
+      const emailSent = await sendEmail({
+        to: validatedData.to,
+        from: validatedData.from,
+        subject: validatedData.subject,
+        html: validatedData.message.replace(/\n/g, '<br>'),
+        attachments: attachments.length > 0 ? attachments : undefined,
+      });
+
+      if (!emailSent) {
+        return res.status(500).json({ error: "Failed to send email" });
+      }
+
+      res.json({ success: true, message: "Email sent successfully" });
+    } catch (error) {
+      console.error('[Factoring Email] Error:', error);
+      res.status(400).json({ error: "Invalid request data" });
+    }
   });
 
   // Payments Routes

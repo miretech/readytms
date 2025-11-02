@@ -53,6 +53,12 @@ interface EmailOptions {
   to: string;
   subject: string;
   html: string;
+  attachments?: {
+    filename: string;
+    content: Buffer | string;
+    type?: string;
+  }[];
+  from?: string;
 }
 
 interface SMSOptions {
@@ -70,12 +76,23 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Ready TMS <noreply@updates.readytms.com>',
+    const emailPayload: any = {
+      from: options.from || 'Ready TMS <noreply@updates.readytms.com>',
       to: options.to,
       subject: options.subject,
       html: options.html,
-    });
+    };
+
+    // Add attachments if provided
+    if (options.attachments && options.attachments.length > 0) {
+      emailPayload.attachments = options.attachments.map(att => ({
+        filename: att.filename,
+        content: att.content,
+        ...(att.type && { type: att.type }),
+      }));
+    }
+
+    const { data, error } = await resend.emails.send(emailPayload);
 
     if (error) {
       console.error('[Notifications] Email send error:', error);
