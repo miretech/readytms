@@ -170,27 +170,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Password Reset - Request reset email
   app.post("/api/auth/request-password-reset", async (req, res) => {
     try {
+      console.log("[API] Password reset request received");
       const { email, userType } = req.body;
+      console.log(`[API] Email: ${email}, UserType: ${userType}`);
       
       if (!email || !userType) {
+        console.log("[API] Missing email or userType");
         return res.status(400).json({ message: "Email and user type are required" });
       }
 
       if (userType !== "admin" && userType !== "driver") {
+        console.log("[API] Invalid userType");
         return res.status(400).json({ message: "Invalid user type" });
       }
 
+      console.log("[API] Calling storage.requestPasswordReset...");
       // Generate reset token and send email
       const result = await storage.requestPasswordReset(email, userType);
+      console.log("[API] Result from storage:", result);
       
       if (!result.success) {
+        console.log("[API] Reset failed, returning generic message");
         // Don't reveal if email exists or not for security
         return res.json({ message: "If the email exists, a password reset link has been sent." });
       }
 
+      console.log("[API] Reset successful, email sent");
       res.json({ message: "Password reset link has been sent to your email." });
     } catch (error) {
-      console.error("Password reset request error:", error);
+      console.error("[API] Password reset request error:", error);
       // Don't reveal internal errors
       res.json({ message: "If the email exists, a password reset link has been sent." });
     }
