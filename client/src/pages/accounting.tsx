@@ -17,6 +17,8 @@ import {
   CreditCard,
   FileText,
   Download,
+  Mail,
+  Paperclip,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +63,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MetricCard } from "@/components/metric-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -995,9 +998,341 @@ function PaymentDialog({
   );
 }
 
+// Email Factoring Dialog Component
+function EmailFactoringDialog({
+  open,
+  onOpenChange,
+  invoice,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  invoice: Invoice | null;
+}) {
+  const { toast } = useToast();
+  const [attachPods, setAttachPods] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+
+  const { data: loads = [] } = useQuery<Load[]>({ queryKey: ["/api/loads"] });
+  const { data: customers = [] } = useQuery<Customer[]>({ queryKey: ["/api/customers"] });
+  const { data: companySettings } = useQuery<CompanySettings>({ queryKey: ["/api/company-settings"] });
+
+  const form = useForm({
+    defaultValues: {
+      to: "",
+      from: companySettings?.email || "",
+      subject: "",
+      message: "",
+    },
+  });
+
+  useEffect(() => {
+    if (invoice && open) {
+      const customer = customers.find(c => c.id === invoice.customerId);
+      const load = loads.find(l => l.id === invoice.loadId);
+      
+      form.reset({
+        to: customer?.email || "",
+        from: companySettings?.email || "",
+        subject: `Invoice ${invoice.invoiceNumber} - Ready TMS`,
+        message: `Dear ${customer?.name || "Customer"},\n\nPlease find attached invoice ${invoice.invoiceNumber} for load ${load?.loadNumber || ""}.\n\nInvoice Details:\n- Amount: $${invoice.total.toFixed(2)}\n- Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}\n- Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}\n\nThank you for your business.\n\nBest regards,\n${companySettings?.companyName || "Ready TMS"}`,
+      });
+    }
+  }, [invoice, customers, loads, companySettings, open, form]);
+
+  // Helper function to generate invoice PDF as base64
+  const generateInvoicePDFBase64 = async (): Promise<string | null> => {
+    if (!invoice) return null;
+
+    const customer = customers.find((c) => c.id === invoice.customerId);
+    const load = loads.find((l) => l.id === invoice.loadId);
+    const pdf = new jsPDF();
+
+    // Company Header
+    pdf.setFontSize(20);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(companySettings?.companyName || "Ready TMS", 15, 20);
+    
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    if (companySettings?.address) {
+      pdf.text(companySettings.address, 15, 28);
+    }
+    if (companySettings?.cityStateZip) {
+      pdf.text(companySettings.cityStateZip, 15, 34);
+    }
+    if (companySettings?.phone) {
+      pdf.text(`Phone: ${companySettings.phone}`, 15, 40);
+    }
+    
+    // Invoice Title
+    pdf.setFontSize(24);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("INVOICE", 150, 30);
+    
+    // Invoice Details
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Invoice #: ${invoice.invoiceNumber}`, 150, 40);
+    pdf.text(`Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}`, 150, 46);
+    pdf.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 52);
+    
+    // Bill To Section
+    pdf.setFont("helvetica", "bold");
+    pdf.text("BILL TO:", 15, 60);
+    pdf.setFont("helvetica", "normal");
+    if (customer) {
+      pdf.text(customer.name, 15, 68);
+      pdf.text(customer.address, 15, 74);
+      pdf.text(customer.email, 15, 80);
+      pdf.text(customer.phone, 15, 86);
+    }
+    
+    // Load Information
+    pdf.setFont("helvetica", "bold");
+    pdf.text("LOAD INFORMATION:", 15, 100);
+    pdf.setFont("helvetica", "normal");
+    if (load) {
+      pdf.text(`Load #: ${load.loadNumber}`, 15, 108);
+      if (load.origin && load.destination) {
+        pdf.text(`Route: ${load.origin} → ${load.destination}`, 15, 114);
+      }
+    }
+    
+    // Line Items Table
+    const startY = 130;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Description", 15, startY);
+    pdf.text("Amount", 170, startY);
+    
+    pdf.setLineWidth(0.5);
+    pdf.line(15, startY + 2, 195, startY + 2);
+    
+    pdf.setFont("helvetica", "normal");
+    let currentY = startY + 10;
+    
+    // Subtotal
+    pdf.text("Subtotal", 15, currentY);
+    pdf.text(`$${invoice.subtotal.toFixed(2)}`, 170, currentY);
+    currentY += 8;
+    
+    // Lumper Fee
+    if (invoice.lumperFee && invoice.lumperFee > 0) {
+      pdf.text("Lumper Fee", 15, currentY);
+      pdf.text(`$${invoice.lumperFee.toFixed(2)}`, 170, currentY);
+      currentY += 8;
+    }
+    
+    // Tax
+    if (invoice.tax && invoice.tax > 0) {
+      pdf.text("Tax", 15, currentY);
+      pdf.text(`$${invoice.tax.toFixed(2)}`, 170, currentY);
+      currentY += 8;
+    }
+    
+    // Total line
+    pdf.setLineWidth(0.5);
+    pdf.line(15, currentY, 195, currentY);
+    currentY += 8;
+    
+    // Total
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.text("TOTAL", 15, currentY);
+    pdf.text(`$${invoice.total.toFixed(2)}`, 170, currentY);
+    
+    // Notes
+    if (invoice.notes) {
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Notes:", 15, currentY + 15);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(invoice.notes, 15, currentY + 22, { maxWidth: 180 });
+    }
+    
+    // Get PDF as base64 string (remove data URI prefix)
+    const pdfBase64 = pdf.output('datauristring').split(',')[1];
+    return pdfBase64;
+  };
+
+  const handleSend = async () => {
+    const values = form.getValues();
+    
+    if (!values.to || !values.subject || !values.message) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!invoice) {
+      toast({
+        title: "Error",
+        description: "No invoice selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      // Generate PDF as base64
+      const pdfBase64 = await generateInvoicePDFBase64();
+
+      // Send email
+      const response = await apiRequest("POST", "/api/accounting/factoring-email", {
+        to: values.to,
+        from: values.from || undefined,
+        subject: values.subject,
+        message: values.message,
+        invoiceId: invoice.id,
+        loadId: invoice.loadId,
+        invoicePdf: pdfBase64,
+        attachPods,
+      });
+
+      if (response.success) {
+        toast({
+          title: "Email Sent",
+          description: "Invoice has been emailed to factoring company",
+        });
+        onOpenChange(false);
+      } else {
+        throw new Error("Failed to send email");
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Email to Factoring Company</DialogTitle>
+          <DialogDescription>
+            Send invoice {invoice?.invoiceNumber} to your factoring company
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="to"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>To *</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="email" placeholder="factoring@example.com" data-testid="input-to-email" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="from"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>From</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="email" placeholder="your@email.com" data-testid="input-from-email" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="subject"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subject *</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Invoice subject" data-testid="input-subject" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="message"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Message *</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} rows={8} placeholder="Email message..." data-testid="input-message" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="attach-invoice"
+                  checked={true}
+                  disabled
+                  data-testid="checkbox-attach-invoice"
+                />
+                <label htmlFor="attach-invoice" className="text-sm flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Invoice PDF (automatically attached)
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="attach-pods"
+                  checked={attachPods}
+                  onCheckedChange={(checked) => setAttachPods(checked as boolean)}
+                  data-testid="checkbox-attach-pods"
+                />
+                <label htmlFor="attach-pods" className="text-sm flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" />
+                  Attach PODs (Proof of Delivery)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isSending}
+                data-testid="button-cancel"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSending} data-testid="button-send-email">
+                {isSending ? "Sending..." : <><Mail className="mr-2 h-4 w-4" /> Send Email</>}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Accounting() {
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailingInvoice, setEmailingInvoice] = useState<Invoice | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -1506,6 +1841,16 @@ export default function Accounting() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
+                                  onClick={() => {
+                                    setEmailingInvoice(invoice);
+                                    setEmailDialogOpen(true);
+                                  }}
+                                  data-testid={`button-email-${invoice.id}`}
+                                >
+                                  <Mail className="mr-2 h-4 w-4" />
+                                  Email to Factoring
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                   onClick={() => downloadInvoicePDF(invoice)}
                                   data-testid={`button-download-${invoice.id}`}
                                 >
@@ -1761,6 +2106,11 @@ export default function Accounting() {
         onOpenChange={handleInvoiceDialogClose}
         invoice={editingInvoice}
         existingInvoices={invoices}
+      />
+      <EmailFactoringDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        invoice={emailingInvoice}
       />
       <ExpenseDialog
         open={expenseDialogOpen}
