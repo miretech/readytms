@@ -79,6 +79,7 @@ import {
   type Customer,
   type CompanySettings,
 } from "@shared/schema";
+import { MultiFileUpload } from "@/components/multi-file-upload";
 
 // Form schemas
 const invoiceFormSchema = insertInvoiceSchema.extend({
@@ -138,6 +139,7 @@ function InvoiceDialog({
       total: "",
       paidAmount: "0",
       notes: "",
+      attachments: [],
     },
   });
 
@@ -156,6 +158,7 @@ function InvoiceDialog({
         total: invoice.total.toString(),
         paidAmount: invoice.paidAmount?.toString() || "0",
         notes: invoice.notes || "",
+        attachments: (invoice.attachments as any) || [],
       });
     } else {
       // Generate shorter invoice number using timestamp (last 6 digits + 2 random digits)
@@ -177,6 +180,7 @@ function InvoiceDialog({
         total: "",
         paidAmount: "0",
         notes: "",
+        attachments: [],
       });
     }
   }, [invoice, existingInvoices, form]);
@@ -433,6 +437,25 @@ function InvoiceDialog({
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
                     <Textarea {...field} rows={3} data-testid="input-notes" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="attachments"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <MultiFileUpload
+                      value={field.value || []}
+                      onChange={field.onChange}
+                      accept={[".pdf", ".png", ".jpg", ".jpeg"]}
+                      label="Attachments (Rate Confirmation, BOL, etc.)"
+                      testId="upload-invoice-attachments"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

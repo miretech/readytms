@@ -223,6 +223,7 @@ export const invoices = pgTable("invoices", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0"),
   notes: text("notes"),
+  attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string, uploadedAt: string, label: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -237,6 +238,13 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   tax: z.string().optional(),
   total: z.string(),
   paidAmount: z.string().optional(),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    data: z.string(),
+    type: z.string(),
+    uploadedAt: z.string(),
+    label: z.string().optional(), // e.g., "Rate Confirmation", "BOL", "Other"
+  })).optional(),
 });
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
