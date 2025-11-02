@@ -77,7 +77,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
   try {
     const emailPayload: any = {
-      from: options.from || 'Ready TMS <noreply@updates.readytms.com>',
+      from: options.from || 'Ready TMS <onboarding@resend.dev>',
       to: options.to,
       subject: options.subject,
       html: options.html,

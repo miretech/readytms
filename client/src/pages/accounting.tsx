@@ -443,24 +443,33 @@ function InvoiceDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="attachments"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <MultiFileUpload
-                      value={field.value || []}
-                      onChange={field.onChange}
-                      accept={[".pdf", ".png", ".jpg", ".jpeg"]}
-                      label="Attachments (Rate Confirmation, BOL, etc.)"
-                      testId="upload-invoice-attachments"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Attachments Section - Prominent Styling */}
+            <div className="border-t pt-4 mt-2">
+              <FormField
+                control={form.control}
+                name="attachments"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Paperclip className="h-4 w-4 text-muted-foreground" />
+                      <FormLabel className="text-base font-semibold">
+                        Attachments (Rate Confirmation, BOL, etc.)
+                      </FormLabel>
+                    </div>
+                    <FormControl>
+                      <MultiFileUpload
+                        value={field.value || []}
+                        onChange={field.onChange}
+                        accept={[".pdf", ".png", ".jpg", ".jpeg"]}
+                        label=""
+                        testId="upload-invoice-attachments"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="flex justify-end gap-2">
               <Button
