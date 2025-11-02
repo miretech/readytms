@@ -4,8 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { insertLoadSchema, type Load, type Customer, type Driver, type Truck } from "@shared/schema";
-import { Sparkles } from "lucide-react";
+import { Sparkles, FileText, Download, Eye, X, Calendar } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +60,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   const { toast } = useToast();
   const isEditing = !!load;
   const [activeTab, setActiveTab] = useState<string>("manual");
+  const [viewingPod, setViewingPod] = useState<{ filename: string; data: string; type: string } | null>(null);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
@@ -809,6 +812,99 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                 />
               </div>
 
+              {/* POD Gallery - Show uploaded PODs from drivers */}
+              {load?.podAttachments && Array.isArray(load.podAttachments) && (load.podAttachments as any[]).length > 0 && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-primary" />
+                          Driver Uploaded PODs
+                        </CardTitle>
+                        <CardDescription>
+                          Proof of delivery documents uploaded by the driver
+                        </CardDescription>
+                      </div>
+                      <Badge variant="secondary" data-testid="badge-pod-count">
+                        {(load.podAttachments as any[]).length} {(load.podAttachments as any[]).length === 1 ? 'file' : 'files'}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                      {(load.podAttachments as any[]).map((pod: any, index: number) => {
+                        const isPdf = pod.type?.includes('pdf');
+                        const isImage = pod.type?.includes('image');
+                        
+                        return (
+                          <div
+                            key={index}
+                            className="group relative border rounded-lg overflow-hidden hover-elevate"
+                            data-testid={`pod-item-${index}`}
+                          >
+                            {/* Preview */}
+                            <div className="aspect-video bg-muted flex items-center justify-center relative">
+                              {isImage ? (
+                                <img
+                                  src={pod.data}
+                                  alt={pod.filename}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : isPdf ? (
+                                <FileText className="h-16 w-16 text-muted-foreground" />
+                              ) : (
+                                <FileText className="h-16 w-16 text-muted-foreground" />
+                              )}
+                              
+                              {/* Action overlay */}
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => setViewingPod(pod)}
+                                  data-testid={`button-view-pod-${index}`}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = pod.data;
+                                    link.download = pod.filename;
+                                    link.click();
+                                  }}
+                                  data-testid={`button-download-pod-${index}`}
+                                >
+                                  <Download className="h-4 w-4 mr-1" />
+                                  Download
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            {/* File info */}
+                            <div className="p-2 bg-background">
+                              <p className="text-sm font-medium truncate" title={pod.filename}>
+                                {pod.filename}
+                              </p>
+                              {pod.uploadedAt && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(pod.uploadedAt).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -826,6 +922,80 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
           </Form>
         )}
       </DialogContent>
+
+      {/* POD Viewer Modal */}
+      {viewingPod && (
+        <Dialog open={!!viewingPod} onOpenChange={() => setViewingPod(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span className="truncate">{viewingPod.filename}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setViewingPod(null)}
+                  data-testid="button-close-pod-viewer"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center justify-center bg-muted rounded-lg overflow-hidden" style={{ minHeight: '60vh' }}>
+              {viewingPod.type?.includes('image') ? (
+                <img
+                  src={viewingPod.data}
+                  alt={viewingPod.filename}
+                  className="max-w-full max-h-[70vh] object-contain"
+                  data-testid="pod-viewer-image"
+                />
+              ) : viewingPod.type?.includes('pdf') ? (
+                <iframe
+                  src={viewingPod.data}
+                  className="w-full h-[70vh]"
+                  title={viewingPod.filename}
+                  data-testid="pod-viewer-pdf"
+                />
+              ) : (
+                <div className="text-center p-8">
+                  <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">Preview not available for this file type</p>
+                  <Button
+                    className="mt-4"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = viewingPod.data;
+                      link.download = viewingPod.filename;
+                      link.click();
+                    }}
+                    data-testid="button-download-in-viewer"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download File
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = viewingPod.data;
+                  link.download = viewingPod.filename;
+                  link.click();
+                }}
+                data-testid="button-download-pod"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+              <Button variant="secondary" onClick={() => setViewingPod(null)} data-testid="button-close-viewer">
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }
