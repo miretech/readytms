@@ -16,7 +16,9 @@ import {
   Receipt,
   CreditCard,
   FileText,
+  Download,
 } from "lucide-react";
+import jsPDF from "jspdf";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -72,6 +74,7 @@ import {
   type Payment,
   type Load,
   type Customer,
+  type CompanySettings,
 } from "@shared/schema";
 
 // Form schemas
@@ -104,10 +107,12 @@ function InvoiceDialog({
   open,
   onOpenChange,
   invoice,
+  existingInvoices = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoice?: Invoice | null;
+  existingInvoices?: Invoice[];
 }) {
   const { toast } = useToast();
   const isEditing = !!invoice;
@@ -125,6 +130,7 @@ function InvoiceDialog({
       invoiceDate: "",
       dueDate: "",
       subtotal: "",
+      lumperFee: "0",
       tax: "0",
       total: "",
       paidAmount: "0",
@@ -142,35 +148,44 @@ function InvoiceDialog({
         invoiceDate: new Date(invoice.invoiceDate).toISOString().split("T")[0],
         dueDate: new Date(invoice.dueDate).toISOString().split("T")[0],
         subtotal: invoice.subtotal.toString(),
+        lumperFee: invoice.lumperFee?.toString() || "0",
         tax: invoice.tax?.toString() || "0",
         total: invoice.total.toString(),
         paidAmount: invoice.paidAmount?.toString() || "0",
         notes: invoice.notes || "",
       });
     } else {
+      // Generate shorter invoice number using timestamp (last 6 digits + 2 random digits)
+      // Format: INV-12345678 (shorter than previous INV-1701234567890)
+      const timestamp = Date.now().toString().slice(-6);
+      const random = Math.floor(10 + Math.random() * 90); // 2-digit random number
+      const invoiceNumber = `INV-${timestamp}${random}`;
+      
       form.reset({
-        invoiceNumber: `INV-${Date.now()}`,
+        invoiceNumber,
         loadId: "",
         customerId: "",
         status: "draft",
         invoiceDate: new Date().toISOString().split("T")[0],
         dueDate: "",
         subtotal: "",
+        lumperFee: "0",
         tax: "0",
         total: "",
         paidAmount: "0",
         notes: "",
       });
     }
-  }, [invoice, form]);
+  }, [invoice, existingInvoices, form]);
 
-  // Auto-calculate total when subtotal or tax changes
+  // Auto-calculate total when subtotal, lumper fee, or tax changes
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === "subtotal" || name === "tax") {
+      if (name === "subtotal" || name === "lumperFee" || name === "tax") {
         const subtotal = parseFloat(value.subtotal || "0");
+        const lumperFee = parseFloat(value.lumperFee || "0");
         const tax = parseFloat(value.tax || "0");
-        const total = subtotal + tax;
+        const total = subtotal + lumperFee + tax;
         form.setValue("total", total.toFixed(2));
       }
     });
@@ -358,6 +373,20 @@ function InvoiceDialog({
                     <FormLabel>Subtotal ($)</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" {...field} data-testid="input-subtotal" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="lumperFee"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lumper Fee ($)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} data-testid="input-lumper-fee" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -989,6 +1018,7 @@ export default function Accounting() {
   });
   const { data: loads = [] } = useQuery<Load[]>({ queryKey: ["/api/loads"] });
   const { data: customers = [] } = useQuery<Customer[]>({ queryKey: ["/api/customers"] });
+  const { data: companySettings } = useQuery<CompanySettings>({ queryKey: ["/api/company-settings"] });
 
   const deleteInvoiceMutation = useMutation({
     mutationFn: async (id: string) => await apiRequest("DELETE", `/api/invoices/${id}`),
@@ -1119,6 +1149,131 @@ export default function Accounting() {
       cancelled: "secondary",
     };
     return <Badge variant={variants[status] || "default"} data-testid={`badge-status-${status}`}>{status}</Badge>;
+  };
+
+  const downloadInvoicePDF = (invoice: Invoice) => {
+    const customer = customers.find((c) => c.id === invoice.customerId);
+    const load = loads.find((l) => l.id === invoice.loadId);
+    const pdf = new jsPDF();
+    
+    // Company Header
+    pdf.setFontSize(20);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(companySettings?.companyName || "Ready TMS", 15, 20);
+    
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    if (companySettings?.address) {
+      pdf.text(companySettings.address, 15, 28);
+    }
+    if (companySettings?.cityStateZip) {
+      pdf.text(companySettings.cityStateZip, 15, 34);
+    }
+    if (companySettings?.phone) {
+      pdf.text(`Phone: ${companySettings.phone}`, 15, 40);
+    }
+    
+    // Invoice Title
+    pdf.setFontSize(24);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("INVOICE", 150, 20);
+    
+    // Invoice Details
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Invoice #: ${invoice.invoiceNumber}`, 150, 30);
+    pdf.text(`Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}`, 150, 36);
+    pdf.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 42);
+    
+    // Customer Info
+    pdf.setFontSize(12);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Bill To:", 15, 55);
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(customer?.name || "Unknown Customer", 15, 62);
+    if (customer?.address) {
+      pdf.text(customer.address, 15, 68);
+    }
+    if (customer?.email) {
+      pdf.text(customer.email, 15, 74);
+    }
+    
+    // Line Items Table
+    let yPos = 95;
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Description", 15, yPos);
+    pdf.text("Amount", 170, yPos, { align: "right" });
+    
+    // Draw line
+    pdf.setLineWidth(0.5);
+    pdf.line(15, yPos + 2, 195, yPos + 2);
+    
+    yPos += 10;
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Load #${load?.loadNumber || "N/A"}`, 15, yPos);
+    pdf.text(`$${Number(invoice.subtotal).toFixed(2)}`, 170, yPos, { align: "right" });
+    
+    yPos += 8;
+    if (invoice.lumperFee && Number(invoice.lumperFee) > 0) {
+      pdf.text("Lumper Fee", 15, yPos);
+      pdf.text(`$${Number(invoice.lumperFee).toFixed(2)}`, 170, yPos, { align: "right" });
+      yPos += 8;
+    }
+    
+    if (invoice.tax && Number(invoice.tax) > 0) {
+      pdf.text("Tax", 15, yPos);
+      pdf.text(`$${Number(invoice.tax).toFixed(2)}`, 170, yPos, { align: "right" });
+      yPos += 8;
+    }
+    
+    // Total
+    pdf.setLineWidth(0.5);
+    pdf.line(15, yPos, 195, yPos);
+    yPos += 8;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.text("Total:", 15, yPos);
+    pdf.text(`$${Number(invoice.total).toFixed(2)}`, 170, yPos, { align: "right" });
+    
+    // Payment Info
+    if (invoice.paidAmount && Number(invoice.paidAmount) > 0) {
+      yPos += 8;
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.text("Paid:", 15, yPos);
+      pdf.text(`$${Number(invoice.paidAmount).toFixed(2)}`, 170, yPos, { align: "right" });
+      
+      yPos += 6;
+      pdf.setFont("helvetica", "bold");
+      const balance = Number(invoice.total) - Number(invoice.paidAmount);
+      pdf.text("Balance Due:", 15, yPos);
+      pdf.text(`$${balance.toFixed(2)}`, 170, yPos, { align: "right" });
+    }
+    
+    // Notes
+    if (invoice.notes) {
+      yPos += 15;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Notes:", 15, yPos);
+      yPos += 6;
+      pdf.setFont("helvetica", "normal");
+      const splitNotes = pdf.splitTextToSize(invoice.notes, 180);
+      pdf.text(splitNotes, 15, yPos);
+    }
+    
+    // Footer
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "italic");
+    pdf.text("Thank you for your business!", 105, 280, { align: "center" });
+    
+    // Download
+    pdf.save(`Invoice-${invoice.invoiceNumber}.pdf`);
+    toast({
+      title: "Invoice downloaded",
+      description: `Invoice ${invoice.invoiceNumber} has been downloaded as PDF.`,
+    });
   };
 
   if (invoicesLoading || expensesLoading || paymentsLoading) {
@@ -1350,6 +1505,13 @@ export default function Accounting() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => downloadInvoicePDF(invoice)}
+                                  data-testid={`button-download-${invoice.id}`}
+                                >
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download PDF
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => handleEditInvoice(invoice)}
                                   data-testid={`button-edit-${invoice.id}`}
@@ -1598,6 +1760,7 @@ export default function Accounting() {
         open={invoiceDialogOpen}
         onOpenChange={handleInvoiceDialogClose}
         invoice={editingInvoice}
+        existingInvoices={invoices}
       />
       <ExpenseDialog
         open={expenseDialogOpen}
