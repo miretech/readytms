@@ -1019,7 +1019,7 @@ function EmailFactoringDialog({
   const form = useForm({
     defaultValues: {
       to: "",
-      from: companySettings?.email || "",
+      from: "",
       subject: "",
       message: "",
     },
@@ -1030,11 +1030,12 @@ function EmailFactoringDialog({
       const customer = customers.find(c => c.id === invoice.customerId);
       const load = loads.find(l => l.id === invoice.loadId);
       
+      const total = typeof invoice.total === 'string' ? parseFloat(invoice.total) : invoice.total;
       form.reset({
         to: customer?.email || "",
-        from: companySettings?.email || "",
+        from: "",
         subject: `Invoice ${invoice.invoiceNumber} - Ready TMS`,
-        message: `Dear ${customer?.name || "Customer"},\n\nPlease find attached invoice ${invoice.invoiceNumber} for load ${load?.loadNumber || ""}.\n\nInvoice Details:\n- Amount: $${invoice.total.toFixed(2)}\n- Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}\n- Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}\n\nThank you for your business.\n\nBest regards,\n${companySettings?.companyName || "Ready TMS"}`,
+        message: `Dear ${customer?.name || "Customer"},\n\nPlease find attached invoice ${invoice.invoiceNumber} for load ${load?.loadNumber || ""}.\n\nInvoice Details:\n- Amount: $${total.toFixed(2)}\n- Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}\n- Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}\n\nThank you for your business.\n\nBest regards,\n${companySettings?.companyName || "Ready TMS"}`,
       });
     }
   }, [invoice, customers, loads, companySettings, open, form]);
@@ -1093,8 +1094,8 @@ function EmailFactoringDialog({
     pdf.setFont("helvetica", "normal");
     if (load) {
       pdf.text(`Load #: ${load.loadNumber}`, 15, 108);
-      if (load.origin && load.destination) {
-        pdf.text(`Route: ${load.origin} → ${load.destination}`, 15, 114);
+      if (load.pickupLocation && load.deliveryLocation) {
+        pdf.text(`Route: ${load.pickupLocation} → ${load.deliveryLocation}`, 15, 114);
       }
     }
     
@@ -1110,22 +1111,27 @@ function EmailFactoringDialog({
     pdf.setFont("helvetica", "normal");
     let currentY = startY + 10;
     
+    const subtotal = typeof invoice.subtotal === 'string' ? parseFloat(invoice.subtotal) : invoice.subtotal;
+    const lumperFee = typeof invoice.lumperFee === 'string' ? parseFloat(invoice.lumperFee || '0') : (invoice.lumperFee || 0);
+    const tax = typeof invoice.tax === 'string' ? parseFloat(invoice.tax || '0') : (invoice.tax || 0);
+    const total = typeof invoice.total === 'string' ? parseFloat(invoice.total) : invoice.total;
+    
     // Subtotal
     pdf.text("Subtotal", 15, currentY);
-    pdf.text(`$${invoice.subtotal.toFixed(2)}`, 170, currentY);
+    pdf.text(`$${subtotal.toFixed(2)}`, 170, currentY);
     currentY += 8;
     
     // Lumper Fee
-    if (invoice.lumperFee && invoice.lumperFee > 0) {
+    if (lumperFee > 0) {
       pdf.text("Lumper Fee", 15, currentY);
-      pdf.text(`$${invoice.lumperFee.toFixed(2)}`, 170, currentY);
+      pdf.text(`$${lumperFee.toFixed(2)}`, 170, currentY);
       currentY += 8;
     }
     
     // Tax
-    if (invoice.tax && invoice.tax > 0) {
+    if (tax > 0) {
       pdf.text("Tax", 15, currentY);
-      pdf.text(`$${invoice.tax.toFixed(2)}`, 170, currentY);
+      pdf.text(`$${tax.toFixed(2)}`, 170, currentY);
       currentY += 8;
     }
     
@@ -1138,7 +1144,7 @@ function EmailFactoringDialog({
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(12);
     pdf.text("TOTAL", 15, currentY);
-    pdf.text(`$${invoice.total.toFixed(2)}`, 170, currentY);
+    pdf.text(`$${total.toFixed(2)}`, 170, currentY);
     
     // Notes
     if (invoice.notes) {
@@ -1182,7 +1188,7 @@ function EmailFactoringDialog({
       const pdfBase64 = await generateInvoicePDFBase64();
 
       // Send email
-      const response = await apiRequest("POST", "/api/accounting/factoring-email", {
+      await apiRequest("POST", "/api/accounting/factoring-email", {
         to: values.to,
         from: values.from || undefined,
         subject: values.subject,
@@ -1193,15 +1199,11 @@ function EmailFactoringDialog({
         attachPods,
       });
 
-      if (response.success) {
-        toast({
-          title: "Email Sent",
-          description: "Invoice has been emailed to factoring company",
-        });
-        onOpenChange(false);
-      } else {
-        throw new Error("Failed to send email");
-      }
+      toast({
+        title: "Email Sent",
+        description: "Invoice has been emailed to factoring company",
+      });
+      onOpenChange(false);
     } catch (error) {
       toast({
         title: "Error",
