@@ -803,6 +803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         loadId: z.string().optional(),
         invoicePdf: z.string().optional(), // base64 encoded PDF
         attachPods: z.boolean().default(false),
+        invoiceAttachments: z.array(z.any()).optional(), // invoice attachments (rate confirmations, BOLs, etc.)
       });
 
       const validatedData = schema.parse(req.body);
@@ -823,6 +824,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           filename: `Invoice-${invoice.invoiceNumber}.pdf`,
           content: pdfBuffer,
           type: 'application/pdf',
+        });
+      }
+
+      // Add invoice attachments (rate confirmations, BOLs, etc.)
+      if (validatedData.invoiceAttachments && Array.isArray(validatedData.invoiceAttachments)) {
+        validatedData.invoiceAttachments.forEach((attachment: any, index: number) => {
+          if (attachment.data) {
+            // Remove data URI prefix if present
+            const base64Data = attachment.data.includes(',') 
+              ? attachment.data.split(',')[1] 
+              : attachment.data;
+            const attachmentBuffer = Buffer.from(base64Data, 'base64');
+            attachments.push({
+              filename: attachment.filename || `Attachment-${index + 1}.${attachment.type?.split('/')[1] || 'pdf'}`,
+              content: attachmentBuffer,
+              type: attachment.type || 'application/pdf',
+            });
+          }
         });
       }
 

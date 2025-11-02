@@ -1397,6 +1397,7 @@ function EmailFactoringDialog({
         loadId: invoice.loadId,
         invoicePdf: pdfBase64,
         attachPods,
+        invoiceAttachments: invoice.attachments || [],
       };
       
       console.log('[Email Factoring] Sending request with payload:', {
@@ -1408,6 +1409,7 @@ function EmailFactoringDialog({
         attachPods: payload.attachPods,
         hasPdf: !!payload.invoicePdf,
         pdfSize: pdfBase64?.length,
+        invoiceAttachmentsCount: (invoice.attachments as any)?.length || 0,
       });
 
       // Send email
