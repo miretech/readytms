@@ -1021,6 +1021,141 @@ function PaymentDialog({
   );
 }
 
+// Attachments Viewer Dialog Component
+function AttachmentsViewerDialog({
+  open,
+  onOpenChange,
+  invoice,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  invoice: Invoice | null;
+}) {
+  const attachments = (invoice?.attachments as any) || [];
+
+  const downloadAttachment = (attachment: any) => {
+    const link = document.createElement("a");
+    link.href = attachment.data;
+    link.download = attachment.filename;
+    link.click();
+  };
+
+  const openAttachment = (attachment: any) => {
+    window.open(attachment.data, "_blank");
+  };
+
+  const getFileIcon = (type: string) => {
+    if (type?.includes('image')) return <FileText className="h-8 w-8 text-blue-500" />;
+    if (type?.includes('pdf')) return <FileText className="h-8 w-8 text-red-500" />;
+    return <FileText className="h-8 w-8 text-gray-500" />;
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Invoice Attachments</DialogTitle>
+          <DialogDescription>
+            {invoice && `Attachments for Invoice ${invoice.invoiceNumber}`}
+          </DialogDescription>
+        </DialogHeader>
+
+        {attachments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Paperclip className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-medium">No attachments</h3>
+            <p className="text-sm text-muted-foreground">
+              This invoice has no attachments
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {attachments.map((attachment: any, index: number) => {
+              const isPdf = attachment.type?.includes('pdf');
+              const isImage = attachment.type?.includes('image');
+
+              return (
+                <Card key={index} data-testid={`attachment-card-${index}`}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col gap-3">
+                      {/* Preview */}
+                      <div className="relative w-full h-48 bg-muted rounded flex items-center justify-center overflow-hidden">
+                        {isImage ? (
+                          <img
+                            src={attachment.data}
+                            alt={attachment.filename}
+                            className="w-full h-full object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => openAttachment(attachment)}
+                            data-testid={`img-preview-${index}`}
+                          />
+                        ) : (
+                          <div
+                            className="flex flex-col items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => openAttachment(attachment)}
+                            data-testid={`pdf-preview-${index}`}
+                          >
+                            {getFileIcon(attachment.type)}
+                            <p className="text-xs text-muted-foreground">Click to view</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Details */}
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium truncate" title={attachment.filename}>
+                          {attachment.filename}
+                        </p>
+                        {attachment.label && (
+                          <Badge variant="secondary" className="text-xs">
+                            {attachment.label}
+                          </Badge>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Uploaded: {new Date(attachment.uploadedAt).toLocaleString()}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openAttachment(attachment)}
+                          className="flex-1"
+                          data-testid={`button-view-${index}`}
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadAttachment(attachment)}
+                          className="flex-1"
+                          data-testid={`button-download-${index}`}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-close">
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Email Factoring Dialog Component
 function EmailFactoringDialog({
   open,
@@ -1421,6 +1556,8 @@ export default function Accounting() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [attachmentsDialogOpen, setAttachmentsDialogOpen] = useState(false);
+  const [viewingAttachmentsInvoice, setViewingAttachmentsInvoice] = useState<Invoice | null>(null);
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [expenseSearch, setExpenseSearch] = useState("");
   const [paymentSearch, setPaymentSearch] = useState("");
@@ -1891,6 +2028,7 @@ export default function Accounting() {
                       <TableHead className="text-right">Paid</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Attachments</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1916,6 +2054,16 @@ export default function Accounting() {
                             ${balance.toFixed(2)}
                           </TableCell>
                           <TableCell>{getInvoiceStatusBadge(invoice.status)}</TableCell>
+                          <TableCell className="text-center">
+                            {invoice.attachments && (invoice.attachments as any).length > 0 ? (
+                              <Badge variant="secondary" className="gap-1" data-testid={`badge-attachments-${invoice.id}`}>
+                                <Paperclip className="h-3 w-3" />
+                                {(invoice.attachments as any).length}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -1924,6 +2072,18 @@ export default function Accounting() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                {invoice.attachments && (invoice.attachments as any).length > 0 && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setViewingAttachmentsInvoice(invoice);
+                                      setAttachmentsDialogOpen(true);
+                                    }}
+                                    data-testid={`button-view-attachments-${invoice.id}`}
+                                  >
+                                    <Paperclip className="mr-2 h-4 w-4" />
+                                    View Attachments
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setEmailingInvoice(invoice);
@@ -2195,6 +2355,11 @@ export default function Accounting() {
         open={emailDialogOpen}
         onOpenChange={setEmailDialogOpen}
         invoice={emailingInvoice}
+      />
+      <AttachmentsViewerDialog
+        open={attachmentsDialogOpen}
+        onOpenChange={setAttachmentsDialogOpen}
+        invoice={viewingAttachmentsInvoice}
       />
       <ExpenseDialog
         open={expenseDialogOpen}
