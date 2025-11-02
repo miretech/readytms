@@ -1254,112 +1254,84 @@ function EmailFactoringDialog({
     const load = loads.find((l) => l.id === invoice.loadId);
     const pdf = new jsPDF();
 
-    // Company Header
-    pdf.setFontSize(20);
+    // Invoice Title
+    pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
-    pdf.text(companySettings?.companyName || "Ready TMS", 15, 20);
+    pdf.text("Invoice", 15, 20);
+    
+    // Company Information
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(companySettings?.companyName || "Ready Carrier LLC", 15, 30);
     
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
+    let yPos = 36;
     if (companySettings?.address) {
-      pdf.text(companySettings.address, 15, 28);
+      pdf.text(companySettings.address, 15, yPos);
+      yPos += 6;
     }
     if (companySettings?.cityStateZip) {
-      pdf.text(companySettings.cityStateZip, 15, 34);
+      pdf.text(companySettings.cityStateZip, 15, yPos);
+      yPos += 6;
     }
-    if (companySettings?.phone) {
-      pdf.text(`Phone: ${companySettings.phone}`, 15, 40);
-    }
-    
-    // Invoice Title
-    pdf.setFontSize(24);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("INVOICE", 150, 30);
-    
-    // Invoice Details
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Invoice #: ${invoice.invoiceNumber}`, 150, 40);
-    pdf.text(`Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}`, 150, 46);
-    pdf.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 52);
     
     // Bill To Section
+    yPos += 10;
     pdf.setFont("helvetica", "bold");
-    pdf.text("BILL TO:", 15, 60);
+    pdf.text("BILL TO", 15, yPos);
+    
+    // Invoice Number and Date (Right Side)
+    pdf.setFont("helvetica", "bold");
+    pdf.text("INVOICE #", 130, yPos);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(invoice.invoiceNumber, 170, yPos);
+    
+    yPos += 6;
     pdf.setFont("helvetica", "normal");
     if (customer) {
-      pdf.text(customer.name, 15, 68);
-      pdf.text(customer.address, 15, 74);
-      pdf.text(customer.email, 15, 80);
-      pdf.text(customer.phone, 15, 86);
+      pdf.text(customer.name, 15, yPos);
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.text("INVOICE DATE", 130, yPos);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 170, yPos);
+    
+    yPos += 6;
+    if (customer?.address) {
+      pdf.text(customer.address, 15, yPos);
     }
     
-    // Load Information
+    // Table Header
+    yPos += 20;
     pdf.setFont("helvetica", "bold");
-    pdf.text("LOAD INFORMATION:", 15, 100);
+    pdf.text("DESCRIPTION", 15, yPos);
+    pdf.text("AMOUNT", 170, yPos);
+    
+    yPos += 2;
+    pdf.setLineWidth(0.3);
+    pdf.line(15, yPos, 195, yPos);
+    
+    // Load Number Line Item
+    yPos += 8;
     pdf.setFont("helvetica", "normal");
-    if (load) {
-      pdf.text(`Load #: ${load.loadNumber}`, 15, 108);
-      if (load.pickupLocation && load.deliveryLocation) {
-        pdf.text(`Route: ${load.pickupLocation} → ${load.deliveryLocation}`, 15, 114);
-      }
-    }
+    pdf.text(`LOAD NUMBER #${load?.loadNumber || "N/A"}`, 15, yPos);
     
-    // Line Items Table
-    const startY = 130;
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Description", 15, startY);
-    pdf.text("Amount", 170, startY);
-    
-    pdf.setLineWidth(0.5);
-    pdf.line(15, startY + 2, 195, startY + 2);
-    
-    pdf.setFont("helvetica", "normal");
-    let currentY = startY + 10;
-    
-    const subtotal = typeof invoice.subtotal === 'string' ? parseFloat(invoice.subtotal) : invoice.subtotal;
-    const lumperFee = typeof invoice.lumperFee === 'string' ? parseFloat(invoice.lumperFee || '0') : (invoice.lumperFee || 0);
-    const tax = typeof invoice.tax === 'string' ? parseFloat(invoice.tax || '0') : (invoice.tax || 0);
     const total = typeof invoice.total === 'string' ? parseFloat(invoice.total) : invoice.total;
+    pdf.text(`${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 170, yPos);
     
-    // Subtotal
-    pdf.text("Subtotal", 15, currentY);
-    pdf.text(`$${subtotal.toFixed(2)}`, 170, currentY);
-    currentY += 8;
-    
-    // Lumper Fee
-    if (lumperFee > 0) {
-      pdf.text("Lumper Fee", 15, currentY);
-      pdf.text(`$${lumperFee.toFixed(2)}`, 170, currentY);
-      currentY += 8;
-    }
-    
-    // Tax
-    if (tax > 0) {
-      pdf.text("Tax", 15, currentY);
-      pdf.text(`$${tax.toFixed(2)}`, 170, currentY);
-      currentY += 8;
-    }
-    
-    // Total line
-    pdf.setLineWidth(0.5);
-    pdf.line(15, currentY, 195, currentY);
-    currentY += 8;
-    
-    // Total
+    // Total Line
+    yPos += 15;
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(12);
-    pdf.text("TOTAL", 15, currentY);
-    pdf.text(`$${total.toFixed(2)}`, 170, currentY);
+    pdf.text("TOTAL", 130, yPos);
+    pdf.text(`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 170, yPos);
     
-    // Notes
-    if (invoice.notes) {
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Notes:", 15, currentY + 15);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(invoice.notes, 15, currentY + 22, { maxWidth: 180 });
-    }
+    // Terms & Conditions (Centered at Bottom)
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Terms & Conditions", 105, 250, { align: "center" });
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Thank you. Payment is due within 15 days", 105, 258, { align: "center" });
     
     // Get PDF as base64 string (remove data URI prefix)
     const pdfBase64 = pdf.output('datauristring').split(',')[1];
@@ -1723,117 +1695,84 @@ export default function Accounting() {
     const load = loads.find((l) => l.id === invoice.loadId);
     const pdf = new jsPDF();
     
-    // Company Header
-    pdf.setFontSize(20);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(companySettings?.companyName || "Ready TMS", 15, 20);
-    
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    if (companySettings?.address) {
-      pdf.text(companySettings.address, 15, 28);
-    }
-    if (companySettings?.cityStateZip) {
-      pdf.text(companySettings.cityStateZip, 15, 34);
-    }
-    if (companySettings?.phone) {
-      pdf.text(`Phone: ${companySettings.phone}`, 15, 40);
-    }
-    
     // Invoice Title
-    pdf.setFontSize(24);
+    pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
-    pdf.text("INVOICE", 150, 20);
+    pdf.text("Invoice", 15, 20);
     
-    // Invoice Details
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Invoice #: ${invoice.invoiceNumber}`, 150, 30);
-    pdf.text(`Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}`, 150, 36);
-    pdf.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 42);
-    
-    // Customer Info
-    pdf.setFontSize(12);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Bill To:", 15, 55);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(customer?.name || "Unknown Customer", 15, 62);
-    if (customer?.address) {
-      pdf.text(customer.address, 15, 68);
-    }
-    if (customer?.email) {
-      pdf.text(customer.email, 15, 74);
-    }
-    
-    // Line Items Table
-    let yPos = 95;
+    // Company Information
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Description", 15, yPos);
-    pdf.text("Amount", 170, yPos, { align: "right" });
+    pdf.text(companySettings?.companyName || "Ready Carrier LLC", 15, 30);
     
-    // Draw line
-    pdf.setLineWidth(0.5);
-    pdf.line(15, yPos + 2, 195, yPos + 2);
-    
-    yPos += 10;
+    pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
-    pdf.text(`Load #${load?.loadNumber || "N/A"}`, 15, yPos);
-    pdf.text(`$${Number(invoice.subtotal).toFixed(2)}`, 170, yPos, { align: "right" });
-    
-    yPos += 8;
-    if (invoice.lumperFee && Number(invoice.lumperFee) > 0) {
-      pdf.text("Lumper Fee", 15, yPos);
-      pdf.text(`$${Number(invoice.lumperFee).toFixed(2)}`, 170, yPos, { align: "right" });
-      yPos += 8;
+    let yPos = 36;
+    if (companySettings?.address) {
+      pdf.text(companySettings.address, 15, yPos);
+      yPos += 6;
+    }
+    if (companySettings?.cityStateZip) {
+      pdf.text(companySettings.cityStateZip, 15, yPos);
+      yPos += 6;
     }
     
-    if (invoice.tax && Number(invoice.tax) > 0) {
-      pdf.text("Tax", 15, yPos);
-      pdf.text(`$${Number(invoice.tax).toFixed(2)}`, 170, yPos, { align: "right" });
-      yPos += 8;
-    }
-    
-    // Total
-    pdf.setLineWidth(0.5);
-    pdf.line(15, yPos, 195, yPos);
-    yPos += 8;
+    // Bill To Section
+    yPos += 10;
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(12);
-    pdf.text("Total:", 15, yPos);
-    pdf.text(`$${Number(invoice.total).toFixed(2)}`, 170, yPos, { align: "right" });
+    pdf.text("BILL TO", 15, yPos);
     
-    // Payment Info
-    if (invoice.paidAmount && Number(invoice.paidAmount) > 0) {
-      yPos += 8;
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      pdf.text("Paid:", 15, yPos);
-      pdf.text(`$${Number(invoice.paidAmount).toFixed(2)}`, 170, yPos, { align: "right" });
-      
-      yPos += 6;
-      pdf.setFont("helvetica", "bold");
-      const balance = Number(invoice.total) - Number(invoice.paidAmount);
-      pdf.text("Balance Due:", 15, yPos);
-      pdf.text(`$${balance.toFixed(2)}`, 170, yPos, { align: "right" });
+    // Invoice Number and Date (Right Side)
+    pdf.setFont("helvetica", "bold");
+    pdf.text("INVOICE #", 130, yPos);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(invoice.invoiceNumber, 170, yPos);
+    
+    yPos += 6;
+    pdf.setFont("helvetica", "normal");
+    if (customer) {
+      pdf.text(customer.name, 15, yPos);
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.text("INVOICE DATE", 130, yPos);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 170, yPos);
+    
+    yPos += 6;
+    if (customer?.address) {
+      pdf.text(customer.address, 15, yPos);
     }
     
-    // Notes
-    if (invoice.notes) {
-      yPos += 15;
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Notes:", 15, yPos);
-      yPos += 6;
-      pdf.setFont("helvetica", "normal");
-      const splitNotes = pdf.splitTextToSize(invoice.notes, 180);
-      pdf.text(splitNotes, 15, yPos);
-    }
+    // Table Header
+    yPos += 20;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("DESCRIPTION", 15, yPos);
+    pdf.text("AMOUNT", 170, yPos);
     
-    // Footer
-    pdf.setFontSize(8);
-    pdf.setFont("helvetica", "italic");
-    pdf.text("Thank you for your business!", 105, 280, { align: "center" });
+    yPos += 2;
+    pdf.setLineWidth(0.3);
+    pdf.line(15, yPos, 195, yPos);
+    
+    // Load Number Line Item
+    yPos += 8;
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`LOAD NUMBER #${load?.loadNumber || "N/A"}`, 15, yPos);
+    
+    const total = Number(invoice.total);
+    pdf.text(`${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 170, yPos);
+    
+    // Total Line
+    yPos += 15;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("TOTAL", 130, yPos);
+    pdf.text(`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 170, yPos);
+    
+    // Terms & Conditions (Centered at Bottom)
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Terms & Conditions", 105, 250, { align: "center" });
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Thank you. Payment is due within 15 days", 105, 258, { align: "center" });
     
     // Download
     pdf.save(`Invoice-${invoice.invoiceNumber}.pdf`);

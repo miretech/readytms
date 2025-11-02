@@ -35,7 +35,7 @@ The system provides a comprehensive set of modules:
   - Browser push notifications in driver portal for real-time alerts
   - SMS notifications via RingCentral (pending credentials setup)
 - **Safety & Compliance**: Includes Inspections, Accidents & Incidents reporting, and Violations & Citations tracking.
-- **Accounting & Financial Management**: Financial Overview, Invoices (AR), Expense Management, and Payments & Cash Management.
+- **Accounting & Financial Management**: Financial Overview, Invoices (AR) with multi-file attachment support (rate confirmations, BOLs, etc.), Expense Management, and Payments & Cash Management. Invoices feature professional PDF generation with clean, simple layout and email-to-factoring functionality with automatic attachment inclusion.
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
 - **Driver Settlements**: Automated payroll calculations with percentage-based pay, comprehensive deduction tracking, net pay calculation, and settlement history with PDF export. Settlements include dispatch percentage, advance management, and fuel tracking (Flying J, Fleet One).
 - **Task Manager**: Daily task and reminder system with recurring task support.
@@ -47,7 +47,8 @@ The system provides a comprehensive set of modules:
 ### System Design Choices
 - **Development Approach**: Schema-first design with data models defined for type consistency, followed by horizontal layer implementation.
 - **Authentication & Security**: Traditional Email/Password Authentication using Passport Local Strategy with separate strategies for admin and driver login. Passwords hashed using bcrypt with SHA-256 hashed password reset tokens. Session-based authentication with secure HTTP-only cookies and PostgreSQL-backed session persistence. Admin approval system for new admin registrations with email notifications via Resend integration. Email-based password reset with one-hour token expiration and one-time use tokens.
-- **Notification System**: Multi-channel notification infrastructure using Resend for email notifications and RingCentral SDK for SMS (when credentials are provided). Supports automated GPS tracking reminders, document expiration alerts, and system notifications.
+- **Notification System**: Multi-channel notification infrastructure using Resend for email notifications (uses onboarding@resend.dev as default sender) and RingCentral SDK for SMS (when credentials are provided). Supports automated GPS tracking reminders, document expiration alerts, and system notifications.
+- **Invoice PDF Generation**: Client-side PDF generation using jsPDF with clean, professional layout matching industry standards. Format includes: invoice title, company information, bill-to section, invoice number and date (right-aligned), simple description/amount table showing load number, total amount, and terms & conditions footer ("Thank you. Payment is due within 15 days").
 - **Data Layer**: PostgreSQL with Drizzle ORM, proper foreign key relationships, data normalization, and Drizzle Kit for migrations.
 - **API Design**: RESTful endpoint structure with Zod validation, consistent response formats, and proper HTTP status codes.
 - **Performance**: Utilizes TanStack Query for caching, database indexing, and optimized SQL queries.
