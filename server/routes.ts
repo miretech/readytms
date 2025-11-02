@@ -784,6 +784,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Factoring Email Route
   app.post("/api/accounting/factoring-email", async (req, res) => {
     try {
+      console.log('[Factoring Email] Request received:', {
+        to: req.body.to,
+        from: req.body.from,
+        subject: req.body.subject,
+        invoiceId: req.body.invoiceId,
+        loadId: req.body.loadId,
+        attachPods: req.body.attachPods,
+        hasPdf: !!req.body.invoicePdf,
+      });
+
       const schema = z.object({
         to: z.string().email(),
         from: z.string().email().optional(),

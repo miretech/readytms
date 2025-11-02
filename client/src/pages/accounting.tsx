@@ -1031,11 +1031,50 @@ function EmailFactoringDialog({
       const load = loads.find(l => l.id === invoice.loadId);
       
       const total = typeof invoice.total === 'string' ? parseFloat(invoice.total) : invoice.total;
+      const subtotal = typeof invoice.subtotal === 'string' ? parseFloat(invoice.subtotal) : invoice.subtotal;
+      const lumperFee = typeof invoice.lumperFee === 'string' ? parseFloat(invoice.lumperFee || '0') : (invoice.lumperFee || 0);
+      
+      // Build structured email message
+      let emailMessage = `Dear ${customer?.name || "Valued Customer"},\n\n`;
+      emailMessage += `Please find attached the invoice and proof of delivery documents for your recent shipment.\n\n`;
+      emailMessage += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      emailMessage += `INVOICE SUMMARY\n`;
+      emailMessage += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      emailMessage += `Invoice Number: ${invoice.invoiceNumber}\n`;
+      emailMessage += `Load Number: ${load?.loadNumber || "N/A"}\n`;
+      emailMessage += `Invoice Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}\n`;
+      emailMessage += `Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}\n\n`;
+      
+      if (load) {
+        emailMessage += `SHIPMENT DETAILS\n`;
+        emailMessage += `Origin: ${load.pickupLocation}\n`;
+        emailMessage += `Destination: ${load.deliveryLocation}\n`;
+        if (load.commodity) {
+          emailMessage += `Commodity: ${load.commodity}\n`;
+        }
+        emailMessage += `\n`;
+      }
+      
+      emailMessage += `CHARGES\n`;
+      emailMessage += `Freight Charges: $${subtotal.toFixed(2)}\n`;
+      if (lumperFee > 0) {
+        emailMessage += `Lumper Fee: $${lumperFee.toFixed(2)}\n`;
+      }
+      emailMessage += `TOTAL AMOUNT DUE: $${total.toFixed(2)}\n\n`;
+      emailMessage += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      emailMessage += `Please remit payment to the address listed on the attached invoice.\n\n`;
+      emailMessage += `Thank you for your business!\n\n`;
+      emailMessage += `Best regards,\n`;
+      emailMessage += `${companySettings?.companyName || "Ready TMS"}\n`;
+      if (companySettings?.phone) {
+        emailMessage += `Phone: ${companySettings.phone}`;
+      }
+      
       form.reset({
         to: customer?.email || "",
         from: "",
-        subject: `Invoice ${invoice.invoiceNumber} - Ready TMS`,
-        message: `Dear ${customer?.name || "Customer"},\n\nPlease find attached invoice ${invoice.invoiceNumber} for load ${load?.loadNumber || ""}.\n\nInvoice Details:\n- Amount: $${total.toFixed(2)}\n- Date: ${new Date(invoice.invoiceDate).toLocaleDateString()}\n- Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}\n\nThank you for your business.\n\nBest regards,\n${companySettings?.companyName || "Ready TMS"}`,
+        subject: `Invoice ${invoice.invoiceNumber} - ${companySettings?.companyName || "Ready TMS"}`,
+        message: emailMessage,
       });
     }
   }, [invoice, customers, loads, companySettings, open, form]);
