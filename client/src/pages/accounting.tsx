@@ -1223,11 +1223,14 @@ function EmailFactoringDialog({
     setIsSending(true);
 
     try {
+      console.log('[Email Factoring] Starting email send process...');
+      
       // Generate PDF as base64
+      console.log('[Email Factoring] Generating PDF...');
       const pdfBase64 = await generateInvoicePDFBase64();
+      console.log('[Email Factoring] PDF generated, length:', pdfBase64?.length);
 
-      // Send email
-      await apiRequest("POST", "/api/accounting/factoring-email", {
+      const payload = {
         to: values.to,
         from: values.from || undefined,
         subject: values.subject,
@@ -1236,7 +1239,22 @@ function EmailFactoringDialog({
         loadId: invoice.loadId,
         invoicePdf: pdfBase64,
         attachPods,
+      };
+      
+      console.log('[Email Factoring] Sending request with payload:', {
+        to: payload.to,
+        from: payload.from,
+        subject: payload.subject,
+        invoiceId: payload.invoiceId,
+        loadId: payload.loadId,
+        attachPods: payload.attachPods,
+        hasPdf: !!payload.invoicePdf,
+        pdfSize: pdfBase64?.length,
       });
+
+      // Send email
+      const response = await apiRequest("POST", "/api/accounting/factoring-email", payload);
+      console.log('[Email Factoring] Response received:', response);
 
       toast({
         title: "Email Sent",
@@ -1244,9 +1262,11 @@ function EmailFactoringDialog({
       });
       onOpenChange(false);
     } catch (error) {
+      console.error('[Email Factoring] Error occurred:', error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       toast({
         title: "Error",
-        description: "Failed to send email. Please try again.",
+        description: `Failed to send email: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
