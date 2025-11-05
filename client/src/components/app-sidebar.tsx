@@ -49,6 +49,11 @@ const menuItems = [
     icon: Truck,
   },
   {
+    title: "Trailers",
+    url: "/trailers",
+    icon: Package,
+  },
+  {
     title: "Drivers",
     url: "/drivers",
     icon: Users,

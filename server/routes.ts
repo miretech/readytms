@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertLoadSchema, 
-  insertTruckSchema, 
+  insertTruckSchema,
+  insertTrailerSchema,
   insertDriverSchema, 
   insertCustomerSchema, 
   insertDocumentSchema,
@@ -501,6 +502,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const deleted = await storage.deleteTruck(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Truck not found" });
+    }
+    res.status(204).send();
+  });
+
+  app.get("/api/trailers", async (_req, res) => {
+    const trailers = await storage.getAllTrailers();
+    res.json(trailers);
+  });
+
+  app.get("/api/trailers/:id", async (req, res) => {
+    const trailer = await storage.getTrailer(req.params.id);
+    if (!trailer) {
+      return res.status(404).json({ error: "Trailer not found" });
+    }
+    res.json(trailer);
+  });
+
+  app.post("/api/trailers", async (req, res) => {
+    try {
+      const validatedData = insertTrailerSchema.parse(req.body);
+      const trailer = await storage.createTrailer(validatedData);
+      res.status(201).json(trailer);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid trailer data" });
+    }
+  });
+
+  app.patch("/api/trailers/:id", async (req, res) => {
+    try {
+      const validatedData = insertTrailerSchema.partial().parse(req.body);
+      const trailer = await storage.updateTrailer(req.params.id, validatedData);
+      if (!trailer) {
+        return res.status(404).json({ error: "Trailer not found" });
+      }
+      res.json(trailer);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid trailer data" });
+    }
+  });
+
+  app.delete("/api/trailers/:id", async (req, res) => {
+    const deleted = await storage.deleteTrailer(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Trailer not found" });
     }
     res.status(204).send();
   });

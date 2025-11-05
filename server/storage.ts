@@ -5,6 +5,8 @@ import {
   type InsertLoad,
   type Truck,
   type InsertTruck,
+  type Trailer,
+  type InsertTrailer,
   type Driver,
   type InsertDriver,
   type Customer,
@@ -55,6 +57,7 @@ import {
   users,
   loads,
   trucks,
+  trailers,
   drivers,
   customers,
   documents,
@@ -114,6 +117,12 @@ export interface IStorage {
   createTruck(truck: InsertTruck): Promise<Truck>;
   updateTruck(id: string, truck: Partial<InsertTruck>): Promise<Truck | undefined>;
   deleteTruck(id: string): Promise<boolean>;
+  
+  getAllTrailers(): Promise<Trailer[]>;
+  getTrailer(id: string): Promise<Trailer | undefined>;
+  createTrailer(trailer: InsertTrailer): Promise<Trailer>;
+  updateTrailer(id: string, trailer: Partial<InsertTrailer>): Promise<Trailer | undefined>;
+  deleteTrailer(id: string): Promise<boolean>;
   
   getAllDrivers(): Promise<Driver[]>;
   getDriver(id: string): Promise<Driver | undefined>;
@@ -596,6 +605,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTruck(id: string): Promise<boolean> {
     const result = await db.delete(trucks).where(eq(trucks.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAllTrailers(): Promise<Trailer[]> {
+    return await db.select().from(trailers);
+  }
+
+  async getTrailer(id: string): Promise<Trailer | undefined> {
+    const [trailer] = await db.select().from(trailers).where(eq(trailers.id, id));
+    return trailer || undefined;
+  }
+
+  async createTrailer(insertTrailer: InsertTrailer): Promise<Trailer> {
+    const [trailer] = await db
+      .insert(trailers)
+      .values(insertTrailer)
+      .returning();
+    return trailer;
+  }
+
+  async updateTrailer(id: string, updateData: Partial<InsertTrailer>): Promise<Trailer | undefined> {
+    const [trailer] = await db
+      .update(trailers)
+      .set(updateData)
+      .where(eq(trailers.id, id))
+      .returning();
+    return trailer || undefined;
+  }
+
+  async deleteTrailer(id: string): Promise<boolean> {
+    const result = await db.delete(trailers).where(eq(trailers.id, id)).returning();
     return result.length > 0;
   }
 

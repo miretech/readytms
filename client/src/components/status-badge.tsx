@@ -3,6 +3,7 @@ import { CheckCircle2, Clock, AlertCircle, TruckIcon, Package } from "lucide-rea
 
 type LoadStatus = "pending" | "assigned" | "in-transit" | "delivered" | "invoiced";
 type TruckStatus = "available" | "in-use" | "maintenance" | "out-of-service";
+type TrailerStatus = "available" | "in-use" | "maintenance" | "out-of-service";
 type DriverStatus = "available" | "on-duty" | "off-duty" | "on-leave";
 type InspectionStatus = "Passed" | "Failed" | "Pending";
 type AccidentStatus = "Reported" | "Under Investigation" | "Closed";
@@ -10,8 +11,8 @@ type ViolationStatus = "Pending" | "Paid" | "Contested" | "Dismissed";
 type SeverityLevel = "Minor" | "Moderate" | "Severe" | "Critical";
 
 interface StatusBadgeProps {
-  status: LoadStatus | TruckStatus | DriverStatus | InspectionStatus | AccidentStatus | ViolationStatus | SeverityLevel | string;
-  type?: "load" | "truck" | "driver" | "inspection" | "accident" | "violation" | "severity";
+  status: LoadStatus | TruckStatus | TrailerStatus | DriverStatus | InspectionStatus | AccidentStatus | ViolationStatus | SeverityLevel | string;
+  type?: "load" | "truck" | "trailer" | "driver" | "inspection" | "accident" | "violation" | "severity";
 }
 
 export function StatusBadge({ status, type = "load" }: StatusBadgeProps) {

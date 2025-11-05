@@ -66,6 +66,25 @@ export const insertTruckSchema = createInsertSchema(trucks).omit({
 export type InsertTruck = z.infer<typeof insertTruckSchema>;
 export type Truck = typeof trucks.$inferSelect;
 
+export const trailers = pgTable("trailers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trailerNumber: text("trailer_number").notNull().unique(),
+  type: text("type").notNull(),
+  status: text("status").notNull(),
+  licensePlate: text("license_plate").notNull(),
+  vin: text("vin"),
+  year: integer("year"),
+  make: text("make"),
+  model: text("model"),
+});
+
+export const insertTrailerSchema = createInsertSchema(trailers).omit({
+  id: true,
+});
+
+export type InsertTrailer = z.infer<typeof insertTrailerSchema>;
+export type Trailer = typeof trailers.$inferSelect;
+
 export const drivers = pgTable("drivers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
