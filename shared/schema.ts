@@ -144,7 +144,7 @@ export type Customer = typeof customers.$inferSelect;
 export const loads = pgTable("loads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   loadNumber: text("load_number").notNull().unique(),
-  customerId: varchar("customer_id").notNull(),
+  customerId: varchar("customer_id"), // Optional - can be added via AI extraction later
   status: text("status").notNull(),
   pickupLocation: text("pickup_location").notNull(),
   pickupDate: timestamp("pickup_date").notNull(),
@@ -167,6 +167,7 @@ export const insertLoadSchema = createInsertSchema(loads).omit({
   id: true,
   createdAt: true,
 }).extend({
+  customerId: z.string().optional(), // Optional - can be added via AI extraction later
   pickupDate: z.string(),
   deliveryDate: z.string(),
   rate: z.string(),

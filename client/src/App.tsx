@@ -76,6 +76,7 @@ function Router() {
       
       {/* Protected admin routes */}
       <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
+      <Route path="/dashboard">{() => <ProtectedRoute component={Dashboard} />}</Route>
       <Route path="/loads">{() => <ProtectedRoute component={Loads} />}</Route>
       <Route path="/fleet">{() => <ProtectedRoute component={Fleet} />}</Route>
       <Route path="/trailers">{() => <ProtectedRoute component={Trailers} />}</Route>

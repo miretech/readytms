@@ -39,7 +39,7 @@ import { AILoadUpload } from "@/components/ai-load-upload";
 import { FileUpload } from "@/components/file-upload";
 
 const formSchema = insertLoadSchema.extend({
-  customerId: z.string().min(1, "Customer is required"),
+  customerId: z.string().optional(), // Optional - can be added via AI extraction later
   status: z.string().min(1, "Status is required"),
   pickupLocation: z.string().min(1, "Pickup location is required"),
   deliveryLocation: z.string().min(1, "Delivery location is required"),
@@ -100,7 +100,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
     if (load) {
       form.reset({
         loadNumber: load.loadNumber,
-        customerId: load.customerId,
+        customerId: load.customerId || "",
         status: load.status,
         pickupLocation: load.pickupLocation,
         pickupDate: new Date(load.pickupDate).toISOString().split("T")[0],
@@ -163,7 +163,12 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   });
 
   const onSubmit = (values: FormValues) => {
-    mutation.mutate(values);
+    // Convert empty customerId to undefined for optional field
+    const cleanedValues = {
+      ...values,
+      customerId: values.customerId || undefined,
+    };
+    mutation.mutate(cleanedValues);
   };
 
   const handleAIExtraction = (extractedData: any) => {
@@ -240,11 +245,11 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                 name="customerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Customer</FormLabel>
+                    <FormLabel>Customer <span className="text-muted-foreground">(Optional)</span></FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-customer">
-                          <SelectValue placeholder="Select customer" />
+                          <SelectValue placeholder="Select customer (optional - can add via AI later)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
