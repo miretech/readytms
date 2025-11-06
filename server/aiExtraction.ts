@@ -62,9 +62,12 @@ Guidelines:
       try {
         // Dynamic import for pdf-parse to handle ESM module
         const { PDFParse } = await import("pdf-parse");
-        const pdfParser = new PDFParse(pdfBuffer);
-        const pdfData = await pdfParser.parse();
-        const textContent = pdfData.text;
+        const parser = new PDFParse({ data: pdfBuffer });
+        const result = await parser.getText();
+        const textContent = result.text;
+        
+        // Clean up resources
+        await parser.destroy();
         
         if (!textContent || textContent.trim().length < 10) {
           throw new Error("PDF appears to be empty or contains only images. Please convert the PDF to PNG/JPG for better results.");
