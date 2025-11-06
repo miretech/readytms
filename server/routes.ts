@@ -709,7 +709,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const extractedData = await extractLoadFromDocument(fileData, fileType);
-      res.json(extractedData);
+      
+      // If broker information was extracted, create/find customer automatically
+      let customerId: string | undefined;
+      if (extractedData.brokerName) {
+        // Check if customer already exists with this name
+        const existingCustomers = await storage.getAllCustomers();
+        const existingCustomer = existingCustomers.find(
+          c => c.name.toLowerCase().trim() === extractedData.brokerName!.toLowerCase().trim()
+        );
+        
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+        } else {
+          // Create new customer with extracted broker information
+          const newCustomer = await storage.createCustomer({
+            name: extractedData.brokerName,
+            address: extractedData.brokerAddress || null,
+            city: null,
+            state: null,
+            zip: null,
+            phone: null,
+            email: null,
+            contactPerson: null,
+            mcNumber: null,
+            notes: "Auto-created from AI extraction",
+          });
+          customerId = newCustomer.id;
+        }
+      }
+      
+      // Return both extracted data and customerId
+      res.json({
+        ...extractedData,
+        customerId,
+      });
     } catch (error: any) {
       console.error("Error extracting load:", error);
       res.status(500).json({ error: error.message || "Failed to extract load data" });
