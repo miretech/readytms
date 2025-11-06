@@ -40,7 +40,7 @@ The system provides a comprehensive set of modules:
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
 - **Driver Settlements**: Automated payroll calculations with percentage-based pay, comprehensive deduction tracking, net pay calculation, and settlement history with PDF export. Settlements include dispatch percentage, advance management, and fuel tracking (Flying J, Fleet One).
 - **Task Manager**: Daily task and reminder system with recurring task support.
-- **Maintenance Management**: Service record system with next service date tracking, preventive maintenance scheduling, and PDF attachment support.
+- **Maintenance Management**: Service record system with next service date tracking, preventive maintenance scheduling, and PDF attachment support. Includes automated maintenance reminder notifications sent via email and SMS to drivers when maintenance is due within 7 days, due today, or overdue.
 - **Fuel Tracking & Management**: Fuel card account management with FleetOne (WEX) and Pilot Flying J integration, manual transaction entry, and expense tracking.
 - **Automation & Workflows**: Enterprise-grade automation engine for tasks like auto-invoice generation, expiring document alerts, and load status notifications.
 - **Company Settings**: Editable company branding system for professional document generation, including company name, address, contact, and logo.

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, MoreVertical, Edit, Trash2, AlertCircle, FileText, Download, X, Upload } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, AlertCircle, FileText, Download, X, Upload, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -680,6 +680,25 @@ export default function Maintenance() {
     );
   }
 
+  const checkRemindersMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/maintenance/check-reminders", {});
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Maintenance reminders checked",
+        description: `Sent ${data.sent} reminder(s) to drivers. Skipped ${data.skipped} record(s).`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to check maintenance reminders. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -687,13 +706,24 @@ export default function Maintenance() {
           <h1 className="text-3xl font-semibold tracking-tight">Maintenance</h1>
           <p className="text-sm text-muted-foreground">Track vehicle service and repairs</p>
         </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          data-testid="button-add-service-record"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Service Record
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => checkRemindersMutation.mutate()}
+            disabled={checkRemindersMutation.isPending}
+            data-testid="button-check-reminders"
+          >
+            <Bell className="mr-2 h-4 w-4" />
+            {checkRemindersMutation.isPending ? "Checking..." : "Send Reminders"}
+          </Button>
+          <Button
+            onClick={() => setIsDialogOpen(true)}
+            data-testid="button-add-service-record"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Service Record
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6">

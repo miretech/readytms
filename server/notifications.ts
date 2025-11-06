@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import type { Driver } from '@shared/schema';
+import type { Driver, Maintenance, Truck } from '@shared/schema';
 import { SDK } from '@ringcentral/sdk';
 
 // Initialize Resend for email notifications
@@ -290,4 +290,167 @@ export async function sendGPSReminderNotification(driver: Driver): Promise<void>
   });
 
   console.log(`[Notifications] GPS reminder sent to ${driver.name} - Email: ${emailSent}, SMS: ${smsSent}`);
+}
+
+/**
+ * Send maintenance reminder notification to driver
+ */
+export async function sendMaintenanceReminderNotification(
+  driver: Driver,
+  truck: Truck,
+  maintenance: Maintenance
+): Promise<void> {
+  const daysUntilDue = maintenance.nextServiceDate
+    ? Math.ceil((new Date(maintenance.nextServiceDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+  const status = isOverdue ? 'OVERDUE' : daysUntilDue === 0 ? 'DUE TODAY' : `Due in ${daysUntilDue} days`;
+
+  // Email notification
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: ${isOverdue ? '#dc2626' : '#f59e0b'}; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+        .alert-box { background: ${isOverdue ? '#fee2e2' : '#fef3c7'}; border-left: 4px solid ${isOverdue ? '#dc2626' : '#f59e0b'}; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .details { background: white; padding: 20px; border-radius: 6px; margin: 20px 0; }
+        .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+        .detail-label { font-weight: bold; color: #6b7280; }
+        .detail-value { color: #111827; }
+        .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>${isOverdue ? '⚠️ MAINTENANCE OVERDUE' : '🔧 Maintenance Reminder'}</h1>
+        </div>
+        <div class="content">
+          <p>Hi ${driver.name},</p>
+          
+          <div class="alert-box">
+            <h3 style="margin-top:0;">${status}</h3>
+            <p style="margin-bottom:0;"><strong>${maintenance.maintenanceType}</strong> is ${isOverdue ? 'overdue' : 'due soon'} for Truck ${truck.truckNumber}</p>
+          </div>
+
+          <div class="details">
+            <h3 style="margin-top:0;">Maintenance Details</h3>
+            <div class="detail-row">
+              <span class="detail-label">Truck:</span>
+              <span class="detail-value">${truck.truckNumber}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Service Type:</span>
+              <span class="detail-value">${maintenance.maintenanceType}</span>
+            </div>
+            ${maintenance.nextServiceDate ? `
+            <div class="detail-row">
+              <span class="detail-label">Due Date:</span>
+              <span class="detail-value">${new Date(maintenance.nextServiceDate).toLocaleDateString()}</span>
+            </div>
+            ` : ''}
+            ${maintenance.nextServiceMileage ? `
+            <div class="detail-row">
+              <span class="detail-label">Due at Mileage:</span>
+              <span class="detail-value">${maintenance.nextServiceMileage.toLocaleString()} miles</span>
+            </div>
+            ` : ''}
+            ${maintenance.description ? `
+            <div class="detail-row">
+              <span class="detail-label">Notes:</span>
+              <span class="detail-value">${maintenance.description}</span>
+            </div>
+            ` : ''}
+          </div>
+          
+          <p><strong>Action Required:</strong> Please ${isOverdue ? 'schedule this service immediately' : 'plan to schedule this service'} to keep the truck in optimal condition and comply with DOT regulations.</p>
+          
+          <p>Contact dispatch or the maintenance department to schedule this service.</p>
+          
+          <div class="footer">
+            <p>Ready TMS - Transportation Management System</p>
+            <p>If you have questions, contact dispatch</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const emailSent = await sendEmail({
+    to: driver.email,
+    subject: `${isOverdue ? '⚠️ OVERDUE' : '🔧'} Maintenance ${status} - Truck ${truck.truckNumber}`,
+    html: emailHtml,
+  });
+
+  // SMS notification
+  const smsMessage = `Ready TMS: ${isOverdue ? 'OVERDUE' : 'Reminder'} - ${maintenance.maintenanceType} ${status.toLowerCase()} for Truck ${truck.truckNumber}. ${maintenance.nextServiceDate ? `Due: ${new Date(maintenance.nextServiceDate).toLocaleDateString()}` : ''}. Contact dispatch to schedule.`;
+  
+  const smsSent = await sendSMS({
+    to: driver.phone,
+    message: smsMessage,
+  });
+
+  console.log(`[Notifications] Maintenance reminder sent to ${driver.name} for Truck ${truck.truckNumber} - Email: ${emailSent}, SMS: ${smsSent}`);
+}
+
+/**
+ * Check all maintenance records and send reminders for upcoming/overdue services
+ */
+export async function checkAndSendMaintenanceReminders(
+  getAllMaintenance: () => Promise<Maintenance[]>,
+  getAllTrucks: () => Promise<Truck[]>,
+  getAllDrivers: () => Promise<Driver[]>
+): Promise<{ sent: number; skipped: number }> {
+  console.log('[Notifications] Checking maintenance reminders...');
+  
+  const maintenanceRecords = await getAllMaintenance();
+  const trucks = await getAllTrucks();
+  const drivers = await getAllDrivers();
+
+  let sent = 0;
+  let skipped = 0;
+
+  for (const maintenance of maintenanceRecords) {
+    // Only check for scheduled/active maintenance with next service date
+    if (maintenance.status !== 'Completed' && maintenance.nextServiceDate) {
+      const daysUntilDue = Math.ceil(
+        (new Date(maintenance.nextServiceDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      );
+
+      // Send reminder if: overdue, due today, or due within 7 days
+      if (daysUntilDue <= 7) {
+        const truck = trucks.find(t => t.id === maintenance.truckId);
+        if (!truck) {
+          console.log(`[Notifications] Truck not found for maintenance ${maintenance.id}`);
+          skipped++;
+          continue;
+        }
+
+        // Find driver assigned to this truck
+        const driver = drivers.find(d => d.assignedTruckId === truck.id);
+        if (!driver || !driver.email) {
+          console.log(`[Notifications] No driver or email found for truck ${truck.truckNumber}`);
+          skipped++;
+          continue;
+        }
+
+        try {
+          await sendMaintenanceReminderNotification(driver, truck, maintenance);
+          sent++;
+        } catch (error) {
+          console.error(`[Notifications] Failed to send maintenance reminder:`, error);
+          skipped++;
+        }
+      }
+    }
+  }
+
+  console.log(`[Notifications] Maintenance reminders complete - Sent: ${sent}, Skipped: ${skipped}`);
+  return { sent, skipped };
 }

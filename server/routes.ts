@@ -1495,6 +1495,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Check and send maintenance reminders
+  app.post("/api/maintenance/check-reminders", async (_req, res) => {
+    try {
+      const { checkAndSendMaintenanceReminders } = await import('./notifications');
+      const result = await checkAndSendMaintenanceReminders(
+        () => storage.getAllMaintenance(),
+        () => storage.getAllTrucks(),
+        () => storage.getAllDrivers()
+      );
+      res.json({
+        message: "Maintenance reminders checked",
+        sent: result.sent,
+        skipped: result.skipped
+      });
+    } catch (error) {
+      console.error("Maintenance reminder check error:", error);
+      res.status(500).json({ 
+        error: "Failed to check maintenance reminders",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // Fuel Card Routes
   app.get("/api/fuel-cards", async (_req, res) => {
     const cards = await storage.getAllFuelCards();
