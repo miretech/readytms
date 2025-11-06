@@ -128,10 +128,15 @@ export type Driver = typeof drivers.$inferSelect;
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  email: text("email").notNull(),
-  phone: text("phone").notNull(),
-  address: text("address").notNull(),
-  type: text("type").notNull(), // Can be "shipper", "receiver", or "broker"
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  contactPerson: text("contact_person"),
+  mcNumber: text("mc_number"),
+  notes: text("notes"),
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({

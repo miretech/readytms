@@ -174,7 +174,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   const handleAIExtraction = (extractedData: any) => {
     form.reset({
       loadNumber: extractedData.loadNumber || "",
-      customerId: "",
+      customerId: extractedData.customerId || "",
       status: "pending",
       pickupLocation: extractedData.pickupLocation || "",
       pickupDate: extractedData.pickupDate || "",
@@ -189,10 +189,19 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
       notes: extractedData.notes || "",
     });
     setActiveTab("manual");
-    toast({
-      title: "Load data extracted!",
-      description: "Please review and complete the remaining fields.",
-    });
+    
+    // Show appropriate toast message based on whether broker was found/created
+    if (extractedData.brokerName && extractedData.customerId) {
+      toast({
+        title: "Load data extracted with broker!",
+        description: `Broker "${extractedData.brokerName}" was automatically added. Please review the fields.`,
+      });
+    } else {
+      toast({
+        title: "Load data extracted!",
+        description: "Please review and complete the remaining fields.",
+      });
+    }
   };
 
   return (

@@ -15,6 +15,9 @@ interface ExtractedLoad {
   weight?: number;
   commodity?: string;
   notes?: string;
+  brokerName?: string;
+  brokerAddress?: string;
+  customerId?: string;
 }
 
 interface AILoadUploadProps {
