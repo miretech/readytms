@@ -343,69 +343,67 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
               />
             </div>
 
-            {/* Broker Information Section */}
-            {(form.watch("customerId") || form.watch("brokerName")) && (
-              <Card className="p-4 bg-muted/30">
-                <h4 className="text-sm font-semibold mb-3 text-foreground">Broker Information</h4>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="brokerName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Broker Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} placeholder="Company name" data-testid="input-broker-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+            {/* Broker/Shipper Information Section */}
+            <Card className="p-4 bg-muted/30">
+              <h4 className="text-sm font-semibold mb-3 text-foreground">Broker/Shipper Information</h4>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="brokerName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Broker/Shipper Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="Company name" data-testid="input-broker-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <FormField
-                    control={form.control}
-                    name="brokerPhone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} placeholder="(555) 123-4567" data-testid="input-broker-phone" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <FormField
+                  control={form.control}
+                  name="brokerPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="(555) 123-4567" data-testid="input-broker-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <FormField
-                    control={form.control}
-                    name="brokerAddress"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} placeholder="Street, City, State, ZIP" data-testid="input-broker-address" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <FormField
+                  control={form.control}
+                  name="brokerAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="Street, City, State, ZIP" data-testid="input-broker-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <FormField
-                    control={form.control}
-                    name="brokerEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} type="email" placeholder="broker@company.com" data-testid="input-broker-email" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </Card>
-            )}
+                <FormField
+                  control={form.control}
+                  name="brokerEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} type="email" placeholder="broker@company.com" data-testid="input-broker-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </Card>
 
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
