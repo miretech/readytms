@@ -46,6 +46,11 @@ const formSchema = insertLoadSchema.extend({
   rate: z.string().min(1, "Rate is required"),
   invoiceAttachment: z.string().nullable().optional(),
   podAttachment: z.string().nullable().optional(),
+  // Broker information fields (editable)
+  brokerName: z.string().optional(),
+  brokerAddress: z.string().optional(),
+  brokerPhone: z.string().optional(),
+  brokerEmail: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -61,6 +66,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   const isEditing = !!load;
   const [activeTab, setActiveTab] = useState<string>("manual");
   const [viewingPod, setViewingPod] = useState<{ filename: string; data: string; type: string } | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
@@ -93,11 +99,35 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
       notes: "",
       invoiceAttachment: "",
       podAttachment: "",
+      brokerName: "",
+      brokerAddress: "",
+      brokerPhone: "",
+      brokerEmail: "",
     },
   });
 
+  // Watch for customer selection and populate broker fields
+  useEffect(() => {
+    const customerId = form.watch("customerId");
+    if (customerId && customers.length > 0) {
+      const customer = customers.find(c => c.id === customerId);
+      if (customer) {
+        setSelectedCustomer(customer);
+        form.setValue("brokerName", customer.name || "");
+        form.setValue("brokerAddress", customer.address || "");
+        form.setValue("brokerPhone", customer.phone || "");
+        form.setValue("brokerEmail", customer.email || "");
+      }
+    } else {
+      setSelectedCustomer(null);
+    }
+  }, [form.watch("customerId"), customers]);
+
   useEffect(() => {
     if (load) {
+      // Find the customer for this load
+      const customer = customers.find(c => c.id === load.customerId);
+      
       form.reset({
         loadNumber: load.loadNumber,
         customerId: load.customerId || "",
@@ -115,6 +145,10 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
         notes: load.notes || "",
         invoiceAttachment: load.invoiceAttachment || "",
         podAttachment: load.podAttachment || "",
+        brokerName: customer?.name || "",
+        brokerAddress: customer?.address || "",
+        brokerPhone: customer?.phone || "",
+        brokerEmail: customer?.email || "",
       });
     } else {
       form.reset({
@@ -134,19 +168,41 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
         notes: "",
         invoiceAttachment: "",
         podAttachment: "",
+        brokerName: "",
+        brokerAddress: "",
+        brokerPhone: "",
+        brokerEmail: "",
       });
     }
-  }, [load, form]);
+  }, [load, form, customers]);
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      if (isEditing) {
-        return await apiRequest("PATCH", `/api/loads/${load.id}`, values);
+      // If broker information was edited and we have a customerId, update the customer
+      if (values.customerId && (values.brokerName || values.brokerAddress || values.brokerPhone || values.brokerEmail)) {
+        try {
+          await apiRequest("PATCH", `/api/customers/${values.customerId}`, {
+            name: values.brokerName || "",
+            address: values.brokerAddress || null,
+            phone: values.brokerPhone || null,
+            email: values.brokerEmail || null,
+          });
+        } catch (error) {
+          console.error("Failed to update customer:", error);
+        }
       }
-      return await apiRequest("POST", "/api/loads", values);
+      
+      // Remove broker fields before sending to load endpoint
+      const { brokerName, brokerAddress, brokerPhone, brokerEmail, ...loadData } = values;
+      
+      if (isEditing) {
+        return await apiRequest("PATCH", `/api/loads/${load.id}`, loadData);
+      }
+      return await apiRequest("POST", "/api/loads", loadData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/loads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       toast({
         title: isEditing ? "Load updated" : "Load created",
         description: `The load has been successfully ${isEditing ? "updated" : "created"}.`,
@@ -172,6 +228,9 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   };
 
   const handleAIExtraction = (extractedData: any) => {
+    // Find the customer if one was created/linked
+    const customer = extractedData.customerId ? customers.find(c => c.id === extractedData.customerId) : null;
+    
     form.reset({
       loadNumber: extractedData.loadNumber || "",
       customerId: extractedData.customerId || "",
@@ -187,6 +246,10 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
       weight: extractedData.weight || 0,
       commodity: extractedData.commodity || "",
       notes: extractedData.notes || "",
+      brokerName: customer?.name || extractedData.brokerName || "",
+      brokerAddress: customer?.address || extractedData.brokerAddress || "",
+      brokerPhone: customer?.phone || "",
+      brokerEmail: customer?.email || "",
     });
     setActiveTab("manual");
     
@@ -273,7 +336,73 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                   </FormItem>
                 )}
               />
+            </div>
 
+            {/* Broker Information Section */}
+            {(form.watch("customerId") || form.watch("brokerName")) && (
+              <Card className="p-4 bg-muted/30">
+                <h4 className="text-sm font-semibold mb-3 text-foreground">Broker Information</h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="brokerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Broker Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="Company name" data-testid="input-broker-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="brokerPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="(555) 123-4567" data-testid="input-broker-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="brokerAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Address</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="Street, City, State, ZIP" data-testid="input-broker-address" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="brokerEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} type="email" placeholder="broker@company.com" data-testid="input-broker-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Card>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="status"
