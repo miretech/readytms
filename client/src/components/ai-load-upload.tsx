@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, FileText, Image, Loader2, CheckCircle2, X } from "lucide-react";
+import { Upload, FileText, Image, Loader2, CheckCircle2, X, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
@@ -39,7 +39,14 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
     // File size validation: 5MB for PDFs/images (OpenAI Vision API limit)
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      setError(`File is too large. Maximum size is 5MB due to AI processing limits.`);
+      setError(`File is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 5MB.`);
+      return;
+    }
+
+    // File type validation
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf', 'text/plain'];
+    if (!validTypes.includes(file.type)) {
+      setError(`Unsupported file type: ${file.type}. Please upload PDF, PNG, JPG, GIF, or text files.`);
       return;
     }
 
@@ -95,6 +102,7 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
   });
 
   const isImage = preview && (preview.startsWith("data:image/") || fileName?.match(/\.(png|jpg|jpeg|gif|webp)$/i));
+  const isPDF = preview && (preview.startsWith("data:application/pdf") || fileName?.endsWith('.pdf'));
 
   return (
     <div className="space-y-4">
@@ -147,6 +155,8 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 {isImage ? (
                   <Image className="h-6 w-6 text-primary" />
+                ) : isPDF ? (
+                  <FileCheck className="h-6 w-6 text-primary" />
                 ) : (
                   <FileText className="h-6 w-6 text-primary" />
                 )}
@@ -198,6 +208,20 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
                 className="h-auto w-full rounded-md"
                 data-testid="img-preview"
               />
+            </Card>
+          )}
+          
+          {isPDF && (
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <FileCheck className="h-8 w-8 text-primary" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">PDF Document Ready</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    AI will extract text from your PDF and process the load information.
+                  </p>
+                </div>
+              </div>
             </Card>
           )}
 

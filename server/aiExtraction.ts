@@ -60,9 +60,10 @@ Guidelines:
       const pdfBuffer = Buffer.from(base64Content, "base64");
       
       try {
-        // Dynamic import for pdf-parse to handle CommonJS module
-        const pdfParse = (await import("pdf-parse")).default;
-        const pdfData = await pdfParse(pdfBuffer);
+        // Dynamic import for pdf-parse to handle ESM module
+        const { PDFParse } = await import("pdf-parse");
+        const pdfParser = new PDFParse(pdfBuffer);
+        const pdfData = await pdfParser.parse();
         const textContent = pdfData.text;
         
         if (!textContent || textContent.trim().length < 10) {
