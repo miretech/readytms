@@ -16,6 +16,8 @@ const extractedLoadSchema = z.object({
   weight: z.number().nullable().describe("Weight in pounds"),
   commodity: z.string().nullable().describe("Type of commodity or freight"),
   notes: z.string().nullable().describe("Any additional notes or special instructions"),
+  brokerName: z.string().nullable().describe("Name of the broker or freight company issuing the rate confirmation"),
+  brokerAddress: z.string().nullable().describe("Full address of the broker including street, city, state, and ZIP"),
 });
 
 export type ExtractedLoad = z.infer<typeof extractedLoadSchema>;
@@ -39,6 +41,8 @@ Guidelines:
 - Extract weight in pounds if available
 - Extract commodity type
 - Extract load number or reference number if present
+- Extract broker/freight company name (the company issuing the rate confirmation)
+- Extract broker's full address including street, city, state, and ZIP code
 - Include any special instructions or notes`,
       },
     ];
@@ -129,8 +133,16 @@ Guidelines:
                 type: ["string", "null"],
                 description: "Any additional notes or special instructions",
               },
+              brokerName: {
+                type: ["string", "null"],
+                description: "Name of the broker or freight company issuing the rate confirmation",
+              },
+              brokerAddress: {
+                type: ["string", "null"],
+                description: "Full address of the broker including street, city, state, and ZIP",
+              },
             },
-            required: ["loadNumber", "pickupLocation", "pickupDate", "deliveryLocation", "deliveryDate", "rate", "weight", "commodity", "notes"],
+            required: ["loadNumber", "pickupLocation", "pickupDate", "deliveryLocation", "deliveryDate", "rate", "weight", "commodity", "notes", "brokerName", "brokerAddress"],
             additionalProperties: false,
           },
         },
