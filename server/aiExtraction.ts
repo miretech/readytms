@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import pdfParse from "pdf-parse";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -55,9 +56,28 @@ Guidelines:
     const base64Content = fileData.split(",")[1] || fileData;
 
     if (fileType === 'application/pdf') {
-      // PDF files are not supported - OpenAI Vision API doesn't accept PDFs
-      // and pdf-parse has ESM import issues in this environment
-      throw new Error("PDF files are not currently supported for AI extraction. Please convert your document to PNG or JPG first. You can: 1) Open the PDF, 2) Take a screenshot or use 'Export as Image', 3) Upload the PNG/JPG file here for AI extraction.");
+      // Extract text from PDF using pdf-parse
+      console.log("[AI Extract] Processing PDF file");
+      const pdfBuffer = Buffer.from(base64Content, "base64");
+      
+      try {
+        const pdfData = await pdfParse(pdfBuffer);
+        const textContent = pdfData.text;
+        
+        if (!textContent || textContent.trim().length < 10) {
+          throw new Error("PDF appears to be empty or contains only images. Please convert the PDF to PNG/JPG for better results.");
+        }
+        
+        console.log(`[AI Extract] Successfully extracted ${textContent.length} characters from PDF`);
+        
+        messages.push({
+          role: "user",
+          content: `Extract load information from this PDF document:\n\n${textContent}`,
+        });
+      } catch (pdfError: any) {
+        console.error("[AI Extract] PDF parsing error:", pdfError);
+        throw new Error(`Failed to extract text from PDF: ${pdfError.message}. The PDF may be image-based or corrupted. Try converting it to PNG/JPG instead.`);
+      }
     } else if (isImage) {
       // For images, use OpenAI's Vision API
       messages.push({
