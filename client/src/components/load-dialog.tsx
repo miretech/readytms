@@ -107,8 +107,8 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   });
 
   // Watch for customer selection and populate broker fields
+  const customerId = form.watch("customerId");
   useEffect(() => {
-    const customerId = form.watch("customerId");
     if (customerId && customers.length > 0) {
       const customer = customers.find(c => c.id === customerId);
       if (customer) {
@@ -121,7 +121,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
     } else {
       setSelectedCustomer(null);
     }
-  }, [form.watch("customerId"), customers]);
+  }, [customerId, customers, form]);
 
   useEffect(() => {
     if (load) {
@@ -181,12 +181,16 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
       // If broker information was edited and we have a customerId, update the customer
       if (values.customerId && (values.brokerName || values.brokerAddress || values.brokerPhone || values.brokerEmail)) {
         try {
-          await apiRequest("PATCH", `/api/customers/${values.customerId}`, {
-            name: values.brokerName || "",
-            address: values.brokerAddress || null,
-            phone: values.brokerPhone || null,
-            email: values.brokerEmail || null,
-          });
+          // Only include fields that were actually provided to preserve existing customer data
+          const customerUpdate: any = {};
+          if (values.brokerName) customerUpdate.name = values.brokerName;
+          if (values.brokerAddress) customerUpdate.address = values.brokerAddress;
+          if (values.brokerPhone) customerUpdate.phone = values.brokerPhone;
+          if (values.brokerEmail) customerUpdate.email = values.brokerEmail;
+          
+          if (Object.keys(customerUpdate).length > 0) {
+            await apiRequest("PATCH", `/api/customers/${values.customerId}`, customerUpdate);
+          }
         } catch (error) {
           console.error("Failed to update customer:", error);
         }
@@ -246,10 +250,11 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
       weight: extractedData.weight || 0,
       commodity: extractedData.commodity || "",
       notes: extractedData.notes || "",
-      brokerName: customer?.name || extractedData.brokerName || "",
-      brokerAddress: customer?.address || extractedData.brokerAddress || "",
-      brokerPhone: customer?.phone || "",
-      brokerEmail: customer?.email || "",
+      // Prefer extracted values, fall back to customer data only if not extracted
+      brokerName: extractedData.brokerName || customer?.name || "",
+      brokerAddress: extractedData.brokerAddress || customer?.address || "",
+      brokerPhone: extractedData.brokerPhone || customer?.phone || "",
+      brokerEmail: extractedData.brokerEmail || customer?.email || "",
     });
     setActiveTab("manual");
     
