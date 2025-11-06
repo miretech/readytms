@@ -22,7 +22,7 @@ The application is a full-stack web application. The frontend is built with Reac
 ### Feature Specifications
 The system provides a comprehensive set of modules:
 - **Dashboard**: Real-time operational metrics, recent activity, fleet status, and quick navigation.
-- **Load Management**: Full load lifecycle with optional customer assignment (can be added later via AI extraction). AI extraction now automatically extracts broker name and address from rate confirmations and creates/links customer records without requiring navigation to customer page. Includes driver/truck assignment, status workflow, expense/profit tracking, file attachments (PDFs/images for invoices and PODs), and prominent POD Gallery with thumbnail previews, full-screen viewer, and download functionality for driver-uploaded PODs.
+- **Load Management**: Full load lifecycle with optional customer assignment (can be added later via AI extraction). AI extraction supports PDFs, images (PNG, JPG, GIF), and text files up to 5MB. For PDFs, text is extracted using pdf-parse library; for images, OpenAI Vision API is used. System automatically extracts broker name and address from rate confirmations and creates/links customer records with smart duplicate detection (normalizes punctuation and whitespace). Includes driver/truck assignment, status workflow, expense/profit tracking, file attachments (PDFs/images for invoices and PODs), and prominent POD Gallery with thumbnail previews, full-screen viewer, and download functionality for driver-uploaded PODs.
 - **Fleet Management**: Truck inventory, status tracking, and maintenance records.
 - **Trailer Management**: Trailer inventory, status tracking, and equipment management with support for multiple trailer types (Dry Van, Refrigerated, Flatbed, Step Deck, Tanker, Lowboy, Conestoga).
 - **Driver Management**: Comprehensive driver roster with full DOT compliance tracking, including CDL, medical card, SSN, employment, and contact information.
@@ -62,6 +62,7 @@ The system provides a comprehensive set of modules:
 - **Session Management**: Express-session with connect-pg-simple
 - **Email Service**: Resend API for transactional emails (password reset, GPS notifications)
 - **SMS Service**: RingCentral SDK (pending credential setup - requires RC_SERVER_URL, RC_APP_CLIENT_ID, RC_APP_CLIENT_SECRET, RC_USER_JWT, RC_PHONE_NUMBER)
+- **PDF Processing**: pdf-parse library for text extraction from PDF documents
 - **UI Components**: Shadcn UI, Radix primitives
 - **Icons**: Lucide React
 - **Date Handling**: date-fns
