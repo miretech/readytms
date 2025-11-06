@@ -87,6 +87,7 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
     onDrop,
     accept: {
       "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
+      "application/pdf": [".pdf"],
       "text/plain": [".txt"],
     },
     maxFiles: 1,
@@ -131,10 +132,10 @@ export function AILoadUpload({ onExtracted, onClose }: AILoadUploadProps) {
                 {uploading ? "Processing file..." : isDragActive ? "Drop file here" : "Drag & drop a document"}
               </p>
               <p className="text-sm text-muted-foreground">
-                or click to browse (PNG, JPG, or GIF images up to 5MB)
+                or click to browse (PDF, PNG, JPG, or GIF up to 5MB)
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Have a PDF? Convert it to PNG or JPG first (screenshot or "Export as Image")
+                PDFs work best with text-based documents. For image-based PDFs, convert to PNG/JPG for better results.
               </p>
             </div>
           </div>

@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 import { z } from "zod";
-import pdfParse from "pdf-parse";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -56,11 +55,13 @@ Guidelines:
     const base64Content = fileData.split(",")[1] || fileData;
 
     if (fileType === 'application/pdf') {
-      // Extract text from PDF using pdf-parse
+      // Extract text from PDF using pdf-parse (dynamic import for CommonJS compatibility)
       console.log("[AI Extract] Processing PDF file");
       const pdfBuffer = Buffer.from(base64Content, "base64");
       
       try {
+        // Dynamic import for pdf-parse to handle CommonJS module
+        const pdfParse = (await import("pdf-parse")).default;
         const pdfData = await pdfParse(pdfBuffer);
         const textContent = pdfData.text;
         
