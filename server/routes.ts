@@ -708,19 +708,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      console.log(`[AI Extract] Starting extraction for file type: ${fileType}`);
       const extractedData = await extractLoadFromDocument(fileData, fileType);
+      console.log(`[AI Extract] Extraction successful. Broker info: ${extractedData.brokerName ? 'Yes' : 'No'}`);
       
       // If broker information was extracted, create/find customer automatically
       let customerId: string | undefined;
       if (extractedData.brokerName) {
+        // Normalize broker name for matching (remove punctuation, extra spaces, make lowercase)
+        const normalizeName = (name: string) => {
+          return name
+            .toLowerCase()
+            .trim()
+            .replace(/[.,\-_()]/g, '') // Remove common punctuation
+            .replace(/\s+/g, ' ') // Normalize spaces
+            .trim();
+        };
+        
+        const normalizedBrokerName = normalizeName(extractedData.brokerName);
+        
         // Check if customer already exists with this name
         const existingCustomers = await storage.getAllCustomers();
         const existingCustomer = existingCustomers.find(
-          c => c.name.toLowerCase().trim() === extractedData.brokerName!.toLowerCase().trim()
+          c => normalizeName(c.name) === normalizedBrokerName
         );
         
         if (existingCustomer) {
           customerId = existingCustomer.id;
+          console.log(`[AI Extract] Found existing customer: ${existingCustomer.name} (ID: ${existingCustomer.id})`);
         } else {
           // Create new customer with extracted broker information
           const newCustomer = await storage.createCustomer({
@@ -736,6 +751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: "Auto-created from AI extraction",
           });
           customerId = newCustomer.id;
+          console.log(`[AI Extract] Created new customer: ${newCustomer.name} (ID: ${newCustomer.id})`);
         }
       }
       
@@ -745,8 +761,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId,
       });
     } catch (error: any) {
-      console.error("Error extracting load:", error);
-      res.status(500).json({ error: error.message || "Failed to extract load data" });
+      console.error("[AI Extract] Error extracting load:", error);
+      console.error("[AI Extract] Error details:", {
+        message: error?.message,
+        stack: error?.stack,
+        fileType: req.body?.fileType,
+      });
+      
+      // Provide more helpful error messages
+      let errorMessage = error.message || "Failed to extract load data";
+      if (error.message?.includes('data:')) {
+        errorMessage = "Invalid file format. Please ensure you're uploading a valid image file.";
+      } else if (error.message?.includes('OpenAI') || error.message?.includes('AI')) {
+        errorMessage = "AI extraction service error. Please try again or contact support.";
+      }
+      
+      res.status(500).json({ error: errorMessage });
     }
   });
 
