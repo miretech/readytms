@@ -35,7 +35,11 @@ The system provides a comprehensive set of modules:
   - Daily reminder emails for drivers who haven't shared location in 24 hours
   - Browser push notifications in driver portal for real-time alerts
   - SMS notifications via RingCentral (pending credentials setup)
-- **Safety & Compliance**: Includes Inspections, Accidents & Incidents reporting, and Violations & Citations tracking.
+- **Safety & Compliance**: Comprehensive safety management with multi-file attachment support (PDFs and images, 10MB max per file) for all modules. Includes:
+  - **Inspections**: DOT inspections with result tracking, notes, and supporting documents
+  - **Accidents & Incidents**: Full accident reporting with severity classification, injury tracking, insurance claims, and photo/document evidence
+  - **Violations & Citations**: Traffic and DOT violation tracking with citation numbers, fines, points, and supporting documentation
+  - All records support multiple file attachments with base64 encoding, incremental uploads, download, and removal capabilities
 - **Accounting & Financial Management**: Financial Overview, Invoices (AR) with multi-file attachment support (rate confirmations, BOLs, etc.), Expense Management, and Payments & Cash Management. Invoices feature professional PDF generation with clean, simple layout and email-to-factoring functionality with automatic attachment inclusion.
 - **Customer Management**: Full CRM for shippers and receivers, contact information, and load history.
 - **Driver Settlements**: Automated payroll calculations with percentage-based pay, comprehensive deduction tracking, net pay calculation, and settlement history with PDF export. Settlements include dispatch percentage, advance management, and fuel tracking (Flying J, Fleet One).

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, MoreVertical, Edit, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, AlertTriangle, Upload, FileText, Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -114,6 +114,7 @@ interface InspectionDialogProps {
 function InspectionDialog({ open, onOpenChange, inspection }: InspectionDialogProps) {
   const { toast } = useToast();
   const isEditing = !!inspection;
+  const [attachments, setAttachments] = useState<Array<{ filename: string; data: string; type: string }>>([]);
 
   const { data: trucks = [] } = useQuery<Truck[]>({
     queryKey: ["/api/trucks"],
@@ -149,6 +150,7 @@ function InspectionDialog({ open, onOpenChange, inspection }: InspectionDialogPr
         notes: inspection.notes ?? "",
         performedBy: inspection.performedBy ?? "",
       });
+      setAttachments((inspection.attachments as any) || []);
     } else {
       form.reset({
         truckId: "",
@@ -160,15 +162,78 @@ function InspectionDialog({ open, onOpenChange, inspection }: InspectionDialogPr
         notes: "",
         performedBy: "",
       });
+      setAttachments([]);
     }
   }, [inspection, form]);
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments: Array<{ filename: string; data: string; type: string }> = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 10MB limit`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        newAttachments.push({
+          filename: file.name,
+          data: base64,
+          type: file.type,
+        });
+      } catch (error) {
+        toast({
+          title: "Upload failed",
+          description: `Failed to upload ${file.name}`,
+          variant: "destructive",
+        });
+      }
+    }
+
+    setAttachments([...attachments, ...newAttachments]);
+    event.target.value = "";
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
+  };
+
+  const downloadAttachment = (attachment: { filename: string; data: string; type: string }) => {
+    const link = document.createElement("a");
+    link.href = attachment.data;
+    link.download = attachment.filename;
+    link.click();
+  };
+
   const mutation = useMutation({
     mutationFn: async (values: InspectionFormValues) => {
+      const payload: any = {
+        ...values,
+        attachments,
+      };
       if (isEditing) {
-        return await apiRequest("PATCH", `/api/inspections/${inspection.id}`, values);
+        return await apiRequest("PATCH", `/api/inspections/${inspection.id}`, payload);
       }
-      return await apiRequest("POST", "/api/inspections", values);
+      return await apiRequest("POST", "/api/inspections", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/inspections"] });
@@ -359,6 +424,78 @@ function InspectionDialog({ open, onOpenChange, inspection }: InspectionDialogPr
               )}
             />
 
+            <div className="space-y-2">
+              <FormLabel>Attachments {attachments.length > 0 && `(${attachments.length} file${attachments.length > 1 ? 's' : ''})`}</FormLabel>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="inspection-file-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    data-testid="input-inspection-file-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("inspection-file-upload")?.click()}
+                    data-testid="button-upload-inspection-attachment"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {attachments.length > 0 ? 'Add More Files' : 'Upload Files'}
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Select multiple files • PDF or images • Max 10MB each
+                  </span>
+                </div>
+
+                {attachments.length > 0 && (
+                  <div className="space-y-2 mt-2">
+                    <p className="text-xs text-muted-foreground">Attached files:</p>
+                    {attachments.map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 border rounded-md bg-muted/30"
+                        data-testid={`inspection-attachment-${index}`}
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm truncate">{attachment.filename}</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            ({(attachment.data.length * 0.75 / 1024).toFixed(0)}KB)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => downloadAttachment(attachment)}
+                            data-testid={`button-download-inspection-${index}`}
+                            title="Download file"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeAttachment(index)}
+                            data-testid={`button-remove-inspection-${index}`}
+                            title="Remove file"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
@@ -388,6 +525,7 @@ interface AccidentDialogProps {
 function AccidentDialog({ open, onOpenChange, accident }: AccidentDialogProps) {
   const { toast } = useToast();
   const isEditing = !!accident;
+  const [attachments, setAttachments] = useState<Array<{ filename: string; data: string; type: string }>>([]);
 
   const { data: drivers = [] } = useQuery<Driver[]>({
     queryKey: ["/api/drivers"],
@@ -435,6 +573,7 @@ function AccidentDialog({ open, onOpenChange, accident }: AccidentDialogProps) {
         estimatedCost: accident.estimatedCost?.toString() ?? "",
         status: accident.status,
       });
+      setAttachments((accident.attachments as any) || []);
     } else {
       form.reset({
         driverId: "",
@@ -450,15 +589,78 @@ function AccidentDialog({ open, onOpenChange, accident }: AccidentDialogProps) {
         estimatedCost: "",
         status: "Reported",
       });
+      setAttachments([]);
     }
   }, [accident, form]);
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments: Array<{ filename: string; data: string; type: string }> = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 10MB limit`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        newAttachments.push({
+          filename: file.name,
+          data: base64,
+          type: file.type,
+        });
+      } catch (error) {
+        toast({
+          title: "Upload failed",
+          description: `Failed to upload ${file.name}`,
+          variant: "destructive",
+        });
+      }
+    }
+
+    setAttachments([...attachments, ...newAttachments]);
+    event.target.value = "";
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
+  };
+
+  const downloadAttachment = (attachment: { filename: string; data: string; type: string }) => {
+    const link = document.createElement("a");
+    link.href = attachment.data;
+    link.download = attachment.filename;
+    link.click();
+  };
+
   const mutation = useMutation({
     mutationFn: async (values: AccidentFormValues) => {
+      const payload: any = {
+        ...values,
+        attachments,
+      };
       if (isEditing) {
-        return await apiRequest("PATCH", `/api/accidents/${accident.id}`, values);
+        return await apiRequest("PATCH", `/api/accidents/${accident.id}`, payload);
       }
-      return await apiRequest("POST", "/api/accidents", values);
+      return await apiRequest("POST", "/api/accidents", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accidents"] });
@@ -720,6 +922,78 @@ function AccidentDialog({ open, onOpenChange, accident }: AccidentDialogProps) {
               )}
             />
 
+            <div className="space-y-2">
+              <FormLabel>Attachments {attachments.length > 0 && `(${attachments.length} file${attachments.length > 1 ? 's' : ''})`}</FormLabel>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="accident-file-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    data-testid="input-accident-file-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("accident-file-upload")?.click()}
+                    data-testid="button-upload-accident-attachment"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {attachments.length > 0 ? 'Add More Files' : 'Upload Files'}
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Select multiple files • PDF or images • Max 10MB each
+                  </span>
+                </div>
+
+                {attachments.length > 0 && (
+                  <div className="space-y-2 mt-2">
+                    <p className="text-xs text-muted-foreground">Attached files:</p>
+                    {attachments.map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 border rounded-md bg-muted/30"
+                        data-testid={`accident-attachment-${index}`}
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm truncate">{attachment.filename}</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            ({(attachment.data.length * 0.75 / 1024).toFixed(0)}KB)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => downloadAttachment(attachment)}
+                            data-testid={`button-download-accident-${index}`}
+                            title="Download file"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeAttachment(index)}
+                            data-testid={`button-remove-accident-${index}`}
+                            title="Remove file"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
@@ -749,6 +1023,7 @@ interface ViolationDialogProps {
 function ViolationDialog({ open, onOpenChange, violation }: ViolationDialogProps) {
   const { toast } = useToast();
   const isEditing = !!violation;
+  const [attachments, setAttachments] = useState<Array<{ filename: string; data: string; type: string }>>([]);
 
   const { data: drivers = [] } = useQuery<Driver[]>({
     queryKey: ["/api/drivers"],
@@ -790,6 +1065,7 @@ function ViolationDialog({ open, onOpenChange, violation }: ViolationDialogProps
         status: violation.status,
         dueDate: violation.dueDate ? new Date(violation.dueDate).toISOString().split("T")[0] : "",
       });
+      setAttachments((violation.attachments as any) || []);
     } else {
       form.reset({
         driverId: "",
@@ -804,15 +1080,78 @@ function ViolationDialog({ open, onOpenChange, violation }: ViolationDialogProps
         status: "Pending",
         dueDate: "",
       });
+      setAttachments([]);
     }
   }, [violation, form]);
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments: Array<{ filename: string; data: string; type: string }> = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 10MB limit`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        newAttachments.push({
+          filename: file.name,
+          data: base64,
+          type: file.type,
+        });
+      } catch (error) {
+        toast({
+          title: "Upload failed",
+          description: `Failed to upload ${file.name}`,
+          variant: "destructive",
+        });
+      }
+    }
+
+    setAttachments([...attachments, ...newAttachments]);
+    event.target.value = "";
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
+  };
+
+  const downloadAttachment = (attachment: { filename: string; data: string; type: string }) => {
+    const link = document.createElement("a");
+    link.href = attachment.data;
+    link.download = attachment.filename;
+    link.click();
+  };
+
   const mutation = useMutation({
     mutationFn: async (values: ViolationFormValues) => {
+      const payload: any = {
+        ...values,
+        attachments,
+      };
       if (isEditing) {
-        return await apiRequest("PATCH", `/api/violations/${violation.id}`, values);
+        return await apiRequest("PATCH", `/api/violations/${violation.id}`, payload);
       }
-      return await apiRequest("POST", "/api/violations", values);
+      return await apiRequest("POST", "/api/violations", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/violations"] });
@@ -1051,6 +1390,78 @@ function ViolationDialog({ open, onOpenChange, violation }: ViolationDialogProps
                 </FormItem>
               )}
             />
+
+            <div className="space-y-2">
+              <FormLabel>Attachments {attachments.length > 0 && `(${attachments.length} file${attachments.length > 1 ? 's' : ''})`}</FormLabel>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="violation-file-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    data-testid="input-violation-file-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("violation-file-upload")?.click()}
+                    data-testid="button-upload-violation-attachment"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {attachments.length > 0 ? 'Add More Files' : 'Upload Files'}
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Select multiple files • PDF or images • Max 10MB each
+                  </span>
+                </div>
+
+                {attachments.length > 0 && (
+                  <div className="space-y-2 mt-2">
+                    <p className="text-xs text-muted-foreground">Attached files:</p>
+                    {attachments.map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 border rounded-md bg-muted/30"
+                        data-testid={`violation-attachment-${index}`}
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm truncate">{attachment.filename}</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            ({(attachment.data.length * 0.75 / 1024).toFixed(0)}KB)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => downloadAttachment(attachment)}
+                            data-testid={`button-download-violation-${index}`}
+                            title="Download file"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeAttachment(index)}
+                            data-testid={`button-remove-violation-${index}`}
+                            title="Remove file"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="flex justify-end gap-2">
               <Button
