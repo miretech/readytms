@@ -310,6 +310,7 @@ export const inspections = pgTable("inspections", {
   defects: text("defects"),
   notes: text("notes"),
   performedBy: text("performed_by"),
+  attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -318,6 +319,11 @@ export const insertInspectionSchema = createInsertSchema(inspections).omit({
   createdAt: true,
 }).extend({
   inspectionDate: z.string(),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    data: z.string(),
+    type: z.string(),
+  })).optional(),
 });
 
 export type InsertInspection = z.infer<typeof insertInspectionSchema>;
@@ -338,6 +344,7 @@ export const accidents = pgTable("accidents", {
   insuranceClaimNumber: text("insurance_claim_number"),
   estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }),
   status: text("status").notNull(),
+  attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -347,6 +354,11 @@ export const insertAccidentSchema = createInsertSchema(accidents).omit({
 }).extend({
   accidentDate: z.string(),
   estimatedCost: z.string().optional(),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    data: z.string(),
+    type: z.string(),
+  })).optional(),
 });
 
 export type InsertAccident = z.infer<typeof insertAccidentSchema>;
@@ -366,6 +378,7 @@ export const violations = pgTable("violations", {
   points: integer("points"),
   status: text("status").notNull(),
   dueDate: timestamp("due_date"),
+  attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -376,6 +389,11 @@ export const insertViolationSchema = createInsertSchema(violations).omit({
   violationDate: z.string(),
   dueDate: z.string().optional(),
   fineAmount: z.string().optional(),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    data: z.string(),
+    type: z.string(),
+  })).optional(),
 });
 
 export type InsertViolation = z.infer<typeof insertViolationSchema>;
