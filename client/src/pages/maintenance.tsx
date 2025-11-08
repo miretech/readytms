@@ -485,67 +485,75 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
             />
 
             <div className="space-y-2">
-              <FormLabel>Attachments</FormLabel>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="file-upload"
-                  type="file"
-                  accept="application/pdf,image/*"
-                  multiple
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  data-testid="input-file-upload"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => document.getElementById("file-upload")?.click()}
-                  data-testid="button-upload-attachment"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Files
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  PDF or images (max 10MB each)
-                </span>
-              </div>
-
-              {attachments.length > 0 && (
-                <div className="space-y-2 mt-3">
-                  {attachments.map((attachment, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-2 border rounded-md"
-                      data-testid={`attachment-${index}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{attachment.filename}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => downloadAttachment(attachment)}
-                          data-testid={`button-download-${index}`}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => removeAttachment(index)}
-                          data-testid={`button-remove-${index}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+              <FormLabel>Attachments {attachments.length > 0 && `(${attachments.length} file${attachments.length > 1 ? 's' : ''})`}</FormLabel>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="file-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    data-testid="input-file-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("file-upload")?.click()}
+                    data-testid="button-upload-attachment"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {attachments.length > 0 ? 'Add More Files' : 'Upload Files'}
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Select multiple files • PDF or images • Max 10MB each
+                  </span>
                 </div>
-              )}
+
+                {attachments.length > 0 && (
+                  <div className="space-y-2 mt-2">
+                    <p className="text-xs text-muted-foreground">Attached files:</p>
+                    {attachments.map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 border rounded-md bg-muted/30"
+                        data-testid={`attachment-${index}`}
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm truncate">{attachment.filename}</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            ({(attachment.data.length * 0.75 / 1024).toFixed(0)}KB)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => downloadAttachment(attachment)}
+                            data-testid={`button-download-${index}`}
+                            title="Download file"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeAttachment(index)}
+                            data-testid={`button-remove-${index}`}
+                            title="Remove file"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3">
