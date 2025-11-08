@@ -644,6 +644,25 @@ export default function Maintenance() {
     },
   });
 
+  const checkRemindersMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/maintenance/check-reminders", {});
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Maintenance reminders checked",
+        description: `Sent ${data.sent} reminder(s) to drivers. Skipped ${data.skipped} record(s).`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to check maintenance reminders. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getTruckInfo = (truckId: string) => {
     const truck = trucks.find((t) => t.id === truckId);
     return truck ? `${truck.truckNumber} - ${truck.type}` : "Unknown";
@@ -687,25 +706,6 @@ export default function Maintenance() {
       </div>
     );
   }
-
-  const checkRemindersMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest("POST", "/api/maintenance/check-reminders", {});
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Maintenance reminders checked",
-        description: `Sent ${data.sent} reminder(s) to drivers. Skipped ${data.skipped} record(s).`,
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to check maintenance reminders. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
 
   return (
     <div className="space-y-6">

@@ -15,10 +15,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     retry: false,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
     // Return null on 401/404 instead of throwing
     queryFn: async () => {
       try {
-        const res = await fetch("/api/auth/user", { credentials: "include" });
+        const res = await fetch("/api/auth/user", { 
+          credentials: "include",
+          signal: AbortSignal.timeout(10000),
+        });
         if (res.status === 401 || res.status === 404) {
           return null;
         }
