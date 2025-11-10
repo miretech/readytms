@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, MoreVertical, Edit, Trash2, Receipt, Eye, Zap, Package, Download } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Receipt, Eye, Zap, Package, Download, X } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,11 @@ const settlementFormSchema = insertSettlementSchema.extend({
   settlementNumber: z.string().min(1, "Settlement number is required"),
   periodStart: z.string().min(1, "Period start is required"),
   periodEnd: z.string().min(1, "Period end is required"),
+  lineItems: z.array(z.object({
+    brokerName: z.string().optional(),
+    description: z.string().min(1, "Description is required"),
+    grossAmount: z.string().min(1, "Amount is required"),
+  })).optional(),
   totalRevenue: z.string().min(1, "Total revenue is required"),
   driverPayPercentage: z.string().min(1, "Driver pay percentage is required"),
   dispatchPercentage: z.string().optional(),
@@ -111,7 +116,8 @@ function SettlementDialog({
       periodStart: "",
       periodEnd: "",
       totalMiles: undefined,
-      totalRevenue: "",
+      lineItems: [{ brokerName: "", description: "", grossAmount: "" }],
+      totalRevenue: "0",
       driverPayPercentage: "",
       dispatchPercentage: "0",
       advance: "0",
@@ -143,6 +149,50 @@ function SettlementDialog({
     },
   });
 
+  const { fields, append, remove, replace } = useFieldArray({
+    control: form.control,
+    name: "lineItems",
+  });
+
+  const totalRevenueRef = useRef<string>("0");
+
+  // Fetch existing line items when editing
+  const { data: existingLineItems = [] } = useQuery<SettlementLineItem[]>({
+    queryKey: ["/api/settlements", settlement?.id, "line-items"],
+    enabled: isEditing && !!settlement?.id,
+  });
+
+  // Populate line items when editing
+  useEffect(() => {
+    if (isEditing && existingLineItems.length > 0) {
+      const lineItemsData = existingLineItems.map(item => ({
+        brokerName: item.brokerName || "",
+        description: item.description,
+        grossAmount: item.grossAmount.toString(),
+      }));
+      // Use replace to update the field array properly
+      replace(lineItemsData);
+    }
+  }, [existingLineItems, isEditing, replace]);
+
+  // Auto-calculate total revenue from line items
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      const lineItems = value.lineItems || [];
+      const total = lineItems.reduce((sum, item) => {
+        const amount = parseFloat(item?.grossAmount || "0");
+        return sum + amount;
+      }, 0);
+      
+      const totalStr = total.toFixed(2);
+      if (totalRevenueRef.current !== totalStr) {
+        totalRevenueRef.current = totalStr;
+        form.setValue("totalRevenue", totalStr, { shouldValidate: true });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   useEffect(() => {
     if (settlement) {
       form.reset({
@@ -152,6 +202,7 @@ function SettlementDialog({
         periodStart: new Date(settlement.periodStart).toISOString().split("T")[0],
         periodEnd: new Date(settlement.periodEnd).toISOString().split("T")[0],
         totalMiles: settlement.totalMiles || undefined,
+        lineItems: [{ brokerName: "", description: "", grossAmount: "" }],
         totalRevenue: settlement.totalRevenue.toString(),
         driverPayPercentage: settlement.driverPayPercentage.toString(),
         dispatchPercentage: settlement.dispatchPercentage?.toString() || "0",
@@ -192,7 +243,8 @@ function SettlementDialog({
         periodStart: "",
         periodEnd: "",
         totalMiles: undefined,
-        totalRevenue: "",
+        lineItems: [{ brokerName: "", description: "", grossAmount: "" }],
+        totalRevenue: "0",
         driverPayPercentage: "",
         dispatchPercentage: "0",
         advance: "0",
@@ -323,13 +375,42 @@ function SettlementDialog({
         paymentMethod: values.paymentMethod || undefined,
         notes: values.notes || undefined,
       };
+      
+      let savedSettlement;
       if (isEditing) {
-        return await apiRequest("PATCH", `/api/settlements/${settlement.id}`, payload);
+        savedSettlement = await apiRequest("PATCH", `/api/settlements/${settlement.id}`, payload);
+      } else {
+        savedSettlement = await apiRequest("POST", "/api/settlements", payload);
       }
-      return await apiRequest("POST", "/api/settlements", payload);
+
+      // Delete existing line items if editing
+      if (isEditing && existingLineItems.length > 0) {
+        await Promise.all(
+          existingLineItems.map(item =>
+            apiRequest("DELETE", `/api/settlement-line-items/${item.id}`)
+          )
+        );
+      }
+
+      // Save line items
+      const lineItems = values.lineItems || [];
+      await Promise.all(
+        lineItems
+          .filter(item => item.description && item.grossAmount)
+          .map(item =>
+            apiRequest("POST", `/api/settlements/${savedSettlement.id}/line-items`, {
+              brokerName: item.brokerName || null,
+              description: item.description,
+              grossAmount: parseFloat(item.grossAmount),
+            })
+          )
+      );
+
+      return savedSettlement;
     },
-    onSuccess: () => {
+    onSuccess: (savedSettlement) => {
       queryClient.invalidateQueries({ queryKey: ["/api/settlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settlements", savedSettlement.id, "line-items"] });
       toast({
         title: isEditing ? "Settlement updated" : "Settlement created",
         description: `Settlement has been successfully ${isEditing ? "updated" : "created"}.`,
@@ -461,18 +542,113 @@ function SettlementDialog({
                   </FormItem>
                 )}
               />
+            </div>
 
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Load Line Items</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ brokerName: "", description: "", grossAmount: "" })}
+                  data-testid="button-add-load"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Load
+                </Button>
+              </div>
+              
+              <div className="space-y-2">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="grid gap-3 md:grid-cols-[2fr,3fr,2fr,auto] items-start p-3 border rounded-md">
+                    <FormField
+                      control={form.control}
+                      name={`lineItems.${index}.brokerName`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Broker Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="ABC Logistics"
+                              data-testid={`input-broker-name-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`lineItems.${index}.description`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description / Load #</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Load #12345"
+                              data-testid={`input-description-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`lineItems.${index}.grossAmount`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Gross Amount ($)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              {...field}
+                              placeholder="0.00"
+                              data-testid={`input-gross-amount-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex items-end h-full pb-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
+                        data-testid={`button-remove-load-${index}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="totalRevenue"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Total Revenue</FormLabel>
+                    <FormLabel>Total Revenue (Auto-calculated)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
                         {...field}
+                        readOnly
+                        className="bg-muted"
                         data-testid="input-total-revenue"
                         placeholder="0.00"
                       />
@@ -1050,7 +1226,7 @@ function SettlementDetailsDialog({
   settlementId: string | null;
 }) {
   const { data: lineItems = [], isLoading } = useQuery<SettlementLineItem[]>({
-    queryKey: ["/api/settlement-line-items", settlementId],
+    queryKey: ["/api/settlements", settlementId, "line-items"],
     enabled: !!settlementId,
   });
 
@@ -1061,13 +1237,15 @@ function SettlementDetailsDialog({
     }).format(typeof amount === "string" ? parseFloat(amount) : amount);
   };
 
+  const totalRevenue = lineItems.reduce((sum, item) => sum + Number(item.grossAmount), 0);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Settlement Details</DialogTitle>
+          <DialogTitle>Load Details</DialogTitle>
           <DialogDescription>
-            View detailed line items for this settlement
+            View load line items for this settlement
           </DialogDescription>
         </DialogHeader>
 
@@ -1080,38 +1258,39 @@ function SettlementDetailsDialog({
         ) : lineItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Package className="h-12 w-12 text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground">No line items found for this settlement</p>
+            <p className="text-sm text-muted-foreground">No load line items found for this settlement</p>
           </div>
         ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Load #</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lineItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Badge variant={item.itemType === "revenue" ? "default" : "secondary"}>
-                        {item.itemType.charAt(0).toUpperCase() + item.itemType.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{item.description}</TableCell>
-                    <TableCell>{item.loadId || "-"}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {item.itemType === "deduction" && "-"}
-                      {formatCurrency(item.amount)}
-                    </TableCell>
+          <>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Broker Name</TableHead>
+                    <TableHead>Description / Load #</TableHead>
+                    <TableHead className="text-right">Gross Amount</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {lineItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.brokerName || "N/A"}</TableCell>
+                      <TableCell>{item.description}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(item.grossAmount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end pt-4 border-t">
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <p className="text-2xl font-bold">{formatCurrency(totalRevenue)}</p>
+              </div>
+            </div>
+          </>
         )}
       </DialogContent>
     </Dialog>
@@ -1341,6 +1520,10 @@ export default function Settlements() {
     const companyRes = await fetch("/api/company-settings");
     const companySettings = companyRes.ok ? await companyRes.json() : null;
     
+    // Fetch line items
+    const lineItemsRes = await fetch(`/api/settlements/${settlement.id}/line-items`);
+    const lineItems: SettlementLineItem[] = lineItemsRes.ok ? await lineItemsRes.json() : [];
+    
     const doc = new jsPDF();
     const driverName = getDriverName(settlement.driverId);
     const pageHeight = doc.internal.pageSize.height;
@@ -1411,6 +1594,47 @@ export default function Settlements() {
     doc.text(`Truck: ${settlement.truckNumber || "N/A"}`, 20, yPos);
     yPos += 7;
     doc.text(`Period: ${new Date(settlement.periodStart).toLocaleDateString()} - ${new Date(settlement.periodEnd).toLocaleDateString()}`, 20, yPos);
+    
+    // Load Line Items Section
+    if (lineItems.length > 0) {
+      yPos += 15;
+      yPos = checkPageBreak(yPos, 40);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Load Details", 20, yPos);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      yPos += 10;
+      
+      // Table header
+      doc.setFont("helvetica", "bold");
+      doc.text("Broker", 20, yPos);
+      doc.text("Description", 75, yPos);
+      doc.text("Amount", 150, yPos, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      yPos += 2;
+      doc.line(20, yPos, 190, yPos);
+      yPos += 5;
+      
+      // Table rows
+      lineItems.forEach((item) => {
+        yPos = checkPageBreak(yPos, 10);
+        doc.text(item.brokerName || "N/A", 20, yPos);
+        doc.text(item.description, 75, yPos);
+        doc.text(`$${Number(item.grossAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+        yPos += 7;
+      });
+      
+      // Total line
+      yPos += 2;
+      doc.line(20, yPos, 190, yPos);
+      yPos += 5;
+      doc.setFont("helvetica", "bold");
+      doc.text("Total Revenue:", 20, yPos);
+      doc.text(`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      yPos += 10;
+    }
     
     // Revenue Section
     yPos += 15;
