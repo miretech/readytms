@@ -168,7 +168,7 @@ function SettlementDialog({
       const lineItemsData = existingLineItems.map(item => ({
         brokerName: item.brokerName || "",
         description: item.description,
-        grossAmount: item.grossAmount.toString(),
+        grossAmount: item.amount.toString(),
       }));
       // Use replace to update the field array properly
       replace(lineItemsData);
@@ -376,12 +376,14 @@ function SettlementDialog({
         notes: values.notes || undefined,
       };
       
-      let savedSettlement;
+      let savedSettlementRes;
       if (isEditing) {
-        savedSettlement = await apiRequest("PATCH", `/api/settlements/${settlement.id}`, payload);
+        savedSettlementRes = await apiRequest("PATCH", `/api/settlements/${settlement.id}`, payload);
       } else {
-        savedSettlement = await apiRequest("POST", "/api/settlements", payload);
+        savedSettlementRes = await apiRequest("POST", "/api/settlements", payload);
       }
+      
+      const savedSettlement = await savedSettlementRes.json();
 
       // Delete existing line items if editing
       if (isEditing && existingLineItems.length > 0) {
@@ -399,9 +401,11 @@ function SettlementDialog({
           .filter(item => item.description && item.grossAmount)
           .map(item =>
             apiRequest("POST", `/api/settlements/${savedSettlement.id}/line-items`, {
+              settlementId: savedSettlement.id,
               brokerName: item.brokerName || null,
               description: item.description,
-              grossAmount: parseFloat(item.grossAmount),
+              amount: parseFloat(item.grossAmount),
+              itemType: "revenue",
             })
           )
       );
@@ -1237,7 +1241,7 @@ function SettlementDetailsDialog({
     }).format(typeof amount === "string" ? parseFloat(amount) : amount);
   };
 
-  const totalRevenue = lineItems.reduce((sum, item) => sum + Number(item.grossAmount), 0);
+  const totalRevenue = lineItems.reduce((sum, item) => sum + Number(item.amount), 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1277,7 +1281,7 @@ function SettlementDetailsDialog({
                       <TableCell>{item.brokerName || "N/A"}</TableCell>
                       <TableCell>{item.description}</TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(item.grossAmount)}
+                        {formatCurrency(item.amount)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1621,7 +1625,7 @@ export default function Settlements() {
         yPos = checkPageBreak(yPos, 10);
         doc.text(item.brokerName || "N/A", 20, yPos);
         doc.text(item.description, 75, yPos);
-        doc.text(`$${Number(item.grossAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+        doc.text(`$${Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
         yPos += 7;
       });
       
