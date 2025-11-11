@@ -1267,7 +1267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lineItem = await storage.createSettlementLineItem(validatedData);
       res.status(201).json(lineItem);
     } catch (error) {
-      res.status(400).json({ error: "Invalid line item data" });
+      console.error("Line item validation error:", error);
+      res.status(400).json({ error: "Invalid line item data", details: error instanceof Error ? error.message : String(error) });
     }
   });
 

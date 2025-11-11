@@ -500,9 +500,12 @@ export const insertSettlementLineItemSchema = createInsertSchema(settlementLineI
   createdAt: true,
 }).extend({
   brokerName: z.string().optional(),
+  description: z.string().min(1, "Description is required"),
   quantity: z.string().optional(),
   rate: z.string().optional(),
-  amount: z.string(),
+  amount: z.string().min(1, "Amount is required"),
+  itemType: z.string().default("revenue"),
+  settlementId: z.string(),
 });
 
 export type InsertSettlementLineItem = z.infer<typeof insertSettlementLineItemSchema>;
