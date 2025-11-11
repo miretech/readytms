@@ -1226,7 +1226,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settlement = await storage.createSettlement(validatedData);
       res.status(201).json(settlement);
     } catch (error) {
-      res.status(400).json({ error: "Invalid settlement data" });
+      console.error("Settlement validation error:", error);
+      res.status(400).json({ 
+        error: "Invalid settlement data", 
+        details: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
@@ -1239,7 +1243,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(settlement);
     } catch (error) {
-      res.status(400).json({ error: "Invalid settlement data" });
+      console.error("Settlement update validation error:", error);
+      res.status(400).json({ 
+        error: "Invalid settlement data", 
+        details: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
