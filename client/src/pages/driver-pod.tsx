@@ -249,7 +249,7 @@ export default function DriverPOD() {
 
                   <Button
                     type="submit"
-                    className="w-full"
+                    className="w-full bg-red-600 hover:bg-red-700 text-white"
                     disabled={loginMutation.isPending}
                     data-testid="button-driver-login"
                   >
@@ -496,21 +496,52 @@ export default function DriverPOD() {
                   {getStatusBadge(load.status)}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">Delivery</p>
-                    <p className="text-muted-foreground truncate">{load.deliveryLocation}</p>
+              <CardContent className="space-y-3 text-sm">
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-green-600">Pickup</p>
+                      <p className="text-muted-foreground">{load.pickupLocation}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {load.pickupDate ? new Date(load.pickupDate).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : 'TBD'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-blue-600">Delivery</p>
+                      <p className="text-muted-foreground">{load.deliveryLocation}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {load.deliveryDate ? new Date(load.deliveryDate).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : 'TBD'}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <p className="text-muted-foreground">
-                    {((load.podAttachments as any)?.length || 0) > 0 
-                      ? `${(load.podAttachments as any).length} POD file(s) uploaded`
-                      : "No POD uploaded yet"}
-                  </p>
+
+                <div className="pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <p className="text-muted-foreground">
+                      {((load.podAttachments as any)?.length || 0) > 0 
+                        ? `${(load.podAttachments as any).length} POD file(s) uploaded`
+                        : "No POD uploaded yet"}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
