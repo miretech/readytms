@@ -86,6 +86,13 @@ const settlementFormSchema = insertSettlementSchema.extend({
   truckRepair: z.string().optional(),
   trailerRepair: z.string().optional(),
   deductions: z.string().optional(),
+  prepassFee: z.string().optional(),
+  eldFee: z.string().optional(),
+  plateFee: z.string().optional(),
+  fee2290: z.string().optional(),
+  parkingFee: z.string().optional(),
+  truckCredit: z.string().optional(),
+  previousSettlement: z.string().optional(),
   netPay: z.string().min(1, "Net pay is required"),
   status: z.string().min(1, "Status is required"),
   paidDate: z.string().optional(),
@@ -104,6 +111,8 @@ function SettlementDialog({
 }) {
   const { toast } = useToast();
   const isEditing = !!settlement;
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: drivers = [] } = useQuery<Driver[]>({ queryKey: ["/api/drivers"] });
 
@@ -141,6 +150,13 @@ function SettlementDialog({
       truckRepair: "0",
       trailerRepair: "0",
       deductions: "0",
+      prepassFee: "0",
+      eldFee: "0",
+      plateFee: "0",
+      fee2290: "0",
+      parkingFee: "0",
+      truckCredit: "0",
+      previousSettlement: "0",
       netPay: "",
       status: "Pending",
       paidDate: "",
@@ -227,6 +243,13 @@ function SettlementDialog({
         truckRepair: settlement.truckRepair?.toString() || "0",
         trailerRepair: settlement.trailerRepair?.toString() || "0",
         deductions: settlement.deductions?.toString() || "0",
+        prepassFee: settlement.prepassFee?.toString() || "0",
+        eldFee: settlement.eldFee?.toString() || "0",
+        plateFee: settlement.plateFee?.toString() || "0",
+        fee2290: settlement.fee2290?.toString() || "0",
+        parkingFee: settlement.parkingFee?.toString() || "0",
+        truckCredit: settlement.truckCredit?.toString() || "0",
+        previousSettlement: settlement.previousSettlement?.toString() || "0",
         netPay: settlement.netPay.toString(),
         status: settlement.status,
         paidDate: settlement.paidDate ? new Date(settlement.paidDate).toISOString().split("T")[0] : "",
@@ -260,6 +283,13 @@ function SettlementDialog({
         truckRepair: "0",
         trailerRepair: "0",
         deductions: "0",
+        prepassFee: "0",
+        eldFee: "0",
+        plateFee: "0",
+        fee2290: "0",
+        parkingFee: "0",
+        truckCredit: "0",
+        previousSettlement: "0",
         netPay: "",
         status: "Pending",
         paidDate: "",
@@ -272,7 +302,7 @@ function SettlementDialog({
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       // Calculate total deductions and net pay when any relevant field changes
-      const relevantFields = ["driverPayPercentage", "dispatchPercentage", "totalRevenue", "factoringFeePercentage", "tolls", "fuel", "fuelFlyingJ", "fuelFleetOne", "advance", "insurance", "trailerFee", "truckRepair", "trailerRepair"];
+      const relevantFields = ["driverPayPercentage", "dispatchPercentage", "totalRevenue", "factoringFeePercentage", "tolls", "fuel", "fuelFlyingJ", "fuelFleetOne", "advance", "insurance", "trailerFee", "truckRepair", "trailerRepair", "prepassFee", "eldFee", "plateFee", "fee2290", "parkingFee", "truckCredit", "previousSettlement"];
       
       if (relevantFields.includes(name || "")) {
         const totalRevenue = parseFloat(value.totalRevenue || "0");
@@ -299,9 +329,16 @@ function SettlementDialog({
         const trailerFee = parseFloat(value.trailerFee || "0");
         const truckRepair = parseFloat(value.truckRepair || "0");
         const trailerRepair = parseFloat(value.trailerRepair || "0");
+        const prepassFee = parseFloat(value.prepassFee || "0");
+        const eldFee = parseFloat(value.eldFee || "0");
+        const plateFee = parseFloat(value.plateFee || "0");
+        const fee2290 = parseFloat(value.fee2290 || "0");
+        const parkingFee = parseFloat(value.parkingFee || "0");
+        const truckCredit = parseFloat(value.truckCredit || "0");
+        const previousSettlement = parseFloat(value.previousSettlement || "0");
         
-        // Total deductions = dispatch + factoring + fuel sections + all other deductions
-        const totalDeductions = dispatchFee + factoringFee + tolls + fuel + fuelFlyingJ + fuelFleetOne + advance + insurance + trailerFee + truckRepair + trailerRepair;
+        // Total deductions = dispatch + factoring + fuel sections + all other deductions + new fees
+        const totalDeductions = dispatchFee + factoringFee + tolls + fuel + fuelFlyingJ + fuelFleetOne + advance + insurance + trailerFee + truckRepair + trailerRepair + prepassFee + eldFee + plateFee + fee2290 + parkingFee + truckCredit + previousSettlement;
         
         // Debug logging
         console.log("Settlement Calculation:", {
@@ -336,6 +373,130 @@ function SettlementDialog({
     return () => subscription.unsubscribe();
   }, [form]);
 
+  // Auto-save functionality - saves draft every 3 seconds while editing
+  useEffect(() => {
+    if (!isEditing || !autoSaveEnabled || !settlement?.id) {
+      return;
+    }
+
+    const subscription = form.watch(() => {
+      // Clear previous timeout
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+
+      // Set new timeout for auto-save
+      autoSaveTimeoutRef.current = setTimeout(async () => {
+        const values = form.getValues();
+        
+        // Only auto-save if required fields are filled
+        if (!values.driverId || !values.periodStart || !values.periodEnd || !values.totalRevenue || !values.driverPayPercentage) {
+          return;
+        }
+
+        try {
+          const payload = {
+            driverId: values.driverId,
+            truckNumber: values.truckNumber || undefined,
+            settlementNumber: values.settlementNumber,
+            periodStart: values.periodStart,
+            periodEnd: values.periodEnd,
+            totalMiles: values.totalMiles || undefined,
+            totalRevenue: parseFloat(values.totalRevenue),
+            driverPayPercentage: parseFloat(values.driverPayPercentage),
+            dispatchPercentage: parseFloat(values.dispatchPercentage || "0"),
+            advance: parseFloat(values.advance || "0"),
+            advanceBalance: parseFloat(values.advanceBalance || "0"),
+            advanceDate: values.advanceDate || undefined,
+            fuelFlyingJ: parseFloat(values.fuelFlyingJ || "0"),
+            fuelFlyingJStartDate: values.fuelFlyingJStartDate || undefined,
+            fuelFlyingJEndDate: values.fuelFlyingJEndDate || undefined,
+            fuelFleetOne: parseFloat(values.fuelFleetOne || "0"),
+            fuelFleetOneStartDate: values.fuelFleetOneStartDate || undefined,
+            fuelFleetOneEndDate: values.fuelFleetOneEndDate || undefined,
+            tolls: parseFloat(values.tolls || "0"),
+            tollsStartDate: values.tollsStartDate || undefined,
+            tollsEndDate: values.tollsEndDate || undefined,
+            fuel: parseFloat(values.fuel || "0"),
+            factoringFeePercentage: parseFloat(values.factoringFeePercentage || "0"),
+            insurance: parseFloat(values.insurance || "0"),
+            insuranceStartDate: values.insuranceStartDate || undefined,
+            insuranceEndDate: values.insuranceEndDate || undefined,
+            trailerFee: parseFloat(values.trailerFee || "0"),
+            truckRepair: parseFloat(values.truckRepair || "0"),
+            trailerRepair: parseFloat(values.trailerRepair || "0"),
+            deductions: parseFloat(values.deductions || "0"),
+            prepassFee: parseFloat(values.prepassFee || "0"),
+            eldFee: parseFloat(values.eldFee || "0"),
+            plateFee: parseFloat(values.plateFee || "0"),
+            fee2290: parseFloat(values.fee2290 || "0"),
+            parkingFee: parseFloat(values.parkingFee || "0"),
+            truckCredit: parseFloat(values.truckCredit || "0"),
+            previousSettlement: parseFloat(values.previousSettlement || "0"),
+            netPay: parseFloat(values.netPay),
+            status: values.status,
+            paidDate: values.paidDate || undefined,
+            paymentMethod: values.paymentMethod || undefined,
+            notes: values.notes || undefined,
+          };
+
+          await apiRequest("PATCH", `/api/settlements/${settlement.id}`, payload);
+          
+          // Auto-save line items
+          if (existingLineItems.length > 0) {
+            await Promise.all(
+              existingLineItems.map(item =>
+                apiRequest("DELETE", `/api/settlement-line-items/${item.id}`)
+              )
+            );
+          }
+          
+          const lineItems = values.lineItems || [];
+          await Promise.all(
+            lineItems
+              .filter(item => item.description && item.grossAmount)
+              .map(item =>
+                apiRequest("POST", `/api/settlements/${settlement.id}/line-items`, {
+                  settlementId: settlement.id,
+                  brokerName: item.brokerName || null,
+                  description: item.description,
+                  amount: item.grossAmount, // Keep as string to match schema
+                  itemType: "revenue",
+                })
+              )
+          );
+
+          // Invalidate queries to refresh cached data
+          queryClient.invalidateQueries({ queryKey: ["/api/settlements"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/settlements", settlement.id, "line-items"] });
+
+          console.log("Auto-saved at", new Date().toLocaleTimeString());
+        } catch (error) {
+          console.error("Auto-save failed:", error);
+        }
+      }, 3000); // 3 second delay
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [form, isEditing, autoSaveEnabled, settlement?.id, existingLineItems]);
+
+  // Enable auto-save when user starts editing
+  useEffect(() => {
+    if (isEditing && open) {
+      // Small delay before enabling auto-save to avoid saving immediately
+      const timer = setTimeout(() => setAutoSaveEnabled(true), 2000);
+      return () => {
+        clearTimeout(timer);
+        setAutoSaveEnabled(false);
+      };
+    }
+  }, [isEditing, open]);
+
   const mutation = useMutation({
     mutationFn: async (values: SettlementFormValues) => {
       const payload = {
@@ -369,6 +530,13 @@ function SettlementDialog({
         truckRepair: parseFloat(values.truckRepair || "0"),
         trailerRepair: parseFloat(values.trailerRepair || "0"),
         deductions: parseFloat(values.deductions || "0"),
+        prepassFee: parseFloat(values.prepassFee || "0"),
+        eldFee: parseFloat(values.eldFee || "0"),
+        plateFee: parseFloat(values.plateFee || "0"),
+        fee2290: parseFloat(values.fee2290 || "0"),
+        parkingFee: parseFloat(values.parkingFee || "0"),
+        truckCredit: parseFloat(values.truckCredit || "0"),
+        previousSettlement: parseFloat(values.previousSettlement || "0"),
         netPay: parseFloat(values.netPay),
         status: values.status,
         paidDate: values.paidDate || undefined,
@@ -404,7 +572,7 @@ function SettlementDialog({
               settlementId: savedSettlement.id,
               brokerName: item.brokerName || null,
               description: item.description,
-              amount: parseFloat(item.grossAmount),
+              amount: item.grossAmount, // Keep as string to match schema
               itemType: "revenue",
             })
           )
@@ -1076,6 +1244,151 @@ function SettlementDialog({
               </div>
             </div>
 
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Additional Fees</h3>
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="prepassFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PrePass Fee ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-prepass-fee"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="eldFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ELD Fee ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-eld-fee"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="plateFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Plate Fee ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-plate-fee"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="fee2290"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>2290 Fee ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-fee-2290"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="parkingFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parking Fee ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-parking-fee"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="truckCredit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Truck Credit ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-truck-credit"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="previousSettlement"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Previous Settlement ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          data-testid="input-previous-settlement"
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -1449,6 +1762,7 @@ function getStatusBadgeVariant(status: string) {
 
 export default function Settlements() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [driverTypeFilter, setDriverTypeFilter] = useState<"all" | "owner-operator" | "company-driver">("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -1489,13 +1803,24 @@ export default function Settlements() {
     return driver?.name || "Unknown Driver";
   };
 
+  const getDriver = (driverId: string) => {
+    return drivers.find((d) => d.id === driverId);
+  };
+
   const filteredSettlements = settlements.filter((settlement) => {
     const driverName = getDriverName(settlement.driverId).toLowerCase();
     const query = searchQuery.toLowerCase();
-    return (
-      settlement.settlementNumber.toLowerCase().includes(query) ||
-      driverName.includes(query)
-    );
+    const driver = getDriver(settlement.driverId);
+    
+    // Filter by search query
+    const matchesSearch = settlement.settlementNumber.toLowerCase().includes(query) ||
+      driverName.includes(query);
+    
+    // Filter by driver type
+    const matchesDriverType = driverTypeFilter === "all" || 
+      (driver && driver.driverType === driverTypeFilter);
+    
+    return matchesSearch && matchesDriverType;
   });
 
   const handleEdit = (settlement: Settlement) => {
@@ -1798,6 +2123,13 @@ export default function Settlements() {
       { label: "Trailer Fee", value: Number(settlement.trailerFee || 0) },
       { label: "Truck Repair", value: Number(settlement.truckRepair || 0) },
       { label: "Trailer Repair", value: Number(settlement.trailerRepair || 0) },
+      { label: "PrePass Fee", value: Number(settlement.prepassFee || 0) },
+      { label: "ELD Fee", value: Number(settlement.eldFee || 0) },
+      { label: "Plate Fee", value: Number(settlement.plateFee || 0) },
+      { label: "2290 Fee", value: Number(settlement.fee2290 || 0) },
+      { label: "Parking Fee", value: Number(settlement.parkingFee || 0) },
+      { label: "Truck Credit", value: Number(settlement.truckCredit || 0) },
+      { label: "Previous Settlement", value: Number(settlement.previousSettlement || 0) },
     ];
     
     deductions.forEach(({ label, value }) => {
@@ -1909,8 +2241,8 @@ export default function Settlements() {
       </div>
 
       <Card className="p-6">
-        <div className="mb-4">
-          <div className="relative">
+        <div className="mb-4 flex gap-4 flex-col md:flex-row">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by settlement number or driver..."
@@ -1920,6 +2252,16 @@ export default function Settlements() {
               data-testid="input-search"
             />
           </div>
+          <Select value={driverTypeFilter} onValueChange={(value: "all" | "owner-operator" | "company-driver") => setDriverTypeFilter(value)}>
+            <SelectTrigger className="w-full md:w-[240px]" data-testid="select-driver-type">
+              <SelectValue placeholder="Filter by driver type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Drivers</SelectItem>
+              <SelectItem value="owner-operator">Owner Operators</SelectItem>
+              <SelectItem value="company-driver">Company Drivers</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {filteredSettlements.length === 0 ? (

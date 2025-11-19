@@ -1078,15 +1078,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSettlement(insertSettlement: InsertSettlement): Promise<Settlement> {
+    const values: any = {
+      ...insertSettlement,
+      periodStart: new Date(insertSettlement.periodStart),
+      periodEnd: new Date(insertSettlement.periodEnd),
+      paidDate: insertSettlement.paidDate ? new Date(insertSettlement.paidDate) : undefined,
+      advanceDate: insertSettlement.advanceDate ? new Date(insertSettlement.advanceDate) : undefined,
+    };
     const [settlement] = await db
       .insert(settlements)
-      .values({
-        ...insertSettlement,
-        periodStart: new Date(insertSettlement.periodStart),
-        periodEnd: new Date(insertSettlement.periodEnd),
-        paidDate: insertSettlement.paidDate ? new Date(insertSettlement.paidDate) : undefined,
-        advanceDate: insertSettlement.advanceDate ? new Date(insertSettlement.advanceDate) : undefined,
-      })
+      .values(values)
       .returning();
     return settlement;
   }
