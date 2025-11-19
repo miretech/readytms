@@ -112,6 +112,7 @@ export const drivers = pgTable("drivers", {
   lastGpsUpdate: timestamp("last_gps_update"), // Last time driver shared GPS location
   lastGpsNotificationSent: timestamp("last_gps_notification_sent"), // Last time GPS reminder was sent
   gpsNotificationsEnabled: text("gps_notifications_enabled").notNull().default("true"), // "true" or "false"
+  driverType: text("driver_type").notNull().default("company-driver"), // "owner-operator" or "company-driver"
 });
 
 export const insertDriverSchema = createInsertSchema(drivers).omit({
@@ -122,6 +123,7 @@ export const insertDriverSchema = createInsertSchema(drivers).omit({
   medicalCardIssuedDate: z.string().optional().transform(val => val === "" ? undefined : val),
   dateHired: z.string().optional().transform(val => val === "" ? undefined : val),
   dateTerminated: z.string().optional().transform(val => val === "" ? undefined : val),
+  driverType: z.enum(["owner-operator", "company-driver"]),
 });
 
 export type InsertDriver = z.infer<typeof insertDriverSchema>;
@@ -438,6 +440,14 @@ export const settlements = pgTable("settlements", {
   truckRepair: decimal("truck_repair", { precision: 10, scale: 2 }).default("0"),
   trailerRepair: decimal("trailer_repair", { precision: 10, scale: 2 }).default("0"),
   deductions: decimal("deductions", { precision: 10, scale: 2 }).default("0"),
+  // New fee sections
+  prepassFee: decimal("prepass_fee", { precision: 10, scale: 2 }).default("0"),
+  eldFee: decimal("eld_fee", { precision: 10, scale: 2 }).default("0"),
+  plateFee: decimal("plate_fee", { precision: 10, scale: 2 }).default("0"),
+  fee2290: decimal("fee_2290", { precision: 10, scale: 2 }).default("0"),
+  parkingFee: decimal("parking_fee", { precision: 10, scale: 2 }).default("0"),
+  truckCredit: decimal("truck_credit", { precision: 10, scale: 2 }).default("0"),
+  previousSettlement: decimal("previous_settlement", { precision: 10, scale: 2 }).default("0"),
   netPay: decimal("net_pay", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull(),
   paidDate: timestamp("paid_date"),
@@ -476,6 +486,13 @@ export const insertSettlementSchema = createInsertSchema(settlements).omit({
   truckRepair: z.coerce.string().optional(),
   trailerRepair: z.coerce.string().optional(),
   deductions: z.coerce.string().optional(),
+  prepassFee: z.coerce.string().optional(),
+  eldFee: z.coerce.string().optional(),
+  plateFee: z.coerce.string().optional(),
+  fee2290: z.coerce.string().optional(),
+  parkingFee: z.coerce.string().optional(),
+  truckCredit: z.coerce.string().optional(),
+  previousSettlement: z.coerce.string().optional(),
   netPay: z.coerce.string(),
   paidDate: z.string().optional().transform(v => v || undefined),
 });
