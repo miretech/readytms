@@ -126,7 +126,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Fleet Status</CardTitle>
+            <CardTitle>Truck Status</CardTitle>
             <CardDescription>Current truck availability</CardDescription>
           </CardHeader>
           <CardContent>
@@ -135,7 +135,7 @@ export default function Dashboard() {
                 <Truck className="mb-4 h-12 w-12 text-muted-foreground/50" />
                 <h3 className="mb-2 text-lg font-medium">No trucks yet</h3>
                 <p className="text-sm text-muted-foreground">
-                  Add trucks to your fleet to get started
+                  Add trucks to get started
                 </p>
               </div>
             ) : (

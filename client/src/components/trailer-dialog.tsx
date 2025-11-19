@@ -124,7 +124,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Trailer" : "Add New Trailer"}</DialogTitle>
           <DialogDescription>
-            {isEditing ? "Update trailer information" : "Add a new trailer to your fleet"}
+            {isEditing ? "Update trailer information" : "Add a new trailer to your inventory"}
           </DialogDescription>
         </DialogHeader>
 

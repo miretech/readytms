@@ -27,11 +27,11 @@ export default function Landing() {
       <main className="container mx-auto px-6 py-16">
         <div className="mx-auto max-w-4xl text-center">
           <h2 className="mb-6 text-5xl font-bold tracking-tight text-foreground">
-            Streamline Your Fleet Operations
+            Streamline Your Trucking Operations
           </h2>
           <p className="mb-12 text-xl text-muted-foreground">
             Complete transportation management solution for trucking companies.
-            Manage loads, track fleet, optimize routes, and maximize profitability.
+            Manage loads, track trucks, optimize routes, and maximize profitability.
           </p>
           <Button asChild size="lg" className="gap-2 px-8" data-testid="button-get-started">
             <a href="/api/login">
@@ -56,9 +56,9 @@ export default function Landing() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Truck className="h-6 w-6" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-card-foreground">Fleet Tracking</h3>
+            <h3 className="mb-2 text-lg font-semibold text-card-foreground">Truck Tracking</h3>
             <p className="text-muted-foreground">
-              Monitor your entire fleet with real-time status updates and maintenance scheduling.
+              Monitor all your trucks with real-time status updates and maintenance scheduling.
             </p>
           </div>
 
@@ -98,7 +98,7 @@ export default function Landing() {
             </div>
             <h3 className="mb-2 text-lg font-semibold text-card-foreground">Analytics</h3>
             <p className="text-muted-foreground">
-              Gain insights with revenue trends, fleet utilization, and performance metrics.
+              Gain insights with revenue trends, truck utilization, and performance metrics.
             </p>
           </div>
         </div>
@@ -121,7 +121,7 @@ export default function Landing() {
               For Admins
             </h3>
             <p className="mb-8 text-lg text-muted-foreground">
-              Manage your fleet, track loads, and optimize operations all in one place.
+              Manage your trucks, track loads, and optimize operations all in one place.
             </p>
             <Button asChild size="lg" className="px-8" data-testid="button-login-footer">
               <a href="/api/login">Log In to Get Started</a>

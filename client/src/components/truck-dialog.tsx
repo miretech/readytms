@@ -124,7 +124,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Truck" : "Add New Truck"}</DialogTitle>
           <DialogDescription>
-            {isEditing ? "Update truck information" : "Add a new truck to your fleet"}
+            {isEditing ? "Update truck information" : "Add a new truck to your inventory"}
           </DialogDescription>
         </DialogHeader>
 

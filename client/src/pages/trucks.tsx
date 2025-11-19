@@ -25,7 +25,7 @@ import type { Truck } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-export default function Fleet() {
+export default function Trucks() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null);
@@ -108,8 +108,8 @@ export default function Fleet() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Fleet Management</h1>
-          <p className="text-sm text-muted-foreground">Manage your truck fleet and equipment</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Truck Management</h1>
+          <p className="text-sm text-muted-foreground">Manage your trucks and equipment</p>
         </div>
         <Button
           onClick={() => setIsDialogOpen(true)}

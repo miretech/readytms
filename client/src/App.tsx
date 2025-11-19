@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import Dashboard from "@/pages/dashboard";
 import Loads from "@/pages/loads";
-import Fleet from "@/pages/fleet";
+import Trucks from "@/pages/trucks";
 import Trailers from "@/pages/trailers";
 import Drivers from "@/pages/drivers";
 import Customers from "@/pages/customers";
@@ -78,7 +78,7 @@ function Router() {
       <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
       <Route path="/dashboard">{() => <ProtectedRoute component={Dashboard} />}</Route>
       <Route path="/loads">{() => <ProtectedRoute component={Loads} />}</Route>
-      <Route path="/fleet">{() => <ProtectedRoute component={Fleet} />}</Route>
+      <Route path="/trucks">{() => <ProtectedRoute component={Trucks} />}</Route>
       <Route path="/trailers">{() => <ProtectedRoute component={Trailers} />}</Route>
       <Route path="/drivers">{() => <ProtectedRoute component={Drivers} />}</Route>
       <Route path="/customers">{() => <ProtectedRoute component={Customers} />}</Route>
