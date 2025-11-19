@@ -61,6 +61,8 @@ export const trucks = pgTable("trucks", {
 
 export const insertTruckSchema = createInsertSchema(trucks).omit({
   id: true,
+}).extend({
+  status: z.enum(["available", "in-use", "maintenance", "out-of-service", "terminated"]),
 });
 
 export type InsertTruck = z.infer<typeof insertTruckSchema>;

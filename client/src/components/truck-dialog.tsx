@@ -188,6 +188,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                         <SelectItem value="in-use">In Use</SelectItem>
                         <SelectItem value="maintenance">Maintenance</SelectItem>
                         <SelectItem value="out-of-service">Out of Service</SelectItem>
+                        <SelectItem value="terminated">Terminated</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

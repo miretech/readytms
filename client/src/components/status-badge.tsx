@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, AlertCircle, TruckIcon, Package } from "lucide-react";
 
 type LoadStatus = "pending" | "assigned" | "in-transit" | "delivered" | "invoiced";
-type TruckStatus = "available" | "in-use" | "maintenance" | "out-of-service";
+type TruckStatus = "available" | "in-use" | "maintenance" | "out-of-service" | "terminated";
 type TrailerStatus = "available" | "in-use" | "maintenance" | "out-of-service";
 type DriverStatus = "available" | "on-duty" | "off-duty" | "on-leave";
 type InspectionStatus = "Passed" | "Failed" | "Pending";
@@ -179,6 +179,15 @@ export function StatusBadge({ status, type = "load" }: StatusBadgeProps) {
         variant: "default" as const,
         label: statusLower === "maintenance" ? "Maintenance" : statusLower === "out-of-service" ? "Out of Service" : "On Leave",
         className: "bg-chart-3 text-white border-chart-3",
+      };
+    }
+    
+    if (statusLower === "terminated") {
+      return {
+        icon: AlertCircle,
+        variant: "default" as const,
+        label: "Terminated",
+        className: "bg-destructive text-white border-destructive",
       };
     }
     
