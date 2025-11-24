@@ -210,6 +210,8 @@ function SettlementDialog({
   }, [form]);
 
   useEffect(() => {
+    if (!open) return; // Don't reset if dialog is closed
+    
     if (settlement) {
       form.reset({
         driverId: settlement.driverId,
@@ -258,7 +260,8 @@ function SettlementDialog({
       });
     } else {
       const today = new Date();
-      const settlementNumber = `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+      const uniqueId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+      const settlementNumber = `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${uniqueId.slice(-8)}`;
       form.reset({
         driverId: "",
         truckNumber: "",
@@ -297,7 +300,7 @@ function SettlementDialog({
         notes: "",
       });
     }
-  }, [settlement, form]);
+  }, [open, settlement, form]);
 
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
