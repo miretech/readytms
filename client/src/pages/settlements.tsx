@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -113,6 +113,14 @@ function SettlementDialog({
   const isEditing = !!settlement;
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Generate new settlement number each time dialog opens for create mode
+  const newSettlementNumber = useMemo(() => {
+    if (isEditing || !open) return "";
+    const today = new Date();
+    const uniqueId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    return `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${uniqueId.slice(-8)}`;
+  }, [open, isEditing]);
 
   const { data: drivers = [] } = useQuery<Driver[]>({ queryKey: ["/api/drivers"] });
 
@@ -259,13 +267,10 @@ function SettlementDialog({
         notes: settlement.notes || "",
       });
     } else {
-      const today = new Date();
-      const uniqueId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-      const settlementNumber = `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${uniqueId.slice(-8)}`;
       form.reset({
         driverId: "",
         truckNumber: "",
-        settlementNumber,
+        settlementNumber: newSettlementNumber,
         periodStart: "",
         periodEnd: "",
         totalMiles: undefined,
@@ -300,7 +305,7 @@ function SettlementDialog({
         notes: "",
       });
     }
-  }, [open, settlement, form]);
+  }, [open, settlement, form, newSettlementNumber]);
 
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
@@ -649,7 +654,7 @@ function SettlementDialog({
                   <FormItem>
                     <FormLabel>Settlement Number</FormLabel>
                     <FormControl>
-                      <Input {...field} data-testid="input-settlement-number" readOnly={!isEditing} />
+                      <Input {...field} data-testid="input-settlement-number" readOnly />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
