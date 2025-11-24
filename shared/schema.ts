@@ -412,13 +412,13 @@ export const settlements = pgTable("settlements", {
   periodStart: timestamp("period_start").notNull(),
   periodEnd: timestamp("period_end").notNull(),
   totalMiles: integer("total_miles"),
-  totalRevenue: decimal("total_revenue", { precision: 10, scale: 2 }).notNull(),
+  totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }).notNull(),
   driverPayPercentage: decimal("driver_pay_percentage", { precision: 5, scale: 2 }).notNull(),
   // Dispatch section
   dispatchPercentage: decimal("dispatch_percentage", { precision: 5, scale: 2 }).default("0"),
   // Advance section
-  advance: decimal("advance", { precision: 10, scale: 2 }).default("0"),
-  advanceBalance: decimal("advance_balance", { precision: 10, scale: 2 }).default("0"),
+  advance: decimal("advance", { precision: 12, scale: 2 }).default("0"),
+  advanceBalance: decimal("advance_balance", { precision: 12, scale: 2 }).default("0"),
   advanceDate: timestamp("advance_date"),
   // Fuel sections
   fuelFlyingJ: decimal("fuel_flying_j", { precision: 10, scale: 2 }).default("0"),
@@ -448,7 +448,7 @@ export const settlements = pgTable("settlements", {
   parkingFee: decimal("parking_fee", { precision: 10, scale: 2 }).default("0"),
   truckCredit: decimal("truck_credit", { precision: 10, scale: 2 }).default("0"),
   previousSettlement: decimal("previous_settlement", { precision: 10, scale: 2 }).default("0"),
-  netPay: decimal("net_pay", { precision: 10, scale: 2 }).notNull(),
+  netPay: decimal("net_pay", { precision: 12, scale: 2 }).notNull(),
   status: text("status").notNull(),
   paidDate: timestamp("paid_date"),
   paymentMethod: text("payment_method"),
