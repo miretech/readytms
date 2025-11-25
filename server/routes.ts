@@ -525,7 +525,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trailer = await storage.createTrailer(validatedData);
       res.status(201).json(trailer);
     } catch (error) {
-      res.status(400).json({ error: "Invalid trailer data" });
+      console.error("Trailer validation error:", error);
+      res.status(400).json({ error: "Invalid trailer data", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -538,7 +539,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(trailer);
     } catch (error) {
-      res.status(400).json({ error: "Invalid trailer data" });
+      console.error("Trailer update validation error:", error);
+      res.status(400).json({ error: "Invalid trailer data", details: error instanceof Error ? error.message : String(error) });
     }
   });
 

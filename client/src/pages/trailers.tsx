@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Shield, DollarSign, Calendar, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -159,8 +160,9 @@ export default function Trailers() {
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Vehicle Details</TableHead>
-                  <TableHead>License Plate</TableHead>
-                  <TableHead>VIN</TableHead>
+                  <TableHead>Insurance</TableHead>
+                  <TableHead>Rent/Mo</TableHead>
+                  <TableHead>Dates</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -176,14 +178,68 @@ export default function Trailers() {
                       <div className="text-sm">
                         {trailer.year && trailer.make && trailer.model ? (
                           <span>{trailer.year} {trailer.make} {trailer.model}</span>
+                        ) : trailer.licensePlate ? (
+                          <span className="font-mono">{trailer.licensePlate}</span>
                         ) : (
                           <span className="text-muted-foreground">Not specified</span>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{trailer.licensePlate}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {trailer.vin || "N/A"}
+                    <TableCell>
+                      {trailer.insuranceProvider ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <Shield className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs">{trailer.insuranceProvider}</span>
+                          </div>
+                          {trailer.insuranceExpirationDate && (
+                            <Badge 
+                              variant={new Date(trailer.insuranceExpirationDate) < new Date() ? "destructive" : 
+                                       new Date(trailer.insuranceExpirationDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? "secondary" : "outline"}
+                              className="text-xs"
+                            >
+                              {new Date(trailer.insuranceExpirationDate) < new Date() ? (
+                                <><AlertTriangle className="h-3 w-3 mr-1" />Expired</>
+                              ) : (
+                                <>Exp: {new Date(trailer.insuranceExpirationDate).toLocaleDateString()}</>
+                              )}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not set</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {trailer.rentPerMonth ? (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-sm font-medium">
+                            {parseFloat(trailer.rentPerMonth).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1 text-xs">
+                        {trailer.pickupDate && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-green-600" />
+                            <span>In: {new Date(trailer.pickupDate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                        {trailer.dropOffDate && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-orange-600" />
+                            <span>Out: {new Date(trailer.dropOffDate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                        {!trailer.pickupDate && !trailer.dropOffDate && (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
