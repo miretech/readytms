@@ -60,9 +60,9 @@ export default function Customers() {
 
   const filteredCustomers = customers.filter((customer) =>
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.type.toLowerCase().includes(searchQuery.toLowerCase())
+    (customer.email?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+    (customer.phone?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+    (customer.address?.toLowerCase() || "").includes(searchQuery.toLowerCase())
   );
 
   // Pagination logic
@@ -91,17 +91,6 @@ export default function Customers() {
   const handleDialogClose = () => {
     setIsDialogOpen(false);
     setEditingCustomer(null);
-  };
-
-  const getTypeBadgeVariant = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "shipper":
-        return "default";
-      case "receiver":
-        return "secondary";
-      default:
-        return "outline";
-    }
   };
 
   if (isLoading) {
@@ -168,7 +157,6 @@ export default function Customers() {
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
-                  <TableHead>Type</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -193,11 +181,6 @@ export default function Customers() {
                         <MapPin className="h-3 w-3 text-muted-foreground" />
                         <span className="line-clamp-2">{customer.address}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getTypeBadgeVariant(customer.type)} data-testid={`badge-type-${customer.id}`}>
-                        {customer.type.charAt(0).toUpperCase() + customer.type.slice(1)}
-                      </Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>

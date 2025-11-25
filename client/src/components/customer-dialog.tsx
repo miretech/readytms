@@ -19,13 +19,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -34,10 +27,6 @@ import { useToast } from "@/hooks/use-toast";
 
 const formSchema = insertCustomerSchema.extend({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().min(1, "Phone number is required"),
-  address: z.string().min(1, "Address is required"),
-  type: z.string().min(1, "Type is required"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -59,7 +48,6 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
       email: "",
       phone: "",
       address: "",
-      type: "shipper",
     },
   });
 
@@ -67,10 +55,15 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
     if (customer) {
       form.reset({
         name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        address: customer.address,
-        type: customer.type,
+        email: customer.email || "",
+        phone: customer.phone || "",
+        address: customer.address || "",
+        city: customer.city || "",
+        state: customer.state || "",
+        zip: customer.zip || "",
+        contactPerson: customer.contactPerson || "",
+        mcNumber: customer.mcNumber || "",
+        notes: customer.notes || "",
       });
     } else {
       form.reset({
@@ -78,7 +71,12 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
         email: "",
         phone: "",
         address: "",
-        type: "shipper",
+        city: "",
+        state: "",
+        zip: "",
+        contactPerson: "",
+        mcNumber: "",
+        notes: "",
       });
     }
   }, [customer, form]);
@@ -161,29 +159,6 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
                     <FormControl>
                       <Input {...field} placeholder="(555) 123-4567" data-testid="input-customer-phone" />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-customer-type">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="shipper">Shipper</SelectItem>
-                        <SelectItem value="receiver">Receiver</SelectItem>
-                        <SelectItem value="broker">Broker</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
