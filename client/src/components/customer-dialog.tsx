@@ -143,7 +143,7 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input {...field} type="email" placeholder="contact@company.com" data-testid="input-customer-email" />
+                      <Input {...field} value={field.value || ""} type="email" placeholder="contact@company.com" data-testid="input-customer-email" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -157,7 +157,7 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="(555) 123-4567" data-testid="input-customer-phone" />
+                      <Input {...field} value={field.value || ""} placeholder="(555) 123-4567" data-testid="input-customer-phone" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -173,7 +173,11 @@ export function CustomerDialog({ open, onOpenChange, customer }: CustomerDialogP
                   <FormLabel>Address</FormLabel>
                   <FormControl>
                     <Textarea 
-                      {...field} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                      value={field.value || ""}
                       placeholder="123 Main St, City, State, ZIP" 
                       className="resize-none"
                       rows={3}
