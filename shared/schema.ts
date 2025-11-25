@@ -78,6 +78,21 @@ export const trailers = pgTable("trailers", {
   year: integer("year"),
   make: text("make"),
   model: text("model"),
+  // Insurance section
+  insuranceProvider: text("insurance_provider"),
+  insurancePolicyNumber: text("insurance_policy_number"),
+  insuranceExpirationDate: text("insurance_expiration_date"),
+  // Dates section
+  pickupDate: text("pickup_date"),
+  dropOffDate: text("drop_off_date"),
+  // Tolls section - stores array of file attachments as JSON
+  tollsAttachments: jsonb("tolls_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Repairs section
+  repairs: text("repairs"),
+  // Rent section
+  rentPerMonth: decimal("rent_per_month", { precision: 10, scale: 2 }),
+  // Pickup pictures section - stores array of image attachments as JSON
+  pickupPictures: jsonb("pickup_pictures").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
 });
 
 export const insertTrailerSchema = createInsertSchema(trailers).omit({
