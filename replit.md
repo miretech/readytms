@@ -24,7 +24,16 @@ The system provides a comprehensive set of modules:
 - **Dashboard**: Real-time operational metrics, recent activity, fleet status, and quick navigation.
 - **Load Management**: Full load lifecycle with optional customer assignment (can be added later via AI extraction). AI extraction supports PDFs, images (PNG, JPG, GIF), and text files up to 5MB. For PDFs, text is extracted using pdf-parse library; for images, OpenAI Vision API is used. System automatically extracts broker name and address from rate confirmations and creates/links customer records with smart duplicate detection (normalizes punctuation and whitespace). Includes driver/truck assignment, status workflow, expense/profit tracking, file attachments (PDFs/images for invoices and PODs), and prominent POD Gallery with thumbnail previews, full-screen viewer, and download functionality for driver-uploaded PODs.
 - **Fleet Management**: Truck inventory, status tracking (available, in-use, maintenance, out-of-service, terminated), and maintenance records.
-- **Trailer Management**: Trailer inventory, status tracking, and equipment management with support for multiple trailer types (Dry Van, Refrigerated, Flatbed, Step Deck, Tanker, Lowboy, Conestoga).
+- **Trailer Management**: Comprehensive trailer inventory and equipment management with:
+  - Support for multiple trailer types (Dry Van, Refrigerated, Flatbed, Step Deck, Tanker, Lowboy, Conestoga)
+  - Status tracking (available, in-use, maintenance, out-of-service, terminated)
+  - Insurance tracking with provider, policy number, and expiration date (color-coded status badges)
+  - Pickup and drop-off date tracking for leased trailers
+  - Monthly rent tracking with formatted display
+  - Tolls attachments (PDF/image uploads) for toll documentation
+  - Repairs tracking with notes field
+  - Pickup pictures support for documenting trailer condition at acquisition
+  - Tabbed dialog interface organizing: Basic Info, Insurance, Dates & Rent, Tolls, and Pictures
 - **Driver Management**: Comprehensive driver roster with full DOT compliance tracking, including CDL, medical card, SSN, employment, and contact information.
 - **GPS Driver Tracking**: Real-time location tracking with API endpoints for mobile apps, live location display with coordinates and Google Maps links.
 - **Driver Self-Registration**: Public-facing driver signup at `/driver-signup` for self-onboarding.
