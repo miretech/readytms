@@ -23,7 +23,12 @@ The application is a full-stack web application. The frontend is built with Reac
 The system provides a comprehensive set of modules:
 - **Dashboard**: Real-time operational metrics, recent activity, fleet status, and quick navigation.
 - **Load Management**: Full load lifecycle with optional customer assignment (can be added later via AI extraction). AI extraction supports PDFs, images (PNG, JPG, GIF), and text files up to 5MB. For PDFs, text is extracted using pdf-parse library; for images, OpenAI Vision API is used. System automatically extracts broker name and address from rate confirmations and creates/links customer records with smart duplicate detection (normalizes punctuation and whitespace). Includes driver/truck assignment, status workflow, expense/profit tracking, file attachments (PDFs/images for invoices and PODs), and prominent POD Gallery with thumbnail previews, full-screen viewer, and download functionality for driver-uploaded PODs.
-- **Fleet Management**: Truck inventory, status tracking (available, in-use, maintenance, out-of-service, terminated), and maintenance records.
+- **Fleet Management**: Comprehensive truck inventory and management with:
+  - Status tracking (available, in-use, maintenance, out-of-service, terminated)
+  - Cab card tracking with expiration date and document uploads (PDF/images)
+  - Color-coded expiration badges (expired/warning/valid/not-set)
+  - Tabbed dialog interface organizing: Basic Info and Cab Card sections
+  - Maintenance records integration
 - **Trailer Management**: Comprehensive trailer inventory and equipment management with:
   - Support for multiple trailer types (Dry Van, Refrigerated, Flatbed, Step Deck, Tanker, Lowboy, Conestoga)
   - Status tracking (available, in-use, maintenance, out-of-service, terminated)

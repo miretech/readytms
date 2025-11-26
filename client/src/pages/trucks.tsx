@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -24,6 +25,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Truck } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+function getCabCardStatus(expirationDate: string | null): { status: "expired" | "warning" | "valid" | "not-set"; label: string } {
+  if (!expirationDate) {
+    return { status: "not-set", label: "Not set" };
+  }
+  
+  const today = new Date();
+  const expDate = new Date(expirationDate);
+  const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) {
+    return { status: "expired", label: "Expired" };
+  } else if (diffDays <= 30) {
+    return { status: "warning", label: `${diffDays}d left` };
+  } else {
+    return { status: "valid", label: expirationDate };
+  }
+}
 
 export default function Trucks() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -160,12 +179,14 @@ export default function Trucks() {
                   <TableHead>Status</TableHead>
                   <TableHead>Vehicle Details</TableHead>
                   <TableHead>License Plate</TableHead>
-                  <TableHead>VIN</TableHead>
+                  <TableHead>Cab Card</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTrucks.map((truck) => (
+                {filteredTrucks.map((truck) => {
+                  const cabCardStatus = getCabCardStatus(truck.cabCardExpirationDate);
+                  return (
                   <TableRow key={truck.id} data-testid={`row-truck-${truck.id}`}>
                     <TableCell className="font-medium">{truck.truckNumber}</TableCell>
                     <TableCell>{truck.type}</TableCell>
@@ -182,8 +203,25 @@ export default function Trucks() {
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-sm">{truck.licensePlate}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {truck.vin || "N/A"}
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {truck.cabCardAttachments && (truck.cabCardAttachments as any[]).length > 0 && (
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <Badge
+                          variant={
+                            cabCardStatus.status === "expired" ? "destructive" :
+                            cabCardStatus.status === "warning" ? "outline" :
+                            cabCardStatus.status === "valid" ? "default" : "secondary"
+                          }
+                          className={
+                            cabCardStatus.status === "warning" ? "border-yellow-500 text-yellow-700 dark:text-yellow-400" : ""
+                          }
+                          data-testid={`badge-cabcard-${truck.id}`}
+                        >
+                          {cabCardStatus.label}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -216,7 +254,8 @@ export default function Trucks() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

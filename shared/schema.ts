@@ -57,6 +57,9 @@ export const trucks = pgTable("trucks", {
   year: integer("year"),
   make: text("make"),
   model: text("model"),
+  // Cab Card section
+  cabCardExpirationDate: text("cab_card_expiration_date"),
+  cabCardAttachments: jsonb("cab_card_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
 });
 
 export const insertTruckSchema = createInsertSchema(trucks).omit({
