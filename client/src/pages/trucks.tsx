@@ -4,6 +4,7 @@ import { Plus, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -24,6 +25,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Truck } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { format, parseISO, isBefore, addDays, isValid } from "date-fns";
+
+const safeParseDate = (dateStr: string | null | undefined): Date | null => {
+  if (!dateStr) return null;
+  try {
+    const parsed = parseISO(dateStr);
+    return isValid(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const safeFormatDate = (dateStr: string | null | undefined, formatStr: string = "MM/dd/yyyy"): string => {
+  const parsed = safeParseDate(dateStr);
+  return parsed ? format(parsed, formatStr) : "";
+};
 
 export default function Trucks() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -62,20 +79,16 @@ export default function Trucks() {
       truck.type.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      // Extract numeric parts from truck numbers for intelligent sorting
       const numA = parseInt(a.truckNumber.replace(/\D/g, ''));
       const numB = parseInt(b.truckNumber.replace(/\D/g, ''));
       
-      // If both have valid numbers, sort numerically
       if (!isNaN(numA) && !isNaN(numB)) {
         return numA - numB;
       }
       
-      // If only one has a number, put it first
       if (!isNaN(numA)) return -1;
       if (!isNaN(numB)) return 1;
       
-      // If neither has a number, sort alphabetically
       return a.truckNumber.localeCompare(b.truckNumber);
     });
 
@@ -93,6 +106,38 @@ export default function Trucks() {
   const handleDialogClose = () => {
     setIsDialogOpen(false);
     setEditingTruck(null);
+  };
+
+  const getInsuranceStatus = (expirationDate: string | null) => {
+    const expDate = safeParseDate(expirationDate);
+    if (!expDate) return null;
+    
+    const now = new Date();
+    const warningDate = addDays(now, 30);
+
+    if (isBefore(expDate, now)) {
+      return { variant: "destructive" as const, label: "Expired" };
+    } else if (isBefore(expDate, warningDate)) {
+      return { variant: "secondary" as const, label: "Expiring Soon" };
+    } else {
+      return { variant: "default" as const, label: "Active" };
+    }
+  };
+
+  const getDotStatus = (expirationDate: string | null) => {
+    const expDate = safeParseDate(expirationDate);
+    if (!expDate) return null;
+    
+    const now = new Date();
+    const warningDate = addDays(now, 30);
+
+    if (isBefore(expDate, now)) {
+      return { variant: "destructive" as const, label: "Expired" };
+    } else if (isBefore(expDate, warningDate)) {
+      return { variant: "secondary" as const, label: "Due Soon" };
+    } else {
+      return { variant: "default" as const, label: "Valid" };
+    }
   };
 
   if (isLoading) {
@@ -151,7 +196,7 @@ export default function Trucks() {
             )}
           </div>
         ) : (
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -159,64 +204,134 @@ export default function Trucks() {
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Vehicle Details</TableHead>
-                  <TableHead>License Plate</TableHead>
-                  <TableHead>VIN</TableHead>
+                  <TableHead>Insurance</TableHead>
+                  <TableHead>DOT Inspection</TableHead>
+                  <TableHead>Dates</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTrucks.map((truck) => (
-                  <TableRow key={truck.id} data-testid={`row-truck-${truck.id}`}>
-                    <TableCell className="font-medium">{truck.truckNumber}</TableCell>
-                    <TableCell>{truck.type}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={truck.status as any} type="truck" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {truck.year && truck.make && truck.model ? (
-                          <span>{truck.year} {truck.make} {truck.model}</span>
+                {filteredTrucks.map((truck) => {
+                  const insuranceStatus = getInsuranceStatus(truck.insuranceExpirationDate);
+                  const dotStatus = getDotStatus(truck.dotInspectionExpirationDate);
+                  
+                  return (
+                    <TableRow key={truck.id} data-testid={`row-truck-${truck.id}`}>
+                      <TableCell className="font-medium">{truck.truckNumber}</TableCell>
+                      <TableCell>{truck.type}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={truck.status as any} type="truck" />
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {truck.year && truck.make && truck.model ? (
+                            <span>{truck.year} {truck.make} {truck.model}</span>
+                          ) : (
+                            <span className="text-muted-foreground">Not specified</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {truck.licensePlate}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {truck.insuranceProvider ? (
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">{truck.insuranceProvider}</div>
+                            {insuranceStatus && (
+                              <Badge 
+                                variant={insuranceStatus.variant}
+                                className="text-xs"
+                              >
+                                {insuranceStatus.label}
+                              </Badge>
+                            )}
+                            {truck.insuranceExpirationDate && (
+                              <div className="text-xs text-muted-foreground">
+                                Exp: {safeFormatDate(truck.insuranceExpirationDate)}
+                              </div>
+                            )}
+                          </div>
                         ) : (
-                          <span className="text-muted-foreground">Not specified</span>
+                          <span className="text-muted-foreground text-sm">Not set</span>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{truck.licensePlate}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {truck.vin || "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            data-testid={`button-actions-${truck.id}`}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleEdit(truck)}
-                            data-testid={`button-edit-${truck.id}`}
-                          >
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(truck.id)}
-                            className="text-destructive"
-                            data-testid={`button-delete-${truck.id}`}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        {truck.dotInspectionExpirationDate ? (
+                          <div className="space-y-1">
+                            {dotStatus && (
+                              <Badge 
+                                variant={dotStatus.variant}
+                                className="text-xs"
+                              >
+                                {dotStatus.label}
+                              </Badge>
+                            )}
+                            <div className="text-xs text-muted-foreground">
+                              Exp: {safeFormatDate(truck.dotInspectionExpirationDate)}
+                            </div>
+                            {truck.dotInspectionDate && (
+                              <div className="text-xs text-muted-foreground">
+                                Last: {safeFormatDate(truck.dotInspectionDate)}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Not set</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1 text-xs">
+                          {truck.addedDate && (
+                            <div>
+                              <span className="text-muted-foreground">Added: </span>
+                              {safeFormatDate(truck.addedDate)}
+                            </div>
+                          )}
+                          {truck.terminatedDate && (
+                            <div className="text-destructive">
+                              <span>Terminated: </span>
+                              {safeFormatDate(truck.terminatedDate)}
+                            </div>
+                          )}
+                          {!truck.addedDate && !truck.terminatedDate && (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-actions-${truck.id}`}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleEdit(truck)}
+                              data-testid={`button-edit-${truck.id}`}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(truck.id)}
+                              className="text-destructive"
+                              data-testid={`button-delete-${truck.id}`}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
