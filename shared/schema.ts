@@ -57,6 +57,26 @@ export const trucks = pgTable("trucks", {
   year: integer("year"),
   make: text("make"),
   model: text("model"),
+  // Insurance section
+  insuranceProvider: text("insurance_provider"),
+  insurancePolicyNumber: text("insurance_policy_number"),
+  insuranceExpirationDate: text("insurance_expiration_date"),
+  proofOfInsurance: jsonb("proof_of_insurance").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Dates section
+  addedDate: text("added_date"),
+  terminatedDate: text("terminated_date"),
+  // Annual DOT Inspection section
+  dotInspectionDate: text("dot_inspection_date"),
+  dotInspectionExpirationDate: text("dot_inspection_expiration_date"),
+  dotInspectionAttachments: jsonb("dot_inspection_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Cab Card section
+  cabCardAttachments: jsonb("cab_card_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Repair Receipts section
+  repairReceiptAttachments: jsonb("repair_receipt_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Semi Truck Pictures section
+  truckPictures: jsonb("truck_pictures").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Tires section
+  tiresAttachments: jsonb("tires_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
 });
 
 export const insertTruckSchema = createInsertSchema(trucks).omit({
