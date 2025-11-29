@@ -88,6 +88,7 @@ export const trailers = pgTable("trailers", {
   // Dates section
   pickupDate: text("pickup_date"),
   dropOffDate: text("drop_off_date"),
+  terminatedDate: text("terminated_date"), // Date trailer was terminated/retired
   // Tolls section - stores array of file attachments as JSON
   tollsAttachments: jsonb("tolls_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
   // Repairs section

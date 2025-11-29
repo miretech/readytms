@@ -80,6 +80,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
       insuranceExpirationDate: "",
       pickupDate: "",
       dropOffDate: "",
+      terminatedDate: "",
       repairs: "",
       rentPerMonth: "",
     },
@@ -101,6 +102,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         insuranceExpirationDate: trailer.insuranceExpirationDate || "",
         pickupDate: trailer.pickupDate || "",
         dropOffDate: trailer.dropOffDate || "",
+        terminatedDate: trailer.terminatedDate || "",
         repairs: trailer.repairs || "",
         rentPerMonth: trailer.rentPerMonth || "",
       });
@@ -121,6 +123,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         insuranceExpirationDate: "",
         pickupDate: "",
         dropOffDate: "",
+        terminatedDate: "",
         repairs: "",
         rentPerMonth: "",
       });
@@ -181,6 +184,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         insuranceExpirationDate: values.insuranceExpirationDate || undefined,
         pickupDate: values.pickupDate || undefined,
         dropOffDate: values.dropOffDate || undefined,
+        terminatedDate: values.terminatedDate || undefined,
         repairs: values.repairs || undefined,
         vin: values.vin || undefined,
         make: values.make || undefined,
@@ -297,6 +301,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
                               <SelectItem value="in-use">In Use</SelectItem>
                               <SelectItem value="maintenance">Maintenance</SelectItem>
                               <SelectItem value="out-of-service">Out of Service</SelectItem>
+                              <SelectItem value="terminated">Terminated</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -505,6 +510,25 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
                               {...field} 
                               value={field.value || ""} 
                               data-testid="input-dropoff-date" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="terminatedDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Terminated Date</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              {...field} 
+                              value={field.value || ""} 
+                              data-testid="input-terminated-date" 
                             />
                           </FormControl>
                           <FormMessage />
