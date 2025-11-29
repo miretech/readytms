@@ -85,6 +85,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       dateHired: "",
       dateTerminated: "",
       assignedTruckId: "",
+      driverType: "company-driver",
     },
   });
 
@@ -111,6 +112,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         dateHired: driver.dateHired ? new Date(driver.dateHired).toISOString().split('T')[0] : "",
         dateTerminated: driver.dateTerminated ? new Date(driver.dateTerminated).toISOString().split('T')[0] : "",
         assignedTruckId: driver.assignedTruckId || "",
+        driverType: (driver.driverType || "company-driver") as "company-driver" | "owner-operator",
       });
       setLicenseFile(driver.licenseAttachment || null);
       setMedicalCardFile(driver.medicalCardAttachment || null);
@@ -137,6 +139,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         dateHired: "",
         dateTerminated: "",
         assignedTruckId: "",
+        driverType: "company-driver",
       });
       setLicenseFile(null);
       setMedicalCardFile(null);
@@ -146,10 +149,27 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
+      // Convert empty date strings to undefined for proper database handling
+      const payload = {
+        ...values,
+        licenseExpiration: values.licenseExpiration || undefined,
+        medicalCardExpiration: values.medicalCardExpiration || undefined,
+        medicalCardIssuedDate: values.medicalCardIssuedDate || undefined,
+        dateHired: values.dateHired || undefined,
+        dateTerminated: values.dateTerminated || undefined,
+        assignedTruckId: values.assignedTruckId || undefined,
+        address: values.address || undefined,
+        licenseIssuedPlace: values.licenseIssuedPlace || undefined,
+        medicalCardNumber: values.medicalCardNumber || undefined,
+        socialSecurityNumber: values.socialSecurityNumber || undefined,
+        licenseAttachment: values.licenseAttachment || undefined,
+        medicalCardAttachment: values.medicalCardAttachment || undefined,
+        socialSecurityAttachment: values.socialSecurityAttachment || undefined,
+      };
       if (isEditing) {
-        return await apiRequest("PATCH", `/api/drivers/${driver.id}`, values);
+        return await apiRequest("PATCH", `/api/drivers/${driver.id}`, payload);
       }
-      return await apiRequest("POST", "/api/drivers", values);
+      return await apiRequest("POST", "/api/drivers", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/drivers"] });
