@@ -93,6 +93,7 @@ export const trailers = pgTable("trailers", {
   tollsAttachments: jsonb("tolls_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
   // Repairs section
   repairs: text("repairs"),
+  repairsAttachments: jsonb("repairs_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
   // Rent section
   rentPerMonth: decimal("rent_per_month", { precision: 10, scale: 2 }),
   // Pickup pictures section - stores array of image attachments as JSON

@@ -63,6 +63,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
   const isEditing = !!trailer;
   const [tollsFiles, setTollsFiles] = useState<FileAttachment[]>([]);
   const [pickupPictures, setPickupPictures] = useState<FileAttachment[]>([]);
+  const [repairsAttachments, setRepairsAttachments] = useState<FileAttachment[]>([]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -108,6 +109,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
       });
       setTollsFiles((trailer.tollsAttachments as FileAttachment[]) || []);
       setPickupPictures((trailer.pickupPictures as FileAttachment[]) || []);
+      setRepairsAttachments((trailer.repairsAttachments as FileAttachment[]) || []);
     } else {
       form.reset({
         trailerNumber: "",
@@ -129,6 +131,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
       });
       setTollsFiles([]);
       setPickupPictures([]);
+      setRepairsAttachments([]);
     }
   }, [trailer, form, open]);
 
@@ -174,6 +177,15 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
     maxSize: 10 * 1024 * 1024,
   });
 
+  const repairsDropzone = useDropzone({
+    onDrop: (files) => handleFileUpload(files, setRepairsAttachments),
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+    },
+    maxSize: 10 * 1024 * 1024,
+  });
+
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const payload = {
@@ -191,6 +203,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         model: values.model || undefined,
         tollsAttachments: tollsFiles.length > 0 ? tollsFiles : undefined,
         pickupPictures: pickupPictures.length > 0 ? pickupPictures : undefined,
+        repairsAttachments: repairsAttachments.length > 0 ? repairsAttachments : undefined,
       };
       if (isEditing) {
         return await apiRequest("PATCH", `/api/trailers/${trailer.id}`, payload);
@@ -391,19 +404,20 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
                   <div className="pt-4 border-t">
                     <div className="flex items-center gap-2 mb-3">
                       <Wrench className="h-4 w-4 text-muted-foreground" />
-                      <h3 className="font-medium">Repairs & Maintenance Notes</h3>
+                      <h3 className="font-medium">Repairs & Maintenance</h3>
                     </div>
                     <FormField
                       control={form.control}
                       name="repairs"
                       render={({ field }) => (
                         <FormItem>
+                          <FormLabel>Repair Notes</FormLabel>
                           <FormControl>
                             <Textarea 
                               {...field}
                               value={field.value || ""}
                               placeholder="Enter repair notes (tires, brakes, lights, etc.)"
-                              className="min-h-[100px]"
+                              className="min-h-[80px]"
                               data-testid="input-repairs"
                             />
                           </FormControl>
@@ -411,6 +425,75 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
                         </FormItem>
                       )}
                     />
+
+                    {/* Repairs Attachments Upload */}
+                    <div className="mt-4">
+                      <FormLabel>Repair Receipts & Documents</FormLabel>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Upload tire repairs, maintenance receipts, service records (PDF/Images, max 10MB each)
+                      </p>
+                      <div
+                        {...repairsDropzone.getRootProps()}
+                        className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                          repairsDropzone.isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                        }`}
+                      >
+                        <input {...repairsDropzone.getInputProps()} data-testid="input-repairs-upload" />
+                        <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          {repairsDropzone.isDragActive ? "Drop files here" : "Click or drag files to upload"}
+                        </p>
+                      </div>
+                      
+                      {repairsAttachments.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-sm font-medium">Uploaded Documents ({repairsAttachments.length})</p>
+                          <div className="grid gap-2">
+                            {repairsAttachments.map((file, index) => (
+                              <Card key={index} className="p-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {file.fileName.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                                      <Image className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                    ) : (
+                                      <FileText className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                    )}
+                                    <span className="text-sm truncate">{file.fileName}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => {
+                                        const link = document.createElement("a");
+                                        link.href = file.fileData;
+                                        link.download = file.fileName;
+                                        link.click();
+                                      }}
+                                      data-testid={`button-download-repair-${index}`}
+                                    >
+                                      <FileText className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-destructive hover:text-destructive"
+                                      onClick={() => removeFile(index, setRepairsAttachments)}
+                                      data-testid={`button-remove-repair-${index}`}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </TabsContent>
 
