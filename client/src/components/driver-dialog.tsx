@@ -59,6 +59,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
   });
 
   const [licenseFile, setLicenseFile] = useState<string | null>(null);
+  const [medicalCardFile, setMedicalCardFile] = useState<string | null>(null);
   const [ssnFile, setSsnFile] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
@@ -76,6 +77,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       medicalCardNumber: "",
       medicalCardExpiration: "",
       medicalCardIssuedDate: "",
+      medicalCardAttachment: "",
       socialSecurityNumber: "",
       socialSecurityAttachment: "",
       status: "available",
@@ -101,6 +103,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         medicalCardNumber: driver.medicalCardNumber || "",
         medicalCardExpiration: driver.medicalCardExpiration ? new Date(driver.medicalCardExpiration).toISOString().split('T')[0] : "",
         medicalCardIssuedDate: driver.medicalCardIssuedDate ? new Date(driver.medicalCardIssuedDate).toISOString().split('T')[0] : "",
+        medicalCardAttachment: driver.medicalCardAttachment || "",
         socialSecurityNumber: driver.socialSecurityNumber || "",
         socialSecurityAttachment: driver.socialSecurityAttachment || "",
         status: driver.status,
@@ -110,6 +113,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         assignedTruckId: driver.assignedTruckId || "",
       });
       setLicenseFile(driver.licenseAttachment || null);
+      setMedicalCardFile(driver.medicalCardAttachment || null);
       setSsnFile(driver.socialSecurityAttachment || null);
     } else {
       form.reset({
@@ -125,6 +129,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         medicalCardNumber: "",
         medicalCardExpiration: "",
         medicalCardIssuedDate: "",
+        medicalCardAttachment: "",
         socialSecurityNumber: "",
         socialSecurityAttachment: "",
         status: "available",
@@ -134,6 +139,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         assignedTruckId: "",
       });
       setLicenseFile(null);
+      setMedicalCardFile(null);
       setSsnFile(null);
     }
   }, [driver, form]);
@@ -162,7 +168,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
     },
   });
 
-  const handleFileUpload = async (file: File, type: 'license' | 'ssn') => {
+  const handleFileUpload = async (file: File, type: 'license' | 'medical' | 'ssn') => {
     if (!file) return;
     
     const reader = new FileReader();
@@ -171,6 +177,9 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       if (type === 'license') {
         setLicenseFile(base64);
         form.setValue('licenseAttachment', base64);
+      } else if (type === 'medical') {
+        setMedicalCardFile(base64);
+        form.setValue('medicalCardAttachment', base64);
       } else {
         setSsnFile(base64);
         form.setValue('socialSecurityAttachment', base64);
@@ -179,10 +188,13 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
     reader.readAsDataURL(file);
   };
 
-  const removeFile = (type: 'license' | 'ssn') => {
+  const removeFile = (type: 'license' | 'medical' | 'ssn') => {
     if (type === 'license') {
       setLicenseFile(null);
       form.setValue('licenseAttachment', '');
+    } else if (type === 'medical') {
+      setMedicalCardFile(null);
+      form.setValue('medicalCardAttachment', '');
     } else {
       setSsnFile(null);
       form.setValue('socialSecurityAttachment', '');
@@ -400,6 +412,45 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                     <FormLabel>Medical Card Expiration</FormLabel>
                     <FormControl>
                       <Input {...field} type="date" data-testid="input-medical-card-expiration" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="medicalCardAttachment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Medical Card Attachment</FormLabel>
+                    <FormControl>
+                      <div className="space-y-2">
+                        <Input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileUpload(file, 'medical');
+                          }}
+                          data-testid="input-medical-card-attachment"
+                        />
+                        {medicalCardFile && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>File attached</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => removeFile('medical')}
+                              data-testid="button-remove-medical"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

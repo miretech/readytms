@@ -119,6 +119,7 @@ export const drivers = pgTable("drivers", {
   medicalCardNumber: text("medical_card_number"),
   medicalCardExpiration: timestamp("medical_card_expiration"),
   medicalCardIssuedDate: timestamp("medical_card_issued_date"),
+  medicalCardAttachment: text("medical_card_attachment"), // Medical card document attachment
   socialSecurityNumber: text("social_security_number"),
   socialSecurityAttachment: text("social_security_attachment"),
   status: text("status").notNull(),
