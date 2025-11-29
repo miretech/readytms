@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, Shield, DollarSign, Calendar, AlertTriangle } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Shield, DollarSign, Calendar, AlertTriangle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -236,7 +236,13 @@ export default function Trailers() {
                             <span>Out: {new Date(trailer.dropOffDate).toLocaleDateString()}</span>
                           </div>
                         )}
-                        {!trailer.pickupDate && !trailer.dropOffDate && (
+                        {trailer.terminatedDate && (
+                          <div className="flex items-center gap-1">
+                            <XCircle className="h-3 w-3 text-red-600" />
+                            <span>Term: {new Date(trailer.terminatedDate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                        {!trailer.pickupDate && !trailer.dropOffDate && !trailer.terminatedDate && (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </div>
