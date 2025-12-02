@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { FileUp, X } from "lucide-react";
+import { FileUp, X, Download, FileText, Image as ImageIcon, Eye } from "lucide-react";
 
 const formSchema = insertDriverSchema.extend({
   name: z.string().min(1, "Name is required"),
@@ -221,6 +221,40 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
     }
   };
 
+  const getFileTypeFromBase64 = (base64: string): 'image' | 'pdf' | 'unknown' => {
+    if (base64.startsWith('data:image/')) return 'image';
+    if (base64.startsWith('data:application/pdf')) return 'pdf';
+    return 'unknown';
+  };
+
+  const getFileExtension = (base64: string): string => {
+    if (base64.startsWith('data:image/png')) return 'png';
+    if (base64.startsWith('data:image/jpeg') || base64.startsWith('data:image/jpg')) return 'jpg';
+    if (base64.startsWith('data:image/gif')) return 'gif';
+    if (base64.startsWith('data:application/pdf')) return 'pdf';
+    return 'file';
+  };
+
+  const downloadFile = (base64: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = base64;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const viewFile = (base64: string) => {
+    const newWindow = window.open();
+    if (newWindow) {
+      if (getFileTypeFromBase64(base64) === 'pdf') {
+        newWindow.document.write(`<iframe src="${base64}" style="width:100%;height:100%;border:none;"></iframe>`);
+      } else {
+        newWindow.document.write(`<img src="${base64}" style="max-width:100%;height:auto;" />`);
+      }
+    }
+  };
+
   const onSubmit = (values: FormValues) => {
     // Remove password if it's empty (for edit mode)
     if (isEditing && !values.password) {
@@ -364,7 +398,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                   <FormItem>
                     <FormLabel>Driver License Attachment</FormLabel>
                     <FormControl>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Input
                           type="file"
                           accept="image/*,.pdf"
@@ -375,18 +409,63 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                           data-testid="input-license-attachment"
                         />
                         {licenseFile && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>File attached</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => removeFile('license')}
-                              data-testid="button-remove-license"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                          <div className="border rounded-lg p-3 bg-muted/30">
+                            <div className="flex items-start gap-3">
+                              {getFileTypeFromBase64(licenseFile) === 'image' ? (
+                                <div className="relative w-20 h-20 rounded border overflow-hidden bg-white flex-shrink-0">
+                                  <img 
+                                    src={licenseFile} 
+                                    alt="License preview" 
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-20 h-20 rounded border bg-white flex items-center justify-center flex-shrink-0">
+                                  <FileText className="h-10 w-10 text-red-500" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  Driver License.{getFileExtension(licenseFile)}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {getFileTypeFromBase64(licenseFile) === 'pdf' ? 'PDF Document' : 'Image File'}
+                                </p>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => viewFile(licenseFile)}
+                                    data-testid="button-view-license"
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => downloadFile(licenseFile, `driver-license.${getFileExtension(licenseFile)}`)}
+                                    data-testid="button-download-license"
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Download
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeFile('license')}
+                                    className="text-destructive hover:text-destructive"
+                                    data-testid="button-remove-license"
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -445,7 +524,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                   <FormItem>
                     <FormLabel>Medical Card Attachment</FormLabel>
                     <FormControl>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Input
                           type="file"
                           accept="image/*,.pdf"
@@ -456,18 +535,63 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                           data-testid="input-medical-card-attachment"
                         />
                         {medicalCardFile && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>File attached</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => removeFile('medical')}
-                              data-testid="button-remove-medical"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                          <div className="border rounded-lg p-3 bg-muted/30">
+                            <div className="flex items-start gap-3">
+                              {getFileTypeFromBase64(medicalCardFile) === 'image' ? (
+                                <div className="relative w-20 h-20 rounded border overflow-hidden bg-white flex-shrink-0">
+                                  <img 
+                                    src={medicalCardFile} 
+                                    alt="Medical card preview" 
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-20 h-20 rounded border bg-white flex items-center justify-center flex-shrink-0">
+                                  <FileText className="h-10 w-10 text-red-500" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  Medical Card.{getFileExtension(medicalCardFile)}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {getFileTypeFromBase64(medicalCardFile) === 'pdf' ? 'PDF Document' : 'Image File'}
+                                </p>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => viewFile(medicalCardFile)}
+                                    data-testid="button-view-medical"
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => downloadFile(medicalCardFile, `medical-card.${getFileExtension(medicalCardFile)}`)}
+                                    data-testid="button-download-medical"
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Download
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeFile('medical')}
+                                    className="text-destructive hover:text-destructive"
+                                    data-testid="button-remove-medical"
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -498,7 +622,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                   <FormItem>
                     <FormLabel>Social Security Attachment</FormLabel>
                     <FormControl>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Input
                           type="file"
                           accept="image/*,.pdf"
@@ -509,18 +633,63 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                           data-testid="input-ssn-attachment"
                         />
                         {ssnFile && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>File attached</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => removeFile('ssn')}
-                              data-testid="button-remove-ssn"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                          <div className="border rounded-lg p-3 bg-muted/30">
+                            <div className="flex items-start gap-3">
+                              {getFileTypeFromBase64(ssnFile) === 'image' ? (
+                                <div className="relative w-20 h-20 rounded border overflow-hidden bg-white flex-shrink-0">
+                                  <img 
+                                    src={ssnFile} 
+                                    alt="SSN card preview" 
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-20 h-20 rounded border bg-white flex items-center justify-center flex-shrink-0">
+                                  <FileText className="h-10 w-10 text-red-500" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  Social Security Card.{getFileExtension(ssnFile)}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {getFileTypeFromBase64(ssnFile) === 'pdf' ? 'PDF Document' : 'Image File'}
+                                </p>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => viewFile(ssnFile)}
+                                    data-testid="button-view-ssn"
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => downloadFile(ssnFile, `social-security-card.${getFileExtension(ssnFile)}`)}
+                                    data-testid="button-download-ssn"
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Download
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeFile('ssn')}
+                                    className="text-destructive hover:text-destructive"
+                                    data-testid="button-remove-ssn"
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
