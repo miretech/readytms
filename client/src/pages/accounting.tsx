@@ -1342,30 +1342,40 @@ function EmailFactoringDialog({
     const customer = customers.find((c) => c.id === invoice.customerId);
     const load = loads.find((l) => l.id === invoice.loadId);
     const pdf = new jsPDF();
-
-    let yPos = 15;
     
-    // Add logo if available from company settings
+    // Brand colors
+    const brandBlue = [13, 59, 102]; // Dark navy blue
+    const brandRed = [180, 40, 40]; // Dark red for lines
+    const blackText = [33, 37, 41]; // Near black for body text
+
+    let yPos = 20;
+    
+    // Add logo if available from company settings (top right)
     if (companySettings?.logoUrl) {
       try {
-        pdf.addImage(companySettings.logoUrl, 'PNG', 15, yPos, 30, 30);
-        yPos = 50;
+        pdf.addImage(companySettings.logoUrl, 'PNG', 160, 10, 35, 35);
       } catch (e) {
         console.log('Could not add logo to PDF:', e);
-        yPos = 15;
       }
     }
 
-    // Invoice Title
-    pdf.setFontSize(20);
+    // Invoice Title - Dark blue with underline
+    pdf.setFontSize(28);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Invoice", 15, yPos);
-    yPos += 10;
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
+    pdf.text("INVOICE", 15, yPos);
+    // Underline for title
+    pdf.setDrawColor(brandBlue[0], brandBlue[1], brandBlue[2]);
+    pdf.setLineWidth(0.8);
+    pdf.line(15, yPos + 2, 62, yPos + 2);
+    yPos += 15;
     
     // Company Information - Use invoice's carrier info first, then fall back to company settings
     const carrierName = (invoice as any).carrierName || companySettings?.companyName || "Ready Carrier LLC";
     const carrierAddress = (invoice as any).carrierAddress || (companySettings ? `${companySettings.address || ""}, ${companySettings.cityStateZip || ""}` : "");
     
+    // Reset to black for body text
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
     pdf.text(carrierName, 15, yPos);
@@ -1381,25 +1391,32 @@ function EmailFactoringDialog({
         yPos += 5;
       });
     }
-    yPos += 5;
+    yPos += 10;
     
-    // Bill To Section and Invoice Info on same line
-    const billToY = yPos;
+    // Bill To Section - Blue with underline
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
     pdf.text("BILL TO", 15, yPos);
+    pdf.setDrawColor(brandBlue[0], brandBlue[1], brandBlue[2]);
+    pdf.setLineWidth(0.5);
+    pdf.line(15, yPos + 1, 42, yPos + 1);
     
-    // Invoice Number and Date (Right Side)
+    // Invoice Number and Date (Right Side) - Blue labels
     pdf.text("INVOICE #", 130, yPos);
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.setFont("helvetica", "normal");
     pdf.text(invoice.invoiceNumber, 175, yPos);
     
     yPos += 6;
     pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     if (customer) {
       pdf.text(customer.name, 15, yPos);
     }
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
     pdf.text("INVOICE DATE", 130, yPos);
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.setFont("helvetica", "normal");
     pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 175, yPos);
     
@@ -1416,31 +1433,36 @@ function EmailFactoringDialog({
       yPos += 5;
     }
     
-    // Table Header
+    // Table Header - Blue text with red line
     yPos += 15;
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
     pdf.text("DESCRIPTION", 15, yPos);
     pdf.text("AMOUNT", 175, yPos);
     
-    yPos += 2;
-    pdf.setLineWidth(0.5);
+    yPos += 3;
+    pdf.setDrawColor(brandRed[0], brandRed[1], brandRed[2]);
+    pdf.setLineWidth(0.8);
     pdf.line(15, yPos, 195, yPos);
     
-    // Load Number Line Item
-    yPos += 8;
+    // Load Number Line Item - Black text
+    yPos += 10;
     pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.text(`LOAD NUMBER #${load?.loadNumber || "N/A"}`, 15, yPos);
     
     const total = typeof invoice.total === 'string' ? parseFloat(invoice.total) : invoice.total;
     pdf.text(`${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 175, yPos);
     
-    // Total Line
-    yPos += 20;
+    // Total Line - Blue label
+    yPos += 25;
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
     pdf.text("TOTAL", 140, yPos);
     pdf.text(`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 175, yPos);
     
     // Terms & Conditions (Centered at Bottom)
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("Terms & Conditions", 105, 250, { align: "center" });
@@ -1809,29 +1831,39 @@ export default function Accounting() {
     const load = loads.find((l) => l.id === invoice.loadId);
     const pdf = new jsPDF();
     
-    let yPos = 15;
+    // Brand colors
+    const brandBlue = [13, 59, 102]; // Dark navy blue
+    const brandRed = [180, 40, 40]; // Dark red for lines
+    const blackText = [33, 37, 41]; // Near black for body text
+
+    let yPos = 20;
     
-    // Add logo if available from company settings
+    // Add logo if available from company settings (top right)
     if (companySettings?.logoUrl) {
       try {
-        pdf.addImage(companySettings.logoUrl, 'PNG', 15, yPos, 30, 30);
-        yPos = 50;
+        pdf.addImage(companySettings.logoUrl, 'PNG', 160, 10, 35, 35);
       } catch (e) {
         console.log('Could not add logo to PDF:', e);
-        yPos = 15;
       }
     }
 
-    // Invoice Title
-    pdf.setFontSize(20);
+    // Invoice Title - Dark blue with underline
+    pdf.setFontSize(28);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Invoice", 15, yPos);
-    yPos += 10;
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
+    pdf.text("INVOICE", 15, yPos);
+    // Underline for title
+    pdf.setDrawColor(brandBlue[0], brandBlue[1], brandBlue[2]);
+    pdf.setLineWidth(0.8);
+    pdf.line(15, yPos + 2, 62, yPos + 2);
+    yPos += 15;
     
     // Company Information - Use invoice's carrier info first, then fall back to company settings
     const carrierName = (invoice as any).carrierName || companySettings?.companyName || "Ready Carrier LLC";
     const carrierAddress = (invoice as any).carrierAddress || (companySettings ? `${companySettings.address || ""}, ${companySettings.cityStateZip || ""}` : "");
     
+    // Reset to black for body text
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
     pdf.text(carrierName, 15, yPos);
@@ -1847,24 +1879,32 @@ export default function Accounting() {
         yPos += 5;
       });
     }
-    yPos += 5;
+    yPos += 10;
     
-    // Bill To Section and Invoice Info on same line
+    // Bill To Section - Blue with underline
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
     pdf.text("BILL TO", 15, yPos);
+    pdf.setDrawColor(brandBlue[0], brandBlue[1], brandBlue[2]);
+    pdf.setLineWidth(0.5);
+    pdf.line(15, yPos + 1, 42, yPos + 1);
     
-    // Invoice Number and Date (Right Side)
+    // Invoice Number and Date (Right Side) - Blue labels
     pdf.text("INVOICE #", 130, yPos);
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.setFont("helvetica", "normal");
     pdf.text(invoice.invoiceNumber, 175, yPos);
     
     yPos += 6;
     pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     if (customer) {
       pdf.text(customer.name, 15, yPos);
     }
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
     pdf.text("INVOICE DATE", 130, yPos);
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.setFont("helvetica", "normal");
     pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 175, yPos);
     
@@ -1881,31 +1921,36 @@ export default function Accounting() {
       yPos += 5;
     }
     
-    // Table Header
+    // Table Header - Blue text with red line
     yPos += 15;
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
     pdf.text("DESCRIPTION", 15, yPos);
     pdf.text("AMOUNT", 175, yPos);
     
-    yPos += 2;
-    pdf.setLineWidth(0.5);
+    yPos += 3;
+    pdf.setDrawColor(brandRed[0], brandRed[1], brandRed[2]);
+    pdf.setLineWidth(0.8);
     pdf.line(15, yPos, 195, yPos);
     
-    // Load Number Line Item
-    yPos += 8;
+    // Load Number Line Item - Black text
+    yPos += 10;
     pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.text(`LOAD NUMBER #${load?.loadNumber || "N/A"}`, 15, yPos);
     
     const total = Number(invoice.total);
     pdf.text(`${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 175, yPos);
     
-    // Total Line
-    yPos += 20;
+    // Total Line - Blue label
+    yPos += 25;
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(brandBlue[0], brandBlue[1], brandBlue[2]);
     pdf.text("TOTAL", 140, yPos);
     pdf.text(`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 175, yPos);
     
     // Terms & Conditions (Centered at Bottom)
+    pdf.setTextColor(blackText[0], blackText[1], blackText[2]);
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("Terms & Conditions", 105, 250, { align: "center" });
