@@ -123,6 +123,7 @@ function InvoiceDialog({
 
   const { data: loads = [] } = useQuery<Load[]>({ queryKey: ["/api/loads"] });
   const { data: customers = [] } = useQuery<Customer[]>({ queryKey: ["/api/customers"] });
+  const { data: companySettings } = useQuery<CompanySettings>({ queryKey: ["/api/company-settings"] });
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
@@ -161,11 +162,11 @@ function InvoiceDialog({
         attachments: (invoice.attachments as any) || [],
       });
     } else {
-      // Generate shorter invoice number using timestamp (last 6 digits + 2 random digits)
-      // Format: INV-12345678 (shorter than previous INV-1701234567890)
-      const timestamp = Date.now().toString().slice(-6);
+      // Generate short numeric invoice number (6 digits)
+      // Format: 123456 (no letters, short and simple)
+      const timestamp = Date.now().toString().slice(-4);
       const random = Math.floor(10 + Math.random() * 90); // 2-digit random number
-      const invoiceNumber = `INV-${timestamp}${random}`;
+      const invoiceNumber = `${timestamp}${random}`;
       
       form.reset({
         invoiceNumber,
@@ -251,6 +252,46 @@ function InvoiceDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="space-y-4">
+            {/* Carrier & Broker Info Section */}
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Carrier Info (Your Company) */}
+              <Card className="p-4 bg-muted/30">
+                <h4 className="text-sm font-semibold mb-2 text-foreground">Carrier Information</h4>
+                {companySettings ? (
+                  <div className="text-sm space-y-1">
+                    <p className="font-medium">{companySettings.companyName}</p>
+                    <p className="text-muted-foreground">{companySettings.address}</p>
+                    <p className="text-muted-foreground">{companySettings.cityStateZip}</p>
+                    <p className="text-muted-foreground">{companySettings.phone}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Loading carrier info...</p>
+                )}
+              </Card>
+
+              {/* Broker Info (Selected Customer) */}
+              <Card className="p-4 bg-muted/30">
+                <h4 className="text-sm font-semibold mb-2 text-foreground">Broker Information</h4>
+                {(() => {
+                  const customerId = form.watch("customerId");
+                  const customer = customers.find((c) => c.id === customerId);
+                  if (customer) {
+                    return (
+                      <div className="text-sm space-y-1">
+                        <p className="font-medium">{customer.name}</p>
+                        <p className="text-muted-foreground">{customer.address || "No address"}</p>
+                        <p className="text-muted-foreground">
+                          {[customer.city, customer.state, customer.zip].filter(Boolean).join(", ") || "No city/state"}
+                        </p>
+                        <p className="text-muted-foreground">{customer.phone || "No phone"}</p>
+                      </div>
+                    );
+                  }
+                  return <p className="text-sm text-muted-foreground">Select a customer to see broker info</p>;
+                })()}
+              </Card>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
