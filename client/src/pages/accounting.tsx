@@ -87,8 +87,11 @@ const invoiceFormSchema = insertInvoiceSchema.extend({
   invoiceNumber: z.string().min(1, "Invoice number is required"),
   customerId: z.string().min(1, "Customer is required"),
   status: z.string().min(1, "Status is required"),
+  invoiceDate: z.string().min(1, "Invoice date is required"),
+  dueDate: z.string().min(1, "Due date is required"),
   subtotal: z.string().min(1, "Subtotal is required"),
   total: z.string().min(1, "Total is required"),
+  attachments: z.array(z.any()).optional(), // Accept flexible attachments format
 });
 
 const expenseFormSchema = insertExpenseSchema.extend({
