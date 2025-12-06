@@ -274,6 +274,8 @@ export const invoices = pgTable("invoices", {
   paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0"),
   notes: text("notes"),
   attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string, uploadedAt: string, label: string}
+  carrierName: text("carrier_name"), // Editable carrier name for invoice
+  carrierAddress: text("carrier_address"), // Editable carrier address for invoice
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

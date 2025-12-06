@@ -92,6 +92,9 @@ const invoiceFormSchema = insertInvoiceSchema.extend({
   subtotal: z.string().min(1, "Subtotal is required"),
   total: z.string().min(1, "Total is required"),
   attachments: z.array(z.any()).optional(), // Accept flexible attachments format
+  // Carrier info fields (editable)
+  carrierName: z.string().optional(),
+  carrierAddress: z.string().optional(),
 });
 
 const expenseFormSchema = insertExpenseSchema.extend({
@@ -144,6 +147,8 @@ function InvoiceDialog({
       paidAmount: "0",
       notes: "",
       attachments: [],
+      carrierName: "",
+      carrierAddress: "",
     },
   });
 
@@ -163,6 +168,8 @@ function InvoiceDialog({
         paidAmount: invoice.paidAmount?.toString() || "0",
         notes: invoice.notes || "",
         attachments: (invoice.attachments as any) || [],
+        carrierName: (invoice as any).carrierName || companySettings?.companyName || "",
+        carrierAddress: (invoice as any).carrierAddress || (companySettings ? `${companySettings.address}, ${companySettings.cityStateZip}` : ""),
       });
     } else {
       // Generate short numeric invoice number (6 digits)
@@ -170,6 +177,12 @@ function InvoiceDialog({
       const timestamp = Date.now().toString().slice(-4);
       const random = Math.floor(10 + Math.random() * 90); // 2-digit random number
       const invoiceNumber = `${timestamp}${random}`;
+      
+      // Pre-populate carrier info from company settings
+      const carrierName = companySettings?.companyName || "Ready TMS";
+      const carrierAddress = companySettings 
+        ? `${companySettings.address}, ${companySettings.cityStateZip}` 
+        : "2380 Wycliff Street Ste 200, St Paul, MN 55114";
       
       form.reset({
         invoiceNumber,
@@ -185,9 +198,11 @@ function InvoiceDialog({
         paidAmount: "0",
         notes: "",
         attachments: [],
+        carrierName,
+        carrierAddress,
       });
     }
-  }, [invoice, existingInvoices, form]);
+  }, [invoice, existingInvoices, form, companySettings]);
 
   // Auto-calculate total when subtotal, lumper fee, or tax changes
   useEffect(() => {
@@ -257,19 +272,47 @@ function InvoiceDialog({
           <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="space-y-4">
             {/* Carrier & Broker Info Section */}
             <div className="grid gap-4 md:grid-cols-2">
-              {/* Carrier Info (Your Company) */}
+              {/* Carrier Info (Your Company) - Editable */}
               <Card className="p-4 bg-muted/30">
-                <h4 className="text-sm font-semibold mb-2 text-foreground">Carrier Information</h4>
-                {companySettings ? (
-                  <div className="text-sm space-y-1">
-                    <p className="font-medium">{companySettings.companyName}</p>
-                    <p className="text-muted-foreground">{companySettings.address}</p>
-                    <p className="text-muted-foreground">{companySettings.cityStateZip}</p>
-                    <p className="text-muted-foreground">{companySettings.phone}</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Loading carrier info...</p>
-                )}
+                <h4 className="text-sm font-semibold mb-3 text-foreground">Carrier Information</h4>
+                <div className="space-y-3">
+                  <FormField
+                    control={form.control}
+                    name="carrierName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Carrier Name</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            placeholder="Enter carrier name"
+                            data-testid="input-carrier-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="carrierAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Carrier Address</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            placeholder="Enter carrier address"
+                            rows={2}
+                            className="resize-none"
+                            data-testid="input-carrier-address"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </Card>
 
               {/* Broker Info (Selected Customer) */}
