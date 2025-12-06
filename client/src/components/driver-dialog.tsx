@@ -150,6 +150,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       // Convert empty date strings to undefined for proper database handling
+      // For attachments, use null to explicitly clear them (not undefined which omits the field)
       const payload = {
         ...values,
         licenseExpiration: values.licenseExpiration || undefined,
@@ -162,9 +163,10 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         licenseIssuedPlace: values.licenseIssuedPlace || undefined,
         medicalCardNumber: values.medicalCardNumber || undefined,
         socialSecurityNumber: values.socialSecurityNumber || undefined,
-        licenseAttachment: values.licenseAttachment || undefined,
-        medicalCardAttachment: values.medicalCardAttachment || undefined,
-        socialSecurityAttachment: values.socialSecurityAttachment || undefined,
+        // Use null to explicitly clear attachments, empty string means remove
+        licenseAttachment: values.licenseAttachment === '' ? null : (values.licenseAttachment || undefined),
+        medicalCardAttachment: values.medicalCardAttachment === '' ? null : (values.medicalCardAttachment || undefined),
+        socialSecurityAttachment: values.socialSecurityAttachment === '' ? null : (values.socialSecurityAttachment || undefined),
       };
       if (isEditing) {
         return await apiRequest("PATCH", `/api/drivers/${driver.id}`, payload);
