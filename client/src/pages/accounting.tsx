@@ -172,11 +172,13 @@ function InvoiceDialog({
         carrierAddress: (invoice as any).carrierAddress || (companySettings ? `${companySettings.address}, ${companySettings.cityStateZip}` : ""),
       });
     } else {
-      // Generate short numeric invoice number (6 digits)
-      // Format: 123456 (no letters, short and simple)
-      const timestamp = Date.now().toString().slice(-4);
-      const random = Math.floor(10 + Math.random() * 90); // 2-digit random number
-      const invoiceNumber = `${timestamp}${random}`;
+      // Generate short numeric invoice number (4 digits like 8145)
+      // Find the highest existing invoice number and increment
+      const existingNumbers = existingInvoices
+        .map(inv => parseInt(inv.invoiceNumber))
+        .filter(n => !isNaN(n));
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 8000;
+      const invoiceNumber = String(maxNumber + 1);
       
       // Pre-populate carrier info from company settings
       const carrierName = companySettings?.companyName || "Ready TMS";
@@ -1341,10 +1343,24 @@ function EmailFactoringDialog({
     const load = loads.find((l) => l.id === invoice.loadId);
     const pdf = new jsPDF();
 
+    let yPos = 15;
+    
+    // Add logo if available from company settings
+    if (companySettings?.logoUrl) {
+      try {
+        pdf.addImage(companySettings.logoUrl, 'PNG', 15, yPos, 30, 30);
+        yPos = 50;
+      } catch (e) {
+        console.log('Could not add logo to PDF:', e);
+        yPos = 15;
+      }
+    }
+
     // Invoice Title
-    pdf.setFontSize(18);
+    pdf.setFontSize(20);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Invoice", 15, 20);
+    pdf.text("Invoice", 15, yPos);
+    yPos += 10;
     
     // Company Information - Use invoice's carrier info first, then fall back to company settings
     const carrierName = (invoice as any).carrierName || companySettings?.companyName || "Ready Carrier LLC";
@@ -1352,30 +1368,30 @@ function EmailFactoringDialog({
     
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
-    pdf.text(carrierName, 15, 30);
+    pdf.text(carrierName, 15, yPos);
+    yPos += 6;
     
+    // Split address by comma and put each part on a new line
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
-    let yPos = 36;
     if (carrierAddress) {
-      // Split address into lines if it's long
-      const addressLines = carrierAddress.split(",").map((s: string) => s.trim()).filter(Boolean);
-      addressLines.forEach((line: string) => {
-        pdf.text(line, 15, yPos);
-        yPos += 6;
+      const addressParts = carrierAddress.split(",").map((s: string) => s.trim()).filter(Boolean);
+      addressParts.forEach((part: string) => {
+        pdf.text(part.toUpperCase(), 15, yPos);
+        yPos += 5;
       });
     }
+    yPos += 5;
     
-    // Bill To Section
-    yPos += 10;
+    // Bill To Section and Invoice Info on same line
+    const billToY = yPos;
     pdf.setFont("helvetica", "bold");
     pdf.text("BILL TO", 15, yPos);
     
     // Invoice Number and Date (Right Side)
-    pdf.setFont("helvetica", "bold");
     pdf.text("INVOICE #", 130, yPos);
     pdf.setFont("helvetica", "normal");
-    pdf.text(invoice.invoiceNumber, 170, yPos);
+    pdf.text(invoice.invoiceNumber, 175, yPos);
     
     yPos += 6;
     pdf.setFont("helvetica", "normal");
@@ -1385,21 +1401,29 @@ function EmailFactoringDialog({
     pdf.setFont("helvetica", "bold");
     pdf.text("INVOICE DATE", 130, yPos);
     pdf.setFont("helvetica", "normal");
-    pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 170, yPos);
+    pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 175, yPos);
     
     yPos += 6;
     if (customer?.address) {
       pdf.text(customer.address, 15, yPos);
+      yPos += 5;
+    }
+    
+    // Customer city, state, zip
+    const customerLocation = [customer?.city, customer?.state, customer?.zip].filter(Boolean).join(", ");
+    if (customerLocation) {
+      pdf.text(customerLocation, 15, yPos);
+      yPos += 5;
     }
     
     // Table Header
-    yPos += 20;
+    yPos += 15;
     pdf.setFont("helvetica", "bold");
     pdf.text("DESCRIPTION", 15, yPos);
-    pdf.text("AMOUNT", 170, yPos);
+    pdf.text("AMOUNT", 175, yPos);
     
     yPos += 2;
-    pdf.setLineWidth(0.3);
+    pdf.setLineWidth(0.5);
     pdf.line(15, yPos, 195, yPos);
     
     // Load Number Line Item
@@ -1408,13 +1432,13 @@ function EmailFactoringDialog({
     pdf.text(`LOAD NUMBER #${load?.loadNumber || "N/A"}`, 15, yPos);
     
     const total = typeof invoice.total === 'string' ? parseFloat(invoice.total) : invoice.total;
-    pdf.text(`${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 170, yPos);
+    pdf.text(`${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 175, yPos);
     
     // Total Line
-    yPos += 15;
+    yPos += 20;
     pdf.setFont("helvetica", "bold");
-    pdf.text("TOTAL", 130, yPos);
-    pdf.text(`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 170, yPos);
+    pdf.text("TOTAL", 140, yPos);
+    pdf.text(`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 175, yPos);
     
     // Terms & Conditions (Centered at Bottom)
     pdf.setFontSize(10);
@@ -1785,10 +1809,24 @@ export default function Accounting() {
     const load = loads.find((l) => l.id === invoice.loadId);
     const pdf = new jsPDF();
     
+    let yPos = 15;
+    
+    // Add logo if available from company settings
+    if (companySettings?.logoUrl) {
+      try {
+        pdf.addImage(companySettings.logoUrl, 'PNG', 15, yPos, 30, 30);
+        yPos = 50;
+      } catch (e) {
+        console.log('Could not add logo to PDF:', e);
+        yPos = 15;
+      }
+    }
+
     // Invoice Title
-    pdf.setFontSize(18);
+    pdf.setFontSize(20);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Invoice", 15, 20);
+    pdf.text("Invoice", 15, yPos);
+    yPos += 10;
     
     // Company Information - Use invoice's carrier info first, then fall back to company settings
     const carrierName = (invoice as any).carrierName || companySettings?.companyName || "Ready Carrier LLC";
@@ -1796,30 +1834,29 @@ export default function Accounting() {
     
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
-    pdf.text(carrierName, 15, 30);
+    pdf.text(carrierName, 15, yPos);
+    yPos += 6;
     
+    // Split address by comma and put each part on a new line
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
-    let yPos = 36;
     if (carrierAddress) {
-      // Split address into lines if it's long
-      const addressLines = carrierAddress.split(",").map((s: string) => s.trim()).filter(Boolean);
-      addressLines.forEach((line: string) => {
-        pdf.text(line, 15, yPos);
-        yPos += 6;
+      const addressParts = carrierAddress.split(",").map((s: string) => s.trim()).filter(Boolean);
+      addressParts.forEach((part: string) => {
+        pdf.text(part.toUpperCase(), 15, yPos);
+        yPos += 5;
       });
     }
+    yPos += 5;
     
-    // Bill To Section
-    yPos += 10;
+    // Bill To Section and Invoice Info on same line
     pdf.setFont("helvetica", "bold");
     pdf.text("BILL TO", 15, yPos);
     
     // Invoice Number and Date (Right Side)
-    pdf.setFont("helvetica", "bold");
     pdf.text("INVOICE #", 130, yPos);
     pdf.setFont("helvetica", "normal");
-    pdf.text(invoice.invoiceNumber, 170, yPos);
+    pdf.text(invoice.invoiceNumber, 175, yPos);
     
     yPos += 6;
     pdf.setFont("helvetica", "normal");
@@ -1829,21 +1866,29 @@ export default function Accounting() {
     pdf.setFont("helvetica", "bold");
     pdf.text("INVOICE DATE", 130, yPos);
     pdf.setFont("helvetica", "normal");
-    pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 170, yPos);
+    pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 175, yPos);
     
     yPos += 6;
     if (customer?.address) {
       pdf.text(customer.address, 15, yPos);
+      yPos += 5;
+    }
+    
+    // Customer city, state, zip
+    const customerLocation = [customer?.city, customer?.state, customer?.zip].filter(Boolean).join(", ");
+    if (customerLocation) {
+      pdf.text(customerLocation, 15, yPos);
+      yPos += 5;
     }
     
     // Table Header
-    yPos += 20;
+    yPos += 15;
     pdf.setFont("helvetica", "bold");
     pdf.text("DESCRIPTION", 15, yPos);
-    pdf.text("AMOUNT", 170, yPos);
+    pdf.text("AMOUNT", 175, yPos);
     
     yPos += 2;
-    pdf.setLineWidth(0.3);
+    pdf.setLineWidth(0.5);
     pdf.line(15, yPos, 195, yPos);
     
     // Load Number Line Item
@@ -1852,13 +1897,13 @@ export default function Accounting() {
     pdf.text(`LOAD NUMBER #${load?.loadNumber || "N/A"}`, 15, yPos);
     
     const total = Number(invoice.total);
-    pdf.text(`${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 170, yPos);
+    pdf.text(`${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 175, yPos);
     
     // Total Line
-    yPos += 15;
+    yPos += 20;
     pdf.setFont("helvetica", "bold");
-    pdf.text("TOTAL", 130, yPos);
-    pdf.text(`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 170, yPos);
+    pdf.text("TOTAL", 140, yPos);
+    pdf.text(`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 175, yPos);
     
     // Terms & Conditions (Centered at Bottom)
     pdf.setFontSize(10);
