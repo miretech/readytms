@@ -172,12 +172,11 @@ function InvoiceDialog({
         carrierAddress: (invoice as any).carrierAddress || (companySettings ? `${companySettings.address}, ${companySettings.cityStateZip}` : ""),
       });
     } else {
-      // Generate short numeric invoice number (4 digits like 8145)
-      // Find the highest existing invoice number and increment
+      // Generate short numeric invoice number starting from 8200
       const existingNumbers = existingInvoices
         .map(inv => parseInt(inv.invoiceNumber))
         .filter(n => !isNaN(n));
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 8000;
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers, 8199) : 8199;
       const invoiceNumber = String(maxNumber + 1);
       
       // Pre-populate carrier info from company settings
