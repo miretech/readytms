@@ -1346,21 +1346,24 @@ function EmailFactoringDialog({
     pdf.setFont("helvetica", "bold");
     pdf.text("Invoice", 15, 20);
     
-    // Company Information
+    // Company Information - Use invoice's carrier info first, then fall back to company settings
+    const carrierName = (invoice as any).carrierName || companySettings?.companyName || "Ready Carrier LLC";
+    const carrierAddress = (invoice as any).carrierAddress || (companySettings ? `${companySettings.address || ""}, ${companySettings.cityStateZip || ""}` : "");
+    
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
-    pdf.text(companySettings?.companyName || "Ready Carrier LLC", 15, 30);
+    pdf.text(carrierName, 15, 30);
     
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
     let yPos = 36;
-    if (companySettings?.address) {
-      pdf.text(companySettings.address, 15, yPos);
-      yPos += 6;
-    }
-    if (companySettings?.cityStateZip) {
-      pdf.text(companySettings.cityStateZip, 15, yPos);
-      yPos += 6;
+    if (carrierAddress) {
+      // Split address into lines if it's long
+      const addressLines = carrierAddress.split(",").map((s: string) => s.trim()).filter(Boolean);
+      addressLines.forEach((line: string) => {
+        pdf.text(line, 15, yPos);
+        yPos += 6;
+      });
     }
     
     // Bill To Section
@@ -1787,21 +1790,24 @@ export default function Accounting() {
     pdf.setFont("helvetica", "bold");
     pdf.text("Invoice", 15, 20);
     
-    // Company Information
+    // Company Information - Use invoice's carrier info first, then fall back to company settings
+    const carrierName = (invoice as any).carrierName || companySettings?.companyName || "Ready Carrier LLC";
+    const carrierAddress = (invoice as any).carrierAddress || (companySettings ? `${companySettings.address || ""}, ${companySettings.cityStateZip || ""}` : "");
+    
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
-    pdf.text(companySettings?.companyName || "Ready Carrier LLC", 15, 30);
+    pdf.text(carrierName, 15, 30);
     
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
     let yPos = 36;
-    if (companySettings?.address) {
-      pdf.text(companySettings.address, 15, yPos);
-      yPos += 6;
-    }
-    if (companySettings?.cityStateZip) {
-      pdf.text(companySettings.cityStateZip, 15, yPos);
-      yPos += 6;
+    if (carrierAddress) {
+      // Split address into lines if it's long
+      const addressLines = carrierAddress.split(",").map((s: string) => s.trim()).filter(Boolean);
+      addressLines.forEach((line: string) => {
+        pdf.text(line, 15, yPos);
+        yPos += 6;
+      });
     }
     
     // Bill To Section
