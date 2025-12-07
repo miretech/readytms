@@ -130,6 +130,8 @@ function InvoiceDialog({
   const { data: loads = [] } = useQuery<Load[]>({ queryKey: ["/api/loads"] });
   const { data: customers = [] } = useQuery<Customer[]>({ queryKey: ["/api/customers"] });
   const { data: companySettings } = useQuery<CompanySettings>({ queryKey: ["/api/company-settings"] });
+  // Fetch all invoices directly to ensure we have the latest data for invoice number generation
+  const { data: allInvoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
@@ -173,8 +175,10 @@ function InvoiceDialog({
       });
     } else {
       // Generate short numeric invoice number starting from 8200
+      // Use allInvoices (directly fetched) to ensure we have the latest data
       // Only consider invoice numbers in the 8200-99999 range (4-5 digit numbers starting from 8200)
-      const existingNumbers = existingInvoices
+      const invoicesToCheck = allInvoices.length > 0 ? allInvoices : existingInvoices;
+      const existingNumbers = invoicesToCheck
         .map(inv => parseInt(inv.invoiceNumber))
         .filter(n => !isNaN(n) && n >= 8200 && n < 100000);
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 8199;
@@ -204,7 +208,7 @@ function InvoiceDialog({
         carrierAddress,
       });
     }
-  }, [invoice, existingInvoices, form, companySettings]);
+  }, [invoice, existingInvoices, allInvoices, form, companySettings]);
 
   // Auto-calculate total when subtotal, lumper fee, or tax changes
   useEffect(() => {
