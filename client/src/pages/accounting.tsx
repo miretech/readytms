@@ -173,10 +173,11 @@ function InvoiceDialog({
       });
     } else {
       // Generate short numeric invoice number starting from 8200
+      // Only consider invoice numbers in the 8200-99999 range (4-5 digit numbers starting from 8200)
       const existingNumbers = existingInvoices
         .map(inv => parseInt(inv.invoiceNumber))
-        .filter(n => !isNaN(n));
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers, 8199) : 8199;
+        .filter(n => !isNaN(n) && n >= 8200 && n < 100000);
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 8199;
       const invoiceNumber = String(maxNumber + 1);
       
       // Pre-populate carrier info from company settings
