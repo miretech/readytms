@@ -31,9 +31,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Truck as TruckIcon, FileText, Upload, X, Download, Calendar } from "lucide-react";
+import { Truck as TruckIcon, FileText, Upload, X, Download, Calendar, Wrench, User, ClipboardCheck } from "lucide-react";
 
 interface FileAttachment {
   fileName: string;
@@ -60,6 +61,8 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
   const { toast } = useToast();
   const isEditing = !!truck;
   const [cabCardFiles, setCabCardFiles] = useState<FileAttachment[]>([]);
+  const [dotInspectionFiles, setDotInspectionFiles] = useState<FileAttachment[]>([]);
+  const [repairReceiptFiles, setRepairReceiptFiles] = useState<FileAttachment[]>([]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -73,6 +76,12 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
       make: "",
       model: "",
       cabCardExpirationDate: "",
+      dotInspectionDate: "",
+      dotInspectionExpirationDate: "",
+      dateAddedToCompany: "",
+      dateTerminated: "",
+      ownerFullName: "",
+      isCompanyTruck: false,
     },
   });
 
@@ -88,8 +97,16 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
         make: truck.make || "",
         model: truck.model || "",
         cabCardExpirationDate: truck.cabCardExpirationDate || "",
+        dotInspectionDate: (truck as any).dotInspectionDate || "",
+        dotInspectionExpirationDate: (truck as any).dotInspectionExpirationDate || "",
+        dateAddedToCompany: (truck as any).dateAddedToCompany || "",
+        dateTerminated: (truck as any).dateTerminated || "",
+        ownerFullName: (truck as any).ownerFullName || "",
+        isCompanyTruck: (truck as any).isCompanyTruck || false,
       });
       setCabCardFiles((truck.cabCardAttachments as FileAttachment[]) || []);
+      setDotInspectionFiles(((truck as any).dotInspectionAttachments as FileAttachment[]) || []);
+      setRepairReceiptFiles(((truck as any).repairReceiptAttachments as FileAttachment[]) || []);
     } else {
       form.reset({
         truckNumber: "",
@@ -101,8 +118,16 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
         make: "",
         model: "",
         cabCardExpirationDate: "",
+        dotInspectionDate: "",
+        dotInspectionExpirationDate: "",
+        dateAddedToCompany: "",
+        dateTerminated: "",
+        ownerFullName: "",
+        isCompanyTruck: false,
       });
       setCabCardFiles([]);
+      setDotInspectionFiles([]);
+      setRepairReceiptFiles([]);
     }
   }, [truck, form, open]);
 
@@ -140,6 +165,24 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
     maxSize: 10 * 1024 * 1024,
   });
 
+  const dotInspectionDropzone = useDropzone({
+    onDrop: (files) => handleFileUpload(files, setDotInspectionFiles),
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+    },
+    maxSize: 10 * 1024 * 1024,
+  });
+
+  const repairReceiptDropzone = useDropzone({
+    onDrop: (files) => handleFileUpload(files, setRepairReceiptFiles),
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+    },
+    maxSize: 10 * 1024 * 1024,
+  });
+
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const payload = {
@@ -149,6 +192,14 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
         model: values.model || undefined,
         cabCardExpirationDate: values.cabCardExpirationDate || undefined,
         cabCardAttachments: cabCardFiles.length > 0 ? cabCardFiles : undefined,
+        dotInspectionDate: (values as any).dotInspectionDate || undefined,
+        dotInspectionExpirationDate: (values as any).dotInspectionExpirationDate || undefined,
+        dotInspectionAttachments: dotInspectionFiles.length > 0 ? dotInspectionFiles : undefined,
+        repairReceiptAttachments: repairReceiptFiles.length > 0 ? repairReceiptFiles : undefined,
+        dateAddedToCompany: (values as any).dateAddedToCompany || undefined,
+        dateTerminated: (values as any).dateTerminated || undefined,
+        ownerFullName: (values as any).ownerFullName || undefined,
+        isCompanyTruck: (values as any).isCompanyTruck || false,
       };
       if (isEditing) {
         return await apiRequest("PATCH", `/api/trucks/${truck.id}`, payload);
@@ -183,6 +234,82 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
     link.click();
   };
 
+  const isCompanyTruck = form.watch("isCompanyTruck");
+
+  const FileUploadSection = ({ 
+    dropzone, 
+    files, 
+    setFiles, 
+    title, 
+    testIdPrefix 
+  }: { 
+    dropzone: ReturnType<typeof useDropzone>;
+    files: FileAttachment[];
+    setFiles: React.Dispatch<React.SetStateAction<FileAttachment[]>>;
+    title: string;
+    testIdPrefix: string;
+  }) => (
+    <div className="space-y-2">
+      <label className="text-sm font-medium flex items-center gap-2">
+        <FileText className="h-4 w-4" />
+        {title}
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Upload documents (PDF or images, max 10MB each)
+      </p>
+      
+      <div
+        {...dropzone.getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+          dropzone.isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary"
+        }`}
+        data-testid={`dropzone-${testIdPrefix}`}
+      >
+        <input {...dropzone.getInputProps()} />
+        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          {dropzone.isDragActive
+            ? "Drop the files here..."
+            : "Drag & drop files here, or click to select"}
+        </p>
+      </div>
+
+      {files.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-sm font-medium">Uploaded Documents ({files.length})</p>
+          {files.map((file, index) => (
+            <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm truncate">{file.fileName}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => downloadFile(file)}
+                  data-testid={`button-download-${testIdPrefix}-${index}`}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeFile(index, setFiles)}
+                  data-testid={`button-remove-${testIdPrefix}-${index}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh]">
@@ -196,14 +323,26 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="basic" data-testid="tab-basic">
                   <TruckIcon className="mr-2 h-4 w-4" />
-                  Basic Info
+                  Basic
                 </TabsTrigger>
                 <TabsTrigger value="cabcard" data-testid="tab-cabcard">
                   <FileText className="mr-2 h-4 w-4" />
                   Cab Card
+                </TabsTrigger>
+                <TabsTrigger value="dotinspection" data-testid="tab-dotinspection">
+                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                  DOT
+                </TabsTrigger>
+                <TabsTrigger value="repairs" data-testid="tab-repairs">
+                  <Wrench className="mr-2 h-4 w-4" />
+                  Repairs
+                </TabsTrigger>
+                <TabsTrigger value="owner" data-testid="tab-owner">
+                  <User className="mr-2 h-4 w-4" />
+                  Owner
                 </TabsTrigger>
               </TabsList>
 
@@ -378,64 +517,189 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                       )}
                     />
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Cab Card Documents
-                      </label>
-                      <p className="text-xs text-muted-foreground">
-                        Upload cab card documents (PDF or images, max 10MB each)
-                      </p>
-                      
-                      <div
-                        {...cabCardDropzone.getRootProps()}
-                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                          cabCardDropzone.isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary"
-                        }`}
-                        data-testid="dropzone-cab-card"
-                      >
-                        <input {...cabCardDropzone.getInputProps()} />
-                        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          {cabCardDropzone.isDragActive
-                            ? "Drop the files here..."
-                            : "Drag & drop files here, or click to select"}
-                        </p>
-                      </div>
+                    <FileUploadSection
+                      dropzone={cabCardDropzone}
+                      files={cabCardFiles}
+                      setFiles={setCabCardFiles}
+                      title="Cab Card Documents"
+                      testIdPrefix="cabcard"
+                    />
+                  </div>
+                </TabsContent>
 
-                      {cabCardFiles.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                          <p className="text-sm font-medium">Uploaded Documents ({cabCardFiles.length})</p>
-                          {cabCardFiles.map((file, index) => (
-                            <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
-                              <div className="flex items-center gap-2 overflow-hidden">
-                                <FileText className="h-4 w-4 flex-shrink-0" />
-                                <span className="text-sm truncate">{file.fileName}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => downloadFile(file)}
-                                  data-testid={`button-download-cabcard-${index}`}
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removeFile(index, setCabCardFiles)}
-                                  data-testid={`button-remove-cabcard-${index}`}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                <TabsContent value="dotinspection" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-lg">Annual DOT Inspection</h3>
+                    
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="dotInspectionDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Inspection Date
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="date" 
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-dot-inspection-date" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="dotInspectionExpirationDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Expiration Date
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="date" 
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-dot-expiration-date" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FileUploadSection
+                      dropzone={dotInspectionDropzone}
+                      files={dotInspectionFiles}
+                      setFiles={setDotInspectionFiles}
+                      title="DOT Inspection Documents"
+                      testIdPrefix="dotinspection"
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="repairs" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-lg">Repair Receipts</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Upload repair receipts and maintenance records for this truck.
+                    </p>
+
+                    <FileUploadSection
+                      dropzone={repairReceiptDropzone}
+                      files={repairReceiptFiles}
+                      setFiles={setRepairReceiptFiles}
+                      title="Repair Receipt Documents"
+                      testIdPrefix="repairs"
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="owner" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-lg">Owner & Company Information</h3>
+
+                    <FormField
+                      control={form.control}
+                      name="isCompanyTruck"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-company-truck"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              This is a company truck
+                            </FormLabel>
+                            <p className="text-sm text-muted-foreground">
+                              Check this if the truck is owned by the company (owner info is optional)
+                            </p>
+                          </div>
+                        </FormItem>
                       )}
+                    />
+
+                    {!isCompanyTruck && (
+                      <FormField
+                        control={form.control}
+                        name="ownerFullName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              Owner Full Name
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                value={field.value || ""} 
+                                placeholder="John Smith" 
+                                data-testid="input-owner-name" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="dateAddedToCompany"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Date Added to Company
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="date" 
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-date-added" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="dateTerminated"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Date Terminated
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="date" 
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-date-terminated" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   </div>
                 </TabsContent>

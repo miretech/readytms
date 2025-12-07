@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, integer, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, integer, index, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -60,6 +60,18 @@ export const trucks = pgTable("trucks", {
   // Cab Card section
   cabCardExpirationDate: text("cab_card_expiration_date"),
   cabCardAttachments: jsonb("cab_card_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Annual DOT Inspection section
+  dotInspectionDate: text("dot_inspection_date"),
+  dotInspectionExpirationDate: text("dot_inspection_expiration_date"),
+  dotInspectionAttachments: jsonb("dot_inspection_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Repair Receipts
+  repairReceiptAttachments: jsonb("repair_receipt_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Company Dates
+  dateAddedToCompany: text("date_added_to_company"),
+  dateTerminated: text("date_terminated"),
+  // Owner Info
+  ownerFullName: text("owner_full_name"),
+  isCompanyTruck: boolean("is_company_truck").default(false),
 });
 
 export const insertTruckSchema = createInsertSchema(trucks).omit({
