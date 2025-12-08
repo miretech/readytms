@@ -13,42 +13,40 @@ import {
   Clock,
   ArrowRight,
   CheckCircle2,
-  Package
+  Package,
+  Wrench,
+  Fuel,
+  ListTodo,
+  ClipboardList,
+  ChevronDown,
+  Building2
 } from "lucide-react";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
 
 export default function Landing() {
-  const features = [
-    {
-      icon: Package,
-      title: "Load Management",
-      description: "AI-powered load extraction from rate confirmations with complete lifecycle tracking."
-    },
-    {
-      icon: Truck,
-      title: "Fleet Management",
-      description: "Track trucks, trailers, and equipment with real-time status updates and maintenance scheduling."
-    },
-    {
-      icon: Users,
-      title: "Driver Management",
-      description: "Manage driver profiles, DOT compliance, CDL tracking, and automated document expiration alerts."
-    },
-    {
-      icon: DollarSign,
-      title: "Full Accounting",
-      description: "Invoicing, expenses, payments, and driver settlements with professional PDF generation."
-    },
-    {
-      icon: MapPin,
-      title: "GPS Tracking",
-      description: "Real-time driver location tracking with automated notification systems."
-    },
-    {
-      icon: Shield,
-      title: "Safety & Compliance",
-      description: "DOT inspections, accident reporting, violation tracking with document management."
-    },
+  const allFeatures = [
+    { icon: Package, title: "Load Management", description: "AI-powered load extraction with lifecycle tracking" },
+    { icon: Truck, title: "Truck Management", description: "Fleet inventory with DOT inspection & cab card tracking" },
+    { icon: ClipboardList, title: "Trailer Management", description: "Trailer inventory with insurance & rent tracking" },
+    { icon: Users, title: "Driver Management", description: "Driver profiles, DOT compliance, CDL tracking" },
+    { icon: MapPin, title: "GPS Tracking", description: "Real-time location tracking with notifications" },
+    { icon: Shield, title: "Safety & Compliance", description: "Inspections, accidents, violations with documents" },
+    { icon: DollarSign, title: "Invoicing (AR)", description: "Invoice generation with PDF export & email" },
+    { icon: FileText, title: "Driver Settlements", description: "Automated payroll with dynamic fee calculations" },
+    { icon: Building2, title: "Customer CRM", description: "Shipper & receiver relationship management" },
+    { icon: Fuel, title: "Fuel Tracking", description: "Fuel card accounts & transaction management" },
+    { icon: Wrench, title: "Maintenance", description: "Service records with automated reminders" },
+    { icon: ListTodo, title: "Task Manager", description: "Daily tasks & recurring reminders" },
   ];
+
+  const features = allFeatures.slice(0, 6);
 
   const benefits = [
     "Complete load-to-invoice workflow automation",
@@ -69,11 +67,36 @@ export default function Landing() {
             </div>
             <span className="text-2xl font-bold text-primary">ReadyTMS</span>
           </div>
-          <nav className="hidden md:flex items-center gap-6">
-            <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </a>
-            <a href="#benefits" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <nav className="hidden md:flex items-center gap-2">
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent">Features</NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <div className="w-[600px] p-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {allFeatures.map((feature, index) => (
+                          <a
+                            key={index}
+                            href="#features"
+                            className="flex items-start gap-3 rounded-md p-3 hover:bg-muted transition-colors"
+                          >
+                            <div className="p-2 rounded-md bg-primary/10 shrink-0">
+                              <feature.icon className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium">{feature.title}</div>
+                              <div className="text-xs text-muted-foreground">{feature.description}</div>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+            <a href="#benefits" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2">
               Benefits
             </a>
           </nav>
