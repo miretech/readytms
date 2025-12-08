@@ -34,6 +34,7 @@ import CompanySettings from "@/pages/company-settings";
 import AdminApprovals from "@/pages/admin-approvals";
 import Login from "@/pages/login";
 import ResetPassword from "@/pages/reset-password";
+import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
 // Protected routes require authentication
@@ -65,17 +66,46 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <Component />;
 }
 
+// Home route - shows landing for guests, redirects to dashboard for authenticated users
+function HomeRoute() {
+  const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  
+  React.useEffect(() => {
+    if (!isLoading && user) {
+      setLocation("/dashboard");
+    }
+  }, [user, isLoading, setLocation]);
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (user) {
+    return null;
+  }
+  
+  return <Landing />;
+}
+
 function Router() {
   return (
     <Switch>
       {/* Public routes */}
+      <Route path="/" component={HomeRoute} />
       <Route path="/login" component={Login} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/driver-signup" component={DriverSignup} />
       <Route path="/driver-pod" component={DriverPOD} />
       
       {/* Protected admin routes */}
-      <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
       <Route path="/dashboard">{() => <ProtectedRoute component={Dashboard} />}</Route>
       <Route path="/loads">{() => <ProtectedRoute component={Loads} />}</Route>
       <Route path="/trucks">{() => <ProtectedRoute component={Trucks} />}</Route>
@@ -103,7 +133,7 @@ function Router() {
 function AppContent() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const isPublicPage = ["/login", "/reset-password", "/driver-signup", "/driver-pod"].includes(location);
+  const isPublicPage = ["/", "/login", "/reset-password", "/driver-signup", "/driver-pod"].includes(location);
 
   const style = {
     "--sidebar-width": "16rem",
