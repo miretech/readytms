@@ -65,22 +65,34 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Admin login strategy
+  // Admin login strategy (for admin role only)
   passport.use('admin-local', new LocalStrategy(
     {
       usernameField: 'email',
-      passwordField: 'password'
+      passwordField: 'password',
+      passReqToCallback: true
     },
-    async (email, password, done) => {
+    async (req, email, password, done) => {
       try {
         const user = await storage.getUserByEmail(email);
+        const expectedRole = req.body.expectedRole || 'admin';
         
         if (!user) {
           return done(null, false, { message: 'Invalid email or password' });
         }
 
         if (user.isAdmin !== 'true') {
-          return done(null, false, { message: 'Unauthorized: Admin access required' });
+          return done(null, false, { message: 'Unauthorized: Access denied' });
+        }
+
+        // Check if the user's role matches the expected role
+        const userRole = user.role || 'admin';
+        if (userRole !== expectedRole) {
+          if (expectedRole === 'admin') {
+            return done(null, false, { message: 'This account is not registered as an Admin. Please use the Dispatch login.' });
+          } else {
+            return done(null, false, { message: 'This account is not registered as Dispatch. Please use the Admin login.' });
+          }
         }
 
         // Check if the account is approved
@@ -93,7 +105,7 @@ export async function setupAuth(app: Express) {
           return done(null, false, { message: 'Invalid email or password' });
         }
 
-        return done(null, { id: user.id, email: user.email, type: 'admin' });
+        return done(null, { id: user.id, email: user.email, type: 'admin', role: userRole });
       } catch (error) {
         return done(error);
       }
