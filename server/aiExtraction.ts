@@ -18,6 +18,8 @@ const extractedLoadSchema = z.object({
   notes: z.string().nullable().describe("Any additional notes or special instructions"),
   brokerName: z.string().nullable().describe("Name of the broker or freight company issuing the rate confirmation"),
   brokerAddress: z.string().nullable().describe("Full address of the broker including street, city, state, and ZIP"),
+  brokerPhone: z.string().nullable().describe("Phone number of the broker"),
+  brokerEmail: z.string().nullable().describe("Email address of the broker"),
 });
 
 export type ExtractedLoad = z.infer<typeof extractedLoadSchema>;
@@ -43,7 +45,10 @@ Guidelines:
 - Extract load number or reference number if present
 - Extract broker/freight company name (the company issuing the rate confirmation)
 - Extract broker's full address including street, city, state, and ZIP code
-- Include any special instructions or notes`,
+- Extract broker's phone number if available
+- Extract broker's email address if available
+- Include any special instructions or notes
+- Return null for any field that is not found - do not return explanatory text`,
       },
     ];
 
@@ -166,8 +171,16 @@ Guidelines:
                 type: ["string", "null"],
                 description: "Full address of the broker including street, city, state, and ZIP. Return null if not found - do not return explanatory text.",
               },
+              brokerPhone: {
+                type: ["string", "null"],
+                description: "Phone number of the broker. Return null if not found.",
+              },
+              brokerEmail: {
+                type: ["string", "null"],
+                description: "Email address of the broker. Return null if not found.",
+              },
             },
-            required: ["loadNumber", "pickupLocation", "pickupDate", "deliveryLocation", "deliveryDate", "rate", "weight", "commodity", "notes", "brokerName", "brokerAddress"],
+            required: ["loadNumber", "pickupLocation", "pickupDate", "deliveryLocation", "deliveryDate", "rate", "weight", "commodity", "notes", "brokerName", "brokerAddress", "brokerPhone", "brokerEmail"],
             additionalProperties: false,
           },
         },
