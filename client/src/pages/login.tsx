@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +21,19 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const [showRegister, setShowRegister] = useState(false);
+
+  // Get role from query parameter (admin or dispatch)
+  const role = useMemo(() => {
+    const params = new URLSearchParams(search);
+    const roleParam = params.get("role");
+    return roleParam === "dispatch" ? "dispatch" : "admin";
+  }, [search]);
+
+  const isDispatch = role === "dispatch";
+  const roleLabel = isDispatch ? "Dispatch" : "Admin";
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -56,7 +67,7 @@ export default function Login() {
 
   const registerMutation = useMutation({
     mutationFn: async (values: LoginFormValues) => {
-      return await apiRequest("POST", "/api/admin/register", values);
+      return await apiRequest("POST", "/api/admin/register", { ...values, role });
     },
     onSuccess: (data: any) => {
       if (data.pendingApproval) {
@@ -103,11 +114,11 @@ export default function Login() {
 
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{showRegister ? "Create Admin Account" : "Admin Login"}</CardTitle>
+          <CardTitle>{showRegister ? `Create ${roleLabel} Account` : `${roleLabel} Login`}</CardTitle>
           <CardDescription>
             {showRegister 
-              ? "Register a new admin account to get started" 
-              : "Welcome! Please log in to continue"}
+              ? `Register a new ${roleLabel.toLowerCase()} account to get started` 
+              : `Welcome! Please log in to continue as ${roleLabel.toLowerCase()}`}
           </CardDescription>
         </CardHeader>
         <CardContent>

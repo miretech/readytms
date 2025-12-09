@@ -55,11 +55,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin register
   app.post("/api/admin/register", async (req, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      const { email, password, firstName, lastName, role } = req.body;
       
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
+
+      // Validate role - only allow admin or dispatch
+      const userRole = role === "dispatch" ? "dispatch" : "admin";
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
@@ -76,7 +79,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword,
         firstName: firstName || null,
         lastName: lastName || null,
-        isAdmin: "true",
+        isAdmin: userRole === "admin" ? "true" : "false",
+        role: userRole,
         approved: isFirstAdmin ? "true" : "false", // First admin is auto-approved
         approvedBy: isFirstAdmin ? null : null,
         approvedAt: isFirstAdmin ? new Date() : null,

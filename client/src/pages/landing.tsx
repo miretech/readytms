@@ -100,11 +100,16 @@ export default function Landing() {
               Benefits
             </a>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <ThemeToggle />
             <Link href="/login">
               <Button variant="outline" size="sm" data-testid="button-admin-login-header">
-                Admin Login
+                Admin
+              </Button>
+            </Link>
+            <Link href="/login?role=dispatch">
+              <Button variant="outline" size="sm" data-testid="button-dispatch-login-header">
+                Dispatch
               </Button>
             </Link>
             <Link href="/driver-pod">
@@ -129,11 +134,17 @@ export default function Landing() {
                 Streamline your trucking operations with our comprehensive TMS solution. 
                 From dispatch to settlement, manage everything in one place.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
                 <Link href="/login">
                   <Button size="lg" className="gap-2 text-lg px-8" data-testid="button-admin-login-hero">
                     Admin Login
                     <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link href="/login?role=dispatch">
+                  <Button size="lg" variant="outline" className="gap-2 text-lg px-8" data-testid="button-dispatch-login-hero">
+                    Dispatch Login
+                    <Package className="h-5 w-5" />
                   </Button>
                 </Link>
                 <Link href="/driver-pod">
@@ -225,18 +236,34 @@ export default function Landing() {
 
         <section className="py-16 bg-muted/30">
           <div className="container mx-auto px-4 md:px-8">
-            <div className="grid md:grid-cols-2 gap-8">
+            <div className="grid md:grid-cols-3 gap-8">
               <Card className="p-8 text-center">
                 <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto mb-4">
                   <Shield className="h-8 w-8 text-primary" />
                 </div>
                 <h3 className="text-2xl font-bold mb-3">For Administrators</h3>
                 <p className="text-muted-foreground mb-6">
-                  Manage your entire fleet operation including dispatch, drivers, trucks, accounting, and compliance.
+                  Full system access including accounting, settlements, company settings, and user management.
                 </p>
                 <Link href="/login">
                   <Button size="lg" className="gap-2 px-8" data-testid="button-admin-login-card">
                     Admin Login
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </Card>
+
+              <Card className="p-8 text-center">
+                <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto mb-4">
+                  <Package className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-2xl font-bold mb-3">For Dispatch</h3>
+                <p className="text-muted-foreground mb-6">
+                  Manage loads, assign drivers, track trucks, handle customers, and daily dispatch operations.
+                </p>
+                <Link href="/login?role=dispatch">
+                  <Button size="lg" variant="outline" className="gap-2 px-8" data-testid="button-dispatch-login-card">
+                    Dispatch Login
                     <ArrowRight className="h-5 w-5" />
                   </Button>
                 </Link>
@@ -291,10 +318,15 @@ export default function Landing() {
             <p className="text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} Ready TMS. All rights reserved.
             </p>
-            <div className="flex gap-6">
+            <div className="flex gap-6 flex-wrap justify-center">
               <Link href="/login">
                 <span className="text-sm text-muted-foreground hover:text-foreground cursor-pointer">
-                  Admin Login
+                  Admin
+                </span>
+              </Link>
+              <Link href="/login?role=dispatch">
+                <span className="text-sm text-muted-foreground hover:text-foreground cursor-pointer">
+                  Dispatch
                 </span>
               </Link>
               <Link href="/driver-pod">

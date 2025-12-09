@@ -16,6 +16,7 @@ export const sessions = pgTable(
 
 // User storage table for email/password authentication
 // IMPORTANT: Keep default() on id for migration compatibility from old UUID-based system
+// Role: "admin" = full access, "dispatch" = load/dispatch operations, "driver" = driver portal only
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique().notNull(),
@@ -24,6 +25,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   isAdmin: text("is_admin").notNull().default("false"),
+  role: text("role").notNull().default("admin"), // "admin", "dispatch", or "driver"
   approved: text("approved").notNull().default("false"), // Admin approval status
   approvedBy: varchar("approved_by"), // ID of admin who approved this account
   approvedAt: timestamp("approved_at"), // When the account was approved
