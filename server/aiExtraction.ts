@@ -164,7 +164,7 @@ Guidelines:
               },
               brokerAddress: {
                 type: ["string", "null"],
-                description: "Full address of the broker including street, city, state, and ZIP",
+                description: "Full address of the broker including street, city, state, and ZIP. Return null if not found - do not return explanatory text.",
               },
             },
             required: ["loadNumber", "pickupLocation", "pickupDate", "deliveryLocation", "deliveryDate", "rate", "weight", "commodity", "notes", "brokerName", "brokerAddress"],

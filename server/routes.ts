@@ -731,6 +731,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .trim();
         };
         
+        // Clean broker address - filter out explanatory AI messages
+        const cleanBrokerAddress = (address: string | null): string | null => {
+          if (!address) return null;
+          const lowerAddress = address.toLowerCase();
+          // Filter out common AI explanatory text
+          if (lowerAddress.includes('not explicitly mentioned') ||
+              lowerAddress.includes('not mentioned') ||
+              lowerAddress.includes('not found') ||
+              lowerAddress.includes('not available') ||
+              lowerAddress.includes('not provided') ||
+              lowerAddress.includes('n/a') ||
+              lowerAddress.includes('unknown') ||
+              address.trim().length < 5) {
+            return null;
+          }
+          return address;
+        };
+        
+        const cleanedBrokerAddress = cleanBrokerAddress(extractedData.brokerAddress);
+        
         const normalizedBrokerName = normalizeName(extractedData.brokerName);
         
         // Check if customer already exists with this name
@@ -746,7 +766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Create new customer with extracted broker information
           const newCustomer = await storage.createCustomer({
             name: extractedData.brokerName,
-            address: extractedData.brokerAddress || null,
+            address: cleanedBrokerAddress,
             city: null,
             state: null,
             zip: null,
