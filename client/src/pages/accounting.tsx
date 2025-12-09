@@ -112,6 +112,32 @@ type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
+// Helper function to clean AI-generated invalid addresses
+function cleanAddress(address: string | null | undefined): string | null {
+  if (!address) return null;
+  
+  const invalidPatterns = [
+    /not\s*(explicitly\s*)?(defined|found|available|provided|specified|mentioned)/i,
+    /address\s*not\s*(explicitly\s*)?(defined|found|available|provided|specified|mentioned)/i,
+    /contact\s*information\s*includes/i,
+    /n\/a/i,
+    /^none$/i,
+    /^null$/i,
+    /^undefined$/i,
+    /not\s*listed/i,
+    /not\s*given/i,
+    /no\s*address/i,
+  ];
+  
+  for (const pattern of invalidPatterns) {
+    if (pattern.test(address)) {
+      return null;
+    }
+  }
+  
+  return address;
+}
+
 // Invoice Dialog Component
 function InvoiceDialog({
   open,
@@ -331,7 +357,7 @@ function InvoiceDialog({
                     return (
                       <div className="text-sm space-y-1">
                         <p className="font-medium">{customer.name}</p>
-                        <p className="text-muted-foreground">{customer.address || "No address"}</p>
+                        <p className="text-muted-foreground">{cleanAddress(customer.address) || "No address"}</p>
                         <p className="text-muted-foreground">
                           {[customer.city, customer.state, customer.zip].filter(Boolean).join(", ") || "No city/state"}
                         </p>
@@ -1425,8 +1451,9 @@ function EmailFactoringDialog({
     pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 175, yPos);
     
     yPos += 6;
-    if (customer?.address) {
-      pdf.text(customer.address, 15, yPos);
+    const cleanedAddress = cleanAddress(customer?.address);
+    if (cleanedAddress) {
+      pdf.text(cleanedAddress, 15, yPos);
       yPos += 5;
     }
     
@@ -1913,8 +1940,9 @@ export default function Accounting() {
     pdf.text(new Date(invoice.invoiceDate).toLocaleDateString(), 175, yPos);
     
     yPos += 6;
-    if (customer?.address) {
-      pdf.text(customer.address, 15, yPos);
+    const cleanedAddress = cleanAddress(customer?.address);
+    if (cleanedAddress) {
+      pdf.text(cleanedAddress, 15, yPos);
       yPos += 5;
     }
     
