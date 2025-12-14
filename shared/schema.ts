@@ -3,6 +3,48 @@ import { pgTable, text, varchar, decimal, timestamp, integer, index, jsonb, bool
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Companies - Multi-tenant support for managing multiple trucking companies
+export const companies = pgTable("companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  address: text("address"),
+  cityStateZip: text("city_state_zip"),
+  phone: text("phone"),
+  email: text("email"),
+  logoUrl: text("logo_url"),
+  isActive: text("is_active").notNull().default("true"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
+
+// Company Users - Links users to companies with roles
+export const companyUsers = pgTable("company_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  companyId: varchar("company_id").notNull(),
+  role: text("role").notNull().default("admin"), // "admin", "dispatch", "driver"
+  isPrimary: text("is_primary").notNull().default("false"), // "true" = default company on login
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCompanyUserSchema = createInsertSchema(companyUsers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCompanyUser = z.infer<typeof insertCompanyUserSchema>;
+export type CompanyUser = typeof companyUsers.$inferSelect;
+
 // Session storage table for Replit Auth
 export const sessions = pgTable(
   "sessions",
@@ -51,7 +93,8 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 export const trucks = pgTable("trucks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  truckNumber: text("truck_number").notNull().unique(),
+  companyId: varchar("company_id"),
+  truckNumber: text("truck_number").notNull(),
   type: text("type").notNull(),
   status: text("status").notNull(),
   licensePlate: text("license_plate").notNull(),
@@ -87,7 +130,8 @@ export type Truck = typeof trucks.$inferSelect;
 
 export const trailers = pgTable("trailers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  trailerNumber: text("trailer_number").notNull().unique(),
+  companyId: varchar("company_id"),
+  trailerNumber: text("trailer_number").notNull(),
   type: text("type").notNull(),
   status: text("status").notNull(),
   licensePlate: text("license_plate").notNull(),
@@ -123,8 +167,9 @@ export type Trailer = typeof trailers.$inferSelect;
 
 export const drivers = pgTable("drivers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  email: text("email").notNull(),
   password: text("password"), // Bcrypt hashed password (optional for drivers created by admin)
   phone: text("phone").notNull(),
   address: text("address"),
@@ -166,6 +211,7 @@ export type Driver = typeof drivers.$inferSelect;
 
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
@@ -187,7 +233,8 @@ export type Customer = typeof customers.$inferSelect;
 
 export const loads = pgTable("loads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  loadNumber: text("load_number").notNull().unique(),
+  companyId: varchar("company_id"),
+  loadNumber: text("load_number").notNull(),
   customerId: varchar("customer_id"), // Optional - can be added via AI extraction later
   status: text("status").notNull(),
   pickupLocation: text("pickup_location").notNull(),
@@ -249,6 +296,7 @@ export type Document = typeof documents.$inferSelect;
 // Expenses - Individual expense tracking
 export const expenses = pgTable("expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   loadId: varchar("load_id"),
   category: text("category").notNull(),
   description: text("description").notNull(),
@@ -275,7 +323,8 @@ export type Expense = typeof expenses.$inferSelect;
 // Invoices - Customer billing
 export const invoices = pgTable("invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  invoiceNumber: text("invoice_number").notNull().unique(),
+  companyId: varchar("company_id"),
+  invoiceNumber: text("invoice_number").notNull(),
   loadId: varchar("load_id").notNull(),
   customerId: varchar("customer_id").notNull(),
   status: text("status").notNull(),
@@ -319,6 +368,7 @@ export type Invoice = typeof invoices.$inferSelect;
 // Payments - Payment tracking
 export const payments = pgTable("payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   invoiceId: varchar("invoice_id"),
   customerId: varchar("customer_id"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
@@ -343,6 +393,7 @@ export type Payment = typeof payments.$inferSelect;
 // Safety Inspections
 export const inspections = pgTable("inspections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   truckId: varchar("truck_id").notNull(),
   driverId: varchar("driver_id").notNull(),
   inspectionType: text("inspection_type").notNull(),
@@ -373,6 +424,7 @@ export type Inspection = typeof inspections.$inferSelect;
 // Accidents & Incidents
 export const accidents = pgTable("accidents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   driverId: varchar("driver_id").notNull(),
   truckId: varchar("truck_id"),
   loadId: varchar("load_id"),
@@ -408,6 +460,7 @@ export type Accident = typeof accidents.$inferSelect;
 // Violations - DOT/Traffic violations
 export const violations = pgTable("violations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   driverId: varchar("driver_id").notNull(),
   truckId: varchar("truck_id"),
   violationType: text("violation_type").notNull(),
@@ -443,6 +496,7 @@ export type Violation = typeof violations.$inferSelect;
 // Driver Settlements - Payroll/Payments to drivers
 export const settlements = pgTable("settlements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   driverId: varchar("driver_id").notNull(),
   truckNumber: text("truck_number"),
   settlementNumber: text("settlement_number").notNull().unique(),
@@ -540,6 +594,7 @@ export type Settlement = typeof settlements.$inferSelect;
 // Settlement Line Items - Individual loads/entries within a settlement
 export const settlementLineItems = pgTable("settlement_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   settlementId: varchar("settlement_id").notNull(),
   loadId: varchar("load_id"), // Optional - can be manual entry
   brokerName: text("broker_name"), // Broker/Customer name for this load
@@ -570,6 +625,7 @@ export type SettlementLineItem = typeof settlementLineItems.$inferSelect;
 // Recurring Expenses - Templates for recurring deductions
 export const recurringExpenses = pgTable("recurring_expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   driverId: varchar("driver_id"), // null = applies to all drivers
   name: text("name").notNull(),
   description: text("description"),
@@ -597,6 +653,7 @@ export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 // Maintenance Records
 export const maintenance = pgTable("maintenance", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   truckId: varchar("truck_id").notNull(),
   maintenanceType: text("maintenance_type").notNull(),
   serviceDate: timestamp("service_date").notNull(),
@@ -633,6 +690,7 @@ export type Maintenance = typeof maintenance.$inferSelect;
 // Fuel Cards - Store fuel card account information for FleetOne, Pilot Flying J, etc.
 export const fuelCards = pgTable("fuel_cards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   provider: text("provider").notNull(), // FleetOne, Pilot Flying J
   accountName: text("account_name").notNull(),
   accountNumber: text("account_number").notNull(),
@@ -660,6 +718,7 @@ export type FuelCard = typeof fuelCards.$inferSelect;
 // Fuel Transactions - Track fuel purchases with fuel card vendors
 export const fuelTransactions = pgTable("fuel_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   truckId: varchar("truck_id").notNull(),
   driverId: varchar("driver_id").notNull(),
   loadId: varchar("load_id"),
@@ -784,6 +843,7 @@ export type ActivityLog = typeof activityLog.$inferSelect;
 // Short Pays - Track loads with payment discrepancies
 export const shortPays = pgTable("short_pays", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   loadId: varchar("load_id").notNull(),
   loadNumber: text("load_number").notNull(),
   customerId: varchar("customer_id").notNull(),
@@ -813,6 +873,7 @@ export type ShortPay = typeof shortPays.$inferSelect;
 // Charge Backs - Track customer charge backs and disputes
 export const chargeBacks = pgTable("charge_backs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   loadId: varchar("load_id").notNull(),
   loadNumber: text("load_number").notNull(),
   customerId: varchar("customer_id").notNull(),
@@ -843,6 +904,7 @@ export type ChargeBack = typeof chargeBacks.$inferSelect;
 // Tasks - Track daily reminders and recurring tasks
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id"),
   title: text("title").notNull(),
   description: text("description"),
   dueDate: timestamp("due_date").notNull(),
