@@ -112,25 +112,25 @@ export interface IStorage {
   requestPasswordReset(email: string, userType: "admin" | "driver"): Promise<{ success: boolean; message?: string }>;
   resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message?: string }>;
   
-  getAllLoads(): Promise<Load[]>;
+  getAllLoads(companyId?: string): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
   createLoad(load: InsertLoad): Promise<Load>;
   updateLoad(id: string, load: Partial<InsertLoad>): Promise<Load | undefined>;
   deleteLoad(id: string): Promise<boolean>;
   
-  getAllTrucks(): Promise<Truck[]>;
+  getAllTrucks(companyId?: string): Promise<Truck[]>;
   getTruck(id: string): Promise<Truck | undefined>;
   createTruck(truck: InsertTruck): Promise<Truck>;
   updateTruck(id: string, truck: Partial<InsertTruck>): Promise<Truck | undefined>;
   deleteTruck(id: string): Promise<boolean>;
   
-  getAllTrailers(): Promise<Trailer[]>;
+  getAllTrailers(companyId?: string): Promise<Trailer[]>;
   getTrailer(id: string): Promise<Trailer | undefined>;
   createTrailer(trailer: InsertTrailer): Promise<Trailer>;
   updateTrailer(id: string, trailer: Partial<InsertTrailer>): Promise<Trailer | undefined>;
   deleteTrailer(id: string): Promise<boolean>;
   
-  getAllDrivers(): Promise<Driver[]>;
+  getAllDrivers(companyId?: string): Promise<Driver[]>;
   getDriver(id: string): Promise<Driver | undefined>;
   getDriverByEmail(email: string): Promise<Driver | undefined>;
   getDriverByLicense(licenseNumber: string): Promise<Driver | undefined>;
@@ -138,7 +138,7 @@ export interface IStorage {
   updateDriver(id: string, driver: Partial<InsertDriver>): Promise<Driver | undefined>;
   deleteDriver(id: string): Promise<boolean>;
   
-  getAllCustomers(): Promise<Customer[]>;
+  getAllCustomers(companyId?: string): Promise<Customer[]>;
   getCustomer(id: string): Promise<Customer | undefined>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
@@ -148,7 +148,7 @@ export interface IStorage {
   getDocumentsByLoad(loadId: string): Promise<Document[]>;
   
   // Expenses
-  getAllExpenses(): Promise<Expense[]>;
+  getAllExpenses(companyId?: string): Promise<Expense[]>;
   getExpense(id: string): Promise<Expense | undefined>;
   getExpensesByLoad(loadId: string): Promise<Expense[]>;
   createExpense(expense: InsertExpense): Promise<Expense>;
@@ -156,14 +156,14 @@ export interface IStorage {
   deleteExpense(id: string): Promise<boolean>;
   
   // Invoices
-  getAllInvoices(): Promise<Invoice[]>;
+  getAllInvoices(companyId?: string): Promise<Invoice[]>;
   getInvoice(id: string): Promise<Invoice | undefined>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   updateInvoice(id: string, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
   deleteInvoice(id: string): Promise<boolean>;
   
   // Payments
-  getAllPayments(): Promise<Payment[]>;
+  getAllPayments(companyId?: string): Promise<Payment[]>;
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentsByInvoice(invoiceId: string): Promise<Payment[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -171,7 +171,7 @@ export interface IStorage {
   deletePayment(id: string): Promise<boolean>;
   
   // Inspections
-  getAllInspections(): Promise<Inspection[]>;
+  getAllInspections(companyId?: string): Promise<Inspection[]>;
   getInspection(id: string): Promise<Inspection | undefined>;
   getInspectionsByTruck(truckId: string): Promise<Inspection[]>;
   getInspectionsByDriver(driverId: string): Promise<Inspection[]>;
@@ -180,7 +180,7 @@ export interface IStorage {
   deleteInspection(id: string): Promise<boolean>;
   
   // Accidents
-  getAllAccidents(): Promise<Accident[]>;
+  getAllAccidents(companyId?: string): Promise<Accident[]>;
   getAccident(id: string): Promise<Accident | undefined>;
   getAccidentsByDriver(driverId: string): Promise<Accident[]>;
   createAccident(accident: InsertAccident): Promise<Accident>;
@@ -188,7 +188,7 @@ export interface IStorage {
   deleteAccident(id: string): Promise<boolean>;
   
   // Violations
-  getAllViolations(): Promise<Violation[]>;
+  getAllViolations(companyId?: string): Promise<Violation[]>;
   getViolation(id: string): Promise<Violation | undefined>;
   getViolationsByDriver(driverId: string): Promise<Violation[]>;
   createViolation(violation: InsertViolation): Promise<Violation>;
@@ -196,7 +196,7 @@ export interface IStorage {
   deleteViolation(id: string): Promise<boolean>;
   
   // Settlements
-  getAllSettlements(): Promise<Settlement[]>;
+  getAllSettlements(companyId?: string): Promise<Settlement[]>;
   getSettlement(id: string): Promise<Settlement | undefined>;
   getSettlementsByDriver(driverId: string): Promise<Settlement[]>;
   createSettlement(settlement: InsertSettlement): Promise<Settlement>;
@@ -557,7 +557,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getAllLoads(): Promise<Load[]> {
+  async getAllLoads(companyId?: string): Promise<Load[]> {
+    if (companyId) {
+      return await db.select().from(loads)
+        .where(eq(loads.companyId, companyId))
+        .orderBy(desc(loads.createdAt));
+    }
     return await db.select().from(loads).orderBy(desc(loads.createdAt));
   }
 
@@ -600,7 +605,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllTrucks(): Promise<Truck[]> {
+  async getAllTrucks(companyId?: string): Promise<Truck[]> {
+    if (companyId) {
+      return await db.select().from(trucks).where(eq(trucks.companyId, companyId));
+    }
     return await db.select().from(trucks);
   }
 
@@ -631,7 +639,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllTrailers(): Promise<Trailer[]> {
+  async getAllTrailers(companyId?: string): Promise<Trailer[]> {
+    if (companyId) {
+      return await db.select().from(trailers).where(eq(trailers.companyId, companyId));
+    }
     return await db.select().from(trailers);
   }
 
@@ -662,7 +673,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllDrivers(): Promise<Driver[]> {
+  async getAllDrivers(companyId?: string): Promise<Driver[]> {
+    if (companyId) {
+      return await db.select().from(drivers).where(eq(drivers.companyId, companyId));
+    }
     return await db.select().from(drivers);
   }
 
@@ -777,7 +791,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllCustomers(): Promise<Customer[]> {
+  async getAllCustomers(companyId?: string): Promise<Customer[]> {
+    if (companyId) {
+      return await db.select().from(customers).where(eq(customers.companyId, companyId));
+    }
     return await db.select().from(customers);
   }
 
@@ -821,7 +838,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Expenses
-  async getAllExpenses(): Promise<Expense[]> {
+  async getAllExpenses(companyId?: string): Promise<Expense[]> {
+    if (companyId) {
+      return await db.select().from(expenses)
+        .where(eq(expenses.companyId, companyId))
+        .orderBy(desc(expenses.expenseDate));
+    }
     return await db.select().from(expenses).orderBy(desc(expenses.expenseDate));
   }
 
@@ -864,7 +886,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Invoices
-  async getAllInvoices(): Promise<Invoice[]> {
+  async getAllInvoices(companyId?: string): Promise<Invoice[]> {
+    if (companyId) {
+      return await db.select().from(invoices)
+        .where(eq(invoices.companyId, companyId))
+        .orderBy(desc(invoices.invoiceDate));
+    }
     return await db.select().from(invoices).orderBy(desc(invoices.invoiceDate));
   }
 
@@ -907,7 +934,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Payments
-  async getAllPayments(): Promise<Payment[]> {
+  async getAllPayments(companyId?: string): Promise<Payment[]> {
+    if (companyId) {
+      return await db.select().from(payments)
+        .where(eq(payments.companyId, companyId))
+        .orderBy(desc(payments.paymentDate));
+    }
     return await db.select().from(payments).orderBy(desc(payments.paymentDate));
   }
 
@@ -950,7 +982,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Inspections
-  async getAllInspections(): Promise<Inspection[]> {
+  async getAllInspections(companyId?: string): Promise<Inspection[]> {
+    if (companyId) {
+      return await db.select().from(inspections)
+        .where(eq(inspections.companyId, companyId))
+        .orderBy(desc(inspections.inspectionDate));
+    }
     return await db.select().from(inspections).orderBy(desc(inspections.inspectionDate));
   }
 
@@ -997,7 +1034,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Accidents
-  async getAllAccidents(): Promise<Accident[]> {
+  async getAllAccidents(companyId?: string): Promise<Accident[]> {
+    if (companyId) {
+      return await db.select().from(accidents)
+        .where(eq(accidents.companyId, companyId))
+        .orderBy(desc(accidents.accidentDate));
+    }
     return await db.select().from(accidents).orderBy(desc(accidents.accidentDate));
   }
 
@@ -1040,7 +1082,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Violations
-  async getAllViolations(): Promise<Violation[]> {
+  async getAllViolations(companyId?: string): Promise<Violation[]> {
+    if (companyId) {
+      return await db.select().from(violations)
+        .where(eq(violations.companyId, companyId))
+        .orderBy(desc(violations.violationDate));
+    }
     return await db.select().from(violations).orderBy(desc(violations.violationDate));
   }
 
@@ -1087,7 +1134,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Settlements
-  async getAllSettlements(): Promise<Settlement[]> {
+  async getAllSettlements(companyId?: string): Promise<Settlement[]> {
+    if (companyId) {
+      return await db.select().from(settlements)
+        .where(eq(settlements.companyId, companyId))
+        .orderBy(desc(settlements.periodEnd));
+    }
     return await db.select().from(settlements).orderBy(desc(settlements.periodEnd));
   }
 

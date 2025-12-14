@@ -368,12 +368,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/loads", async (_req, res) => {
-    const loads = await storage.getAllLoads();
+  app.get("/api/loads", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const loads = await storage.getAllLoads(companyId);
     res.json(loads);
   });
 
-  app.get("/api/loads/:id", async (req, res) => {
+  app.get("/api/loads/:id", isAuthenticated, async (req: any, res) => {
     const load = await storage.getLoad(req.params.id);
     if (!load) {
       return res.status(404).json({ error: "Load not found" });
@@ -381,9 +382,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(load);
   });
 
-  app.post("/api/loads", async (req, res) => {
+  app.post("/api/loads", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertLoadSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertLoadSchema.parse({ ...req.body, companyId });
       const load = await storage.createLoad(validatedData);
       res.status(201).json(load);
     } catch (error) {
@@ -391,7 +393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/loads/:id", async (req, res) => {
+  app.patch("/api/loads/:id", isAuthenticated, async (req: any, res) => {
     try {
       // Get the old load data before update
       const oldLoad = await storage.getLoad(req.params.id);
@@ -421,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/loads/:id", async (req, res) => {
+  app.delete("/api/loads/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteLoad(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Load not found" });
@@ -550,12 +552,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/trucks", async (_req, res) => {
-    const trucks = await storage.getAllTrucks();
+  app.get("/api/trucks", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const trucks = await storage.getAllTrucks(companyId);
     res.json(trucks);
   });
 
-  app.get("/api/trucks/:id", async (req, res) => {
+  app.get("/api/trucks/:id", isAuthenticated, async (req: any, res) => {
     const truck = await storage.getTruck(req.params.id);
     if (!truck) {
       return res.status(404).json({ error: "Truck not found" });
@@ -563,9 +566,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(truck);
   });
 
-  app.post("/api/trucks", async (req, res) => {
+  app.post("/api/trucks", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertTruckSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertTruckSchema.parse({ ...req.body, companyId });
       const truck = await storage.createTruck(validatedData);
       res.status(201).json(truck);
     } catch (error) {
@@ -573,7 +577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/trucks/:id", async (req, res) => {
+  app.patch("/api/trucks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertTruckSchema.partial().parse(req.body);
       const truck = await storage.updateTruck(req.params.id, validatedData);
@@ -586,7 +590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/trucks/:id", async (req, res) => {
+  app.delete("/api/trucks/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteTruck(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Truck not found" });
@@ -594,12 +598,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/trailers", async (_req, res) => {
-    const trailers = await storage.getAllTrailers();
+  app.get("/api/trailers", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const trailers = await storage.getAllTrailers(companyId);
     res.json(trailers);
   });
 
-  app.get("/api/trailers/:id", async (req, res) => {
+  app.get("/api/trailers/:id", isAuthenticated, async (req: any, res) => {
     const trailer = await storage.getTrailer(req.params.id);
     if (!trailer) {
       return res.status(404).json({ error: "Trailer not found" });
@@ -607,9 +612,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(trailer);
   });
 
-  app.post("/api/trailers", async (req, res) => {
+  app.post("/api/trailers", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertTrailerSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertTrailerSchema.parse({ ...req.body, companyId });
       const trailer = await storage.createTrailer(validatedData);
       res.status(201).json(trailer);
     } catch (error) {
@@ -618,7 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/trailers/:id", async (req, res) => {
+  app.patch("/api/trailers/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertTrailerSchema.partial().parse(req.body);
       const trailer = await storage.updateTrailer(req.params.id, validatedData);
@@ -632,7 +638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/trailers/:id", async (req, res) => {
+  app.delete("/api/trailers/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteTrailer(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Trailer not found" });
@@ -640,8 +646,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/drivers", async (_req, res) => {
-    const drivers = await storage.getAllDrivers();
+  app.get("/api/drivers", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const drivers = await storage.getAllDrivers(companyId);
     res.json(drivers);
   });
 
@@ -689,9 +696,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/drivers", async (req, res) => {
+  app.post("/api/drivers", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertDriverSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertDriverSchema.parse({ ...req.body, companyId });
       
       // If password is provided, hash it
       if (validatedData.password) {
@@ -706,7 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/drivers/:id", async (req, res) => {
+  app.patch("/api/drivers/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertDriverSchema.partial().parse(req.body);
       
@@ -726,7 +734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/drivers/:id", async (req, res) => {
+  app.delete("/api/drivers/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteDriver(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Driver not found" });
@@ -734,12 +742,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/customers", async (_req, res) => {
-    const customers = await storage.getAllCustomers();
+  app.get("/api/customers", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const customers = await storage.getAllCustomers(companyId);
     res.json(customers);
   });
 
-  app.get("/api/customers/:id", async (req, res) => {
+  app.get("/api/customers/:id", isAuthenticated, async (req: any, res) => {
     const customer = await storage.getCustomer(req.params.id);
     if (!customer) {
       return res.status(404).json({ error: "Customer not found" });
@@ -747,9 +756,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(customer);
   });
 
-  app.post("/api/customers", async (req, res) => {
+  app.post("/api/customers", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertCustomerSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertCustomerSchema.parse({ ...req.body, companyId });
       const customer = await storage.createCustomer(validatedData);
       res.status(201).json(customer);
     } catch (error) {
@@ -757,7 +767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/customers/:id", async (req, res) => {
+  app.patch("/api/customers/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertCustomerSchema.partial().parse(req.body);
       const customer = await storage.updateCustomer(req.params.id, validatedData);
@@ -770,7 +780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/customers/:id", async (req, res) => {
+  app.delete("/api/customers/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteCustomer(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Customer not found" });
@@ -906,12 +916,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Expenses Routes
-  app.get("/api/expenses", async (_req, res) => {
-    const expenses = await storage.getAllExpenses();
+  app.get("/api/expenses", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const expenses = await storage.getAllExpenses(companyId);
     res.json(expenses);
   });
 
-  app.get("/api/expenses/:id", async (req, res) => {
+  app.get("/api/expenses/:id", isAuthenticated, async (req: any, res) => {
     const expense = await storage.getExpense(req.params.id);
     if (!expense) {
       return res.status(404).json({ error: "Expense not found" });
@@ -919,14 +930,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(expense);
   });
 
-  app.get("/api/expenses/load/:loadId", async (req, res) => {
+  app.get("/api/expenses/load/:loadId", isAuthenticated, async (req: any, res) => {
     const expenses = await storage.getExpensesByLoad(req.params.loadId);
     res.json(expenses);
   });
 
-  app.post("/api/expenses", async (req, res) => {
+  app.post("/api/expenses", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertExpenseSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertExpenseSchema.parse({ ...req.body, companyId });
       const expense = await storage.createExpense(validatedData);
       res.status(201).json(expense);
     } catch (error) {
@@ -934,7 +946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/expenses/:id", async (req, res) => {
+  app.patch("/api/expenses/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertExpenseSchema.partial().parse(req.body);
       const expense = await storage.updateExpense(req.params.id, validatedData);
@@ -947,7 +959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/expenses/:id", async (req, res) => {
+  app.delete("/api/expenses/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteExpense(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Expense not found" });
@@ -956,12 +968,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoices Routes
-  app.get("/api/invoices", async (_req, res) => {
-    const invoices = await storage.getAllInvoices();
+  app.get("/api/invoices", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const invoices = await storage.getAllInvoices(companyId);
     res.json(invoices);
   });
 
-  app.get("/api/invoices/:id", async (req, res) => {
+  app.get("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
     const invoice = await storage.getInvoice(req.params.id);
     if (!invoice) {
       return res.status(404).json({ error: "Invoice not found" });
@@ -969,9 +982,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(invoice);
   });
 
-  app.post("/api/invoices", async (req, res) => {
+  app.post("/api/invoices", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertInvoiceSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertInvoiceSchema.parse({ ...req.body, companyId });
       const invoice = await storage.createInvoice(validatedData);
       res.status(201).json(invoice);
     } catch (error) {
@@ -979,7 +993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/invoices/:id", async (req, res) => {
+  app.patch("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertInvoiceSchema.partial().parse(req.body);
       const invoice = await storage.updateInvoice(req.params.id, validatedData);
@@ -992,7 +1006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/invoices/:id", async (req, res) => {
+  app.delete("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteInvoice(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Invoice not found" });
@@ -1107,12 +1121,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payments Routes
-  app.get("/api/payments", async (_req, res) => {
-    const payments = await storage.getAllPayments();
+  app.get("/api/payments", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const payments = await storage.getAllPayments(companyId);
     res.json(payments);
   });
 
-  app.get("/api/payments/:id", async (req, res) => {
+  app.get("/api/payments/:id", isAuthenticated, async (req: any, res) => {
     const payment = await storage.getPayment(req.params.id);
     if (!payment) {
       return res.status(404).json({ error: "Payment not found" });
@@ -1120,14 +1135,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(payment);
   });
 
-  app.get("/api/payments/invoice/:invoiceId", async (req, res) => {
+  app.get("/api/payments/invoice/:invoiceId", isAuthenticated, async (req: any, res) => {
     const payments = await storage.getPaymentsByInvoice(req.params.invoiceId);
     res.json(payments);
   });
 
-  app.post("/api/payments", async (req, res) => {
+  app.post("/api/payments", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertPaymentSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertPaymentSchema.parse({ ...req.body, companyId });
       const payment = await storage.createPayment(validatedData);
       res.status(201).json(payment);
     } catch (error) {
@@ -1135,7 +1151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/payments/:id", async (req, res) => {
+  app.patch("/api/payments/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertPaymentSchema.partial().parse(req.body);
       const payment = await storage.updatePayment(req.params.id, validatedData);
@@ -1148,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/payments/:id", async (req, res) => {
+  app.delete("/api/payments/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deletePayment(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Payment not found" });
@@ -1157,12 +1173,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inspections Routes
-  app.get("/api/inspections", async (_req, res) => {
-    const inspections = await storage.getAllInspections();
+  app.get("/api/inspections", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const inspections = await storage.getAllInspections(companyId);
     res.json(inspections);
   });
 
-  app.get("/api/inspections/:id", async (req, res) => {
+  app.get("/api/inspections/:id", isAuthenticated, async (req: any, res) => {
     const inspection = await storage.getInspection(req.params.id);
     if (!inspection) {
       return res.status(404).json({ error: "Inspection not found" });
@@ -1170,19 +1187,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(inspection);
   });
 
-  app.get("/api/inspections/truck/:truckId", async (req, res) => {
+  app.get("/api/inspections/truck/:truckId", isAuthenticated, async (req: any, res) => {
     const inspections = await storage.getInspectionsByTruck(req.params.truckId);
     res.json(inspections);
   });
 
-  app.get("/api/inspections/driver/:driverId", async (req, res) => {
+  app.get("/api/inspections/driver/:driverId", isAuthenticated, async (req: any, res) => {
     const inspections = await storage.getInspectionsByDriver(req.params.driverId);
     res.json(inspections);
   });
 
-  app.post("/api/inspections", async (req, res) => {
+  app.post("/api/inspections", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertInspectionSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertInspectionSchema.parse({ ...req.body, companyId });
       const inspection = await storage.createInspection(validatedData);
       res.status(201).json(inspection);
     } catch (error) {
@@ -1190,7 +1208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/inspections/:id", async (req, res) => {
+  app.patch("/api/inspections/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertInspectionSchema.partial().parse(req.body);
       const inspection = await storage.updateInspection(req.params.id, validatedData);
@@ -1203,7 +1221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/inspections/:id", async (req, res) => {
+  app.delete("/api/inspections/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteInspection(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Inspection not found" });
@@ -1212,12 +1230,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Accidents Routes
-  app.get("/api/accidents", async (_req, res) => {
-    const accidents = await storage.getAllAccidents();
+  app.get("/api/accidents", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const accidents = await storage.getAllAccidents(companyId);
     res.json(accidents);
   });
 
-  app.get("/api/accidents/:id", async (req, res) => {
+  app.get("/api/accidents/:id", isAuthenticated, async (req: any, res) => {
     const accident = await storage.getAccident(req.params.id);
     if (!accident) {
       return res.status(404).json({ error: "Accident not found" });
@@ -1225,14 +1244,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(accident);
   });
 
-  app.get("/api/accidents/driver/:driverId", async (req, res) => {
+  app.get("/api/accidents/driver/:driverId", isAuthenticated, async (req: any, res) => {
     const accidents = await storage.getAccidentsByDriver(req.params.driverId);
     res.json(accidents);
   });
 
-  app.post("/api/accidents", async (req, res) => {
+  app.post("/api/accidents", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertAccidentSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertAccidentSchema.parse({ ...req.body, companyId });
       const accident = await storage.createAccident(validatedData);
       res.status(201).json(accident);
     } catch (error) {
@@ -1240,7 +1260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/accidents/:id", async (req, res) => {
+  app.patch("/api/accidents/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertAccidentSchema.partial().parse(req.body);
       const accident = await storage.updateAccident(req.params.id, validatedData);
@@ -1253,7 +1273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/accidents/:id", async (req, res) => {
+  app.delete("/api/accidents/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteAccident(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Accident not found" });
@@ -1262,12 +1282,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Violations Routes
-  app.get("/api/violations", async (_req, res) => {
-    const violations = await storage.getAllViolations();
+  app.get("/api/violations", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const violations = await storage.getAllViolations(companyId);
     res.json(violations);
   });
 
-  app.get("/api/violations/:id", async (req, res) => {
+  app.get("/api/violations/:id", isAuthenticated, async (req: any, res) => {
     const violation = await storage.getViolation(req.params.id);
     if (!violation) {
       return res.status(404).json({ error: "Violation not found" });
@@ -1275,14 +1296,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(violation);
   });
 
-  app.get("/api/violations/driver/:driverId", async (req, res) => {
+  app.get("/api/violations/driver/:driverId", isAuthenticated, async (req: any, res) => {
     const violations = await storage.getViolationsByDriver(req.params.driverId);
     res.json(violations);
   });
 
-  app.post("/api/violations", async (req, res) => {
+  app.post("/api/violations", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertViolationSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertViolationSchema.parse({ ...req.body, companyId });
       const violation = await storage.createViolation(validatedData);
       res.status(201).json(violation);
     } catch (error) {
@@ -1290,7 +1312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/violations/:id", async (req, res) => {
+  app.patch("/api/violations/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertViolationSchema.partial().parse(req.body);
       const violation = await storage.updateViolation(req.params.id, validatedData);
@@ -1303,7 +1325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/violations/:id", async (req, res) => {
+  app.delete("/api/violations/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteViolation(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Violation not found" });
@@ -1312,12 +1334,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Settlements Routes
-  app.get("/api/settlements", async (_req, res) => {
-    const settlements = await storage.getAllSettlements();
+  app.get("/api/settlements", isAuthenticated, async (req: any, res) => {
+    const companyId = req.user?.activeCompanyId;
+    const settlements = await storage.getAllSettlements(companyId);
     res.json(settlements);
   });
 
-  app.get("/api/settlements/:id", async (req, res) => {
+  app.get("/api/settlements/:id", isAuthenticated, async (req: any, res) => {
     const settlement = await storage.getSettlement(req.params.id);
     if (!settlement) {
       return res.status(404).json({ error: "Settlement not found" });
@@ -1325,14 +1348,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(settlement);
   });
 
-  app.get("/api/settlements/driver/:driverId", async (req, res) => {
+  app.get("/api/settlements/driver/:driverId", isAuthenticated, async (req: any, res) => {
     const settlements = await storage.getSettlementsByDriver(req.params.driverId);
     res.json(settlements);
   });
 
-  app.post("/api/settlements", async (req, res) => {
+  app.post("/api/settlements", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertSettlementSchema.parse(req.body);
+      const companyId = req.user?.activeCompanyId;
+      const validatedData = insertSettlementSchema.parse({ ...req.body, companyId });
       const settlement = await storage.createSettlement(validatedData);
       res.status(201).json(settlement);
     } catch (error) {
@@ -1344,7 +1368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/settlements/:id", async (req, res) => {
+  app.patch("/api/settlements/:id", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertSettlementSchema.partial().parse(req.body);
       const settlement = await storage.updateSettlement(req.params.id, validatedData);
@@ -1361,7 +1385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/settlements/:id", async (req, res) => {
+  app.delete("/api/settlements/:id", isAuthenticated, async (req: any, res) => {
     const deleted = await storage.deleteSettlement(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Settlement not found" });
