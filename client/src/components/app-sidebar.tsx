@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { CompanySwitcher } from "@/components/company-switcher";
 
 // Menu items with role access: 
 // - "all" = visible to both admin and dispatch
@@ -157,8 +158,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b border-sidebar-border p-6">
-        <div className="flex items-center gap-2">
+      <SidebarHeader className="border-b border-sidebar-border p-4">
+        <div className="flex items-center gap-2 mb-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
             <Truck className="h-6 w-6 text-primary-foreground" />
           </div>
@@ -167,6 +168,7 @@ export function AppSidebar() {
             <p className="text-xs text-muted-foreground">Transportation Management</p>
           </div>
         </div>
+        <CompanySwitcher />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
