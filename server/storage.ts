@@ -205,6 +205,7 @@ export interface IStorage {
   
   // Settlement Line Items
   getSettlementLineItems(settlementId: string): Promise<SettlementLineItem[]>;
+  getSettlementLineItem(id: string): Promise<SettlementLineItem | undefined>;
   createSettlementLineItem(lineItem: InsertSettlementLineItem): Promise<SettlementLineItem>;
   updateSettlementLineItem(id: string, lineItem: Partial<InsertSettlementLineItem>): Promise<SettlementLineItem | undefined>;
   deleteSettlementLineItem(id: string): Promise<boolean>;
@@ -1197,6 +1198,11 @@ export class DatabaseStorage implements IStorage {
   // Settlement Line Items
   async getSettlementLineItems(settlementId: string): Promise<SettlementLineItem[]> {
     return await db.select().from(settlementLineItems).where(eq(settlementLineItems.settlementId, settlementId));
+  }
+
+  async getSettlementLineItem(id: string): Promise<SettlementLineItem | undefined> {
+    const [lineItem] = await db.select().from(settlementLineItems).where(eq(settlementLineItems.id, id));
+    return lineItem || undefined;
   }
 
   async createSettlementLineItem(lineItem: InsertSettlementLineItem): Promise<SettlementLineItem> {

@@ -187,3 +187,10 @@ export const isDriver: RequestHandler = (req, res, next) => {
   }
   res.status(403).json({ message: "Forbidden: Driver access required" });
 };
+
+export const requireActiveCompany: RequestHandler = (req, res, next) => {
+  if (req.isAuthenticated() && (req.user as any).activeCompanyId) {
+    return next();
+  }
+  res.status(400).json({ message: "No active company selected. Please select a company." });
+};
