@@ -54,6 +54,10 @@ import {
   type CompanySettings,
   type InsertCompanySettings,
   type PasswordResetToken,
+  type Company,
+  type InsertCompany,
+  type CompanyUser,
+  type InsertCompanyUser,
   users,
   loads,
   trucks,
@@ -81,7 +85,9 @@ import {
   chargeBacks,
   tasks,
   companySettings,
-  passwordResetTokens
+  passwordResetTokens,
+  companies,
+  companyUsers
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
@@ -293,6 +299,23 @@ export interface IStorage {
   // Company Settings
   getCompanySettings(): Promise<CompanySettings | undefined>;
   updateCompanySettings(settings: Partial<InsertCompanySettings>): Promise<CompanySettings | undefined>;
+
+  // Companies (Multi-tenant)
+  getAllCompanies(): Promise<Company[]>;
+  getCompany(id: string): Promise<Company | undefined>;
+  getCompanyByName(name: string): Promise<Company | undefined>;
+  createCompany(company: InsertCompany): Promise<Company>;
+  updateCompany(id: string, company: Partial<InsertCompany>): Promise<Company | undefined>;
+  deleteCompany(id: string): Promise<boolean>;
+
+  // Company Users (User-Company associations)
+  getCompanyUsersByUserId(userId: string): Promise<CompanyUser[]>;
+  getCompanyUsersByCompanyId(companyId: string): Promise<CompanyUser[]>;
+  createCompanyUser(companyUser: InsertCompanyUser): Promise<CompanyUser>;
+  updateCompanyUser(id: string, companyUser: Partial<InsertCompanyUser>): Promise<CompanyUser | undefined>;
+  deleteCompanyUser(id: string): Promise<boolean>;
+  getUserPrimaryCompany(userId: string): Promise<Company | undefined>;
+  getCompaniesByUserId(userId: string): Promise<Company[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1632,6 +1655,114 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // Companies (Multi-tenant) Implementation
+  async getAllCompanies(): Promise<Company[]> {
+    return await db.select().from(companies).orderBy(companies.name);
+  }
+
+  async getCompany(id: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(companies).where(eq(companies.id, id));
+    return company || undefined;
+  }
+
+  async getCompanyByName(name: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(companies).where(eq(companies.name, name));
+    return company || undefined;
+  }
+
+  async createCompany(insertCompany: InsertCompany): Promise<Company> {
+    const [company] = await db
+      .insert(companies)
+      .values(insertCompany)
+      .returning();
+    return company;
+  }
+
+  async updateCompany(id: string, updateData: Partial<InsertCompany>): Promise<Company | undefined> {
+    const [company] = await db
+      .update(companies)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(companies.id, id))
+      .returning();
+    return company || undefined;
+  }
+
+  async deleteCompany(id: string): Promise<boolean> {
+    const result = await db.delete(companies).where(eq(companies.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Company Users Implementation
+  async getCompanyUsersByUserId(userId: string): Promise<CompanyUser[]> {
+    return await db.select().from(companyUsers).where(eq(companyUsers.userId, userId));
+  }
+
+  async getCompanyUsersByCompanyId(companyId: string): Promise<CompanyUser[]> {
+    return await db.select().from(companyUsers).where(eq(companyUsers.companyId, companyId));
+  }
+
+  async createCompanyUser(insertCompanyUser: InsertCompanyUser): Promise<CompanyUser> {
+    const [companyUser] = await db
+      .insert(companyUsers)
+      .values(insertCompanyUser)
+      .returning();
+    return companyUser;
+  }
+
+  async updateCompanyUser(id: string, updateData: Partial<InsertCompanyUser>): Promise<CompanyUser | undefined> {
+    const [companyUser] = await db
+      .update(companyUsers)
+      .set(updateData)
+      .where(eq(companyUsers.id, id))
+      .returning();
+    return companyUser || undefined;
+  }
+
+  async deleteCompanyUser(id: string): Promise<boolean> {
+    const result = await db.delete(companyUsers).where(eq(companyUsers.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async getUserPrimaryCompany(userId: string): Promise<Company | undefined> {
+    const [primaryCompanyUser] = await db
+      .select()
+      .from(companyUsers)
+      .where(and(eq(companyUsers.userId, userId), eq(companyUsers.isPrimary, "true")));
+    
+    if (primaryCompanyUser) {
+      return await this.getCompany(primaryCompanyUser.companyId);
+    }
+    
+    // If no primary, return the first company the user belongs to
+    const [firstCompanyUser] = await db
+      .select()
+      .from(companyUsers)
+      .where(eq(companyUsers.userId, userId));
+    
+    if (firstCompanyUser) {
+      return await this.getCompany(firstCompanyUser.companyId);
+    }
+    
+    return undefined;
+  }
+
+  async getCompaniesByUserId(userId: string): Promise<Company[]> {
+    const userCompanies = await db
+      .select()
+      .from(companyUsers)
+      .where(eq(companyUsers.userId, userId));
+    
+    const companyIds = userCompanies.map(cu => cu.companyId);
+    if (companyIds.length === 0) return [];
+    
+    const result: Company[] = [];
+    for (const companyId of companyIds) {
+      const company = await this.getCompany(companyId);
+      if (company) result.push(company);
+    }
+    return result;
   }
 }
 
