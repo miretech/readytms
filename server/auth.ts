@@ -105,7 +105,18 @@ export async function setupAuth(app: Express) {
           return done(null, false, { message: 'Invalid email or password' });
         }
 
-        return done(null, { id: user.id, email: user.email, type: 'admin', role: userRole });
+        // Get user's primary company (or first company if no primary)
+        const primaryCompany = await storage.getUserPrimaryCompany(user.id);
+        const userCompanies = await storage.getCompaniesByUserId(user.id);
+        const activeCompanyId = primaryCompany?.id || userCompanies[0]?.id || null;
+
+        return done(null, { 
+          id: user.id, 
+          email: user.email, 
+          type: 'admin', 
+          role: userRole,
+          activeCompanyId 
+        });
       } catch (error) {
         return done(error);
       }
@@ -135,7 +146,12 @@ export async function setupAuth(app: Express) {
           return done(null, false, { message: 'Invalid email or password' });
         }
 
-        return done(null, { id: driver.id, email: driver.email, type: 'driver' });
+        return done(null, { 
+          id: driver.id, 
+          email: driver.email, 
+          type: 'driver',
+          activeCompanyId: driver.companyId || null 
+        });
       } catch (error) {
         return done(error);
       }

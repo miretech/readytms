@@ -144,7 +144,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
-        return res.json({ ...userWithoutPassword, type: 'admin' });
+        return res.json({ 
+          ...userWithoutPassword, 
+          type: 'admin',
+          activeCompanyId: sessionUser.activeCompanyId 
+        });
       } else if (sessionUser.type === 'driver') {
         const driver = await storage.getDriver(sessionUser.id);
         if (!driver) {
@@ -152,7 +156,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         // Remove password from response
         const { password, ...driverWithoutPassword } = driver;
-        return res.json({ ...driverWithoutPassword, type: 'driver' });
+        return res.json({ 
+          ...driverWithoutPassword, 
+          type: 'driver',
+          activeCompanyId: sessionUser.activeCompanyId 
+        });
       }
       
       res.status(404).json({ message: "User not found" });
@@ -170,6 +178,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ message: "Logged out successfully" });
     });
+  });
+
+  // Company Routes - Get user's companies
+  app.get("/api/companies", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionUser = req.user;
+      
+      if (sessionUser.type === 'admin') {
+        const companies = await storage.getCompaniesByUserId(sessionUser.id);
+        return res.json(companies);
+      } else if (sessionUser.type === 'driver') {
+        // Drivers belong to one company via their driver record
+        const driver = await storage.getDriver(sessionUser.id);
+        if (driver?.companyId) {
+          const company = await storage.getCompany(driver.companyId);
+          return res.json(company ? [company] : []);
+        }
+        return res.json([]);
+      }
+      
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+      res.status(500).json({ message: "Failed to fetch companies" });
+    }
+  });
+
+  // Get current active company
+  app.get("/api/companies/current", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionUser = req.user;
+      
+      if (!sessionUser.activeCompanyId) {
+        return res.json(null);
+      }
+      
+      const company = await storage.getCompany(sessionUser.activeCompanyId);
+      res.json(company || null);
+    } catch (error) {
+      console.error("Error fetching current company:", error);
+      res.status(500).json({ message: "Failed to fetch current company" });
+    }
+  });
+
+  // Switch active company
+  app.post("/api/companies/switch", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { companyId } = req.body;
+      const sessionUser = req.user;
+      
+      if (!companyId) {
+        return res.status(400).json({ message: "Company ID is required" });
+      }
+      
+      // Verify user has access to this company
+      const userCompanies = await storage.getCompaniesByUserId(sessionUser.id);
+      const hasAccess = userCompanies.some(c => c.id === companyId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "You don't have access to this company" });
+      }
+      
+      // Update session with new active company
+      req.user.activeCompanyId = companyId;
+      
+      // Re-login to persist session changes
+      req.login(req.user, (err: any) => {
+        if (err) {
+          return res.status(500).json({ message: "Failed to switch company" });
+        }
+        res.json({ message: "Company switched successfully", activeCompanyId: companyId });
+      });
+    } catch (error) {
+      console.error("Error switching company:", error);
+      res.status(500).json({ message: "Failed to switch company" });
+    }
   });
 
   // Password Reset - Request reset email
