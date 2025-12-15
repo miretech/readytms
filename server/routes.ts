@@ -642,7 +642,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/trailers", isAuthenticated, async (req: any, res) => {
     const companyId = req.user?.activeCompanyId;
+    console.log("[DEBUG TRAILERS] User:", req.user?.email, "ActiveCompanyId:", companyId);
     const trailers = await storage.getAllTrailers(companyId);
+    console.log("[DEBUG TRAILERS] Found", trailers.length, "trailers for company", companyId);
     res.json(trailers);
   });
 
