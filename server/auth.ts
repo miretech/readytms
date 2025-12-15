@@ -109,6 +109,11 @@ export async function setupAuth(app: Express) {
         const primaryCompany = await storage.getUserPrimaryCompany(user.id);
         const userCompanies = await storage.getCompaniesByUserId(user.id);
         const activeCompanyId = primaryCompany?.id || userCompanies[0]?.id || null;
+        
+        console.log("[DEBUG LOGIN] User:", user.email);
+        console.log("[DEBUG LOGIN] Primary company:", primaryCompany?.name, primaryCompany?.id);
+        console.log("[DEBUG LOGIN] All companies:", userCompanies.map(c => `${c.name}(${c.id})`).join(", "));
+        console.log("[DEBUG LOGIN] Active company ID:", activeCompanyId);
 
         return done(null, { 
           id: user.id, 
