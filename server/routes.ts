@@ -184,9 +184,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/companies", isAuthenticated, async (req: any, res) => {
     try {
       const sessionUser = req.user;
+      console.log("[DEBUG] /api/companies - Session user:", JSON.stringify(sessionUser));
       
       if (sessionUser.type === 'admin') {
+        console.log("[DEBUG] Looking up companies for userId:", sessionUser.id);
         const companies = await storage.getCompaniesByUserId(sessionUser.id);
+        console.log("[DEBUG] Found", companies.length, "companies:", companies.map(c => c.name).join(", "));
         return res.json(companies);
       } else if (sessionUser.type === 'driver') {
         // Drivers belong to one company via their driver record
