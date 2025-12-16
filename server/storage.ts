@@ -54,10 +54,6 @@ import {
   type CompanySettings,
   type InsertCompanySettings,
   type PasswordResetToken,
-  type Company,
-  type InsertCompany,
-  type CompanyUser,
-  type InsertCompanyUser,
   users,
   loads,
   trucks,
@@ -85,9 +81,7 @@ import {
   chargeBacks,
   tasks,
   companySettings,
-  passwordResetTokens,
-  companies,
-  companyUsers
+  passwordResetTokens
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
@@ -112,25 +106,25 @@ export interface IStorage {
   requestPasswordReset(email: string, userType: "admin" | "driver"): Promise<{ success: boolean; message?: string }>;
   resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message?: string }>;
   
-  getAllLoads(companyId?: string): Promise<Load[]>;
+  getAllLoads(): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
   createLoad(load: InsertLoad): Promise<Load>;
   updateLoad(id: string, load: Partial<InsertLoad>): Promise<Load | undefined>;
   deleteLoad(id: string): Promise<boolean>;
   
-  getAllTrucks(companyId?: string): Promise<Truck[]>;
+  getAllTrucks(): Promise<Truck[]>;
   getTruck(id: string): Promise<Truck | undefined>;
   createTruck(truck: InsertTruck): Promise<Truck>;
   updateTruck(id: string, truck: Partial<InsertTruck>): Promise<Truck | undefined>;
   deleteTruck(id: string): Promise<boolean>;
   
-  getAllTrailers(companyId?: string): Promise<Trailer[]>;
+  getAllTrailers(): Promise<Trailer[]>;
   getTrailer(id: string): Promise<Trailer | undefined>;
   createTrailer(trailer: InsertTrailer): Promise<Trailer>;
   updateTrailer(id: string, trailer: Partial<InsertTrailer>): Promise<Trailer | undefined>;
   deleteTrailer(id: string): Promise<boolean>;
   
-  getAllDrivers(companyId?: string): Promise<Driver[]>;
+  getAllDrivers(): Promise<Driver[]>;
   getDriver(id: string): Promise<Driver | undefined>;
   getDriverByEmail(email: string): Promise<Driver | undefined>;
   getDriverByLicense(licenseNumber: string): Promise<Driver | undefined>;
@@ -138,7 +132,7 @@ export interface IStorage {
   updateDriver(id: string, driver: Partial<InsertDriver>): Promise<Driver | undefined>;
   deleteDriver(id: string): Promise<boolean>;
   
-  getAllCustomers(companyId?: string): Promise<Customer[]>;
+  getAllCustomers(): Promise<Customer[]>;
   getCustomer(id: string): Promise<Customer | undefined>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
@@ -148,7 +142,7 @@ export interface IStorage {
   getDocumentsByLoad(loadId: string): Promise<Document[]>;
   
   // Expenses
-  getAllExpenses(companyId?: string): Promise<Expense[]>;
+  getAllExpenses(): Promise<Expense[]>;
   getExpense(id: string): Promise<Expense | undefined>;
   getExpensesByLoad(loadId: string): Promise<Expense[]>;
   createExpense(expense: InsertExpense): Promise<Expense>;
@@ -156,14 +150,14 @@ export interface IStorage {
   deleteExpense(id: string): Promise<boolean>;
   
   // Invoices
-  getAllInvoices(companyId?: string): Promise<Invoice[]>;
+  getAllInvoices(): Promise<Invoice[]>;
   getInvoice(id: string): Promise<Invoice | undefined>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   updateInvoice(id: string, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
   deleteInvoice(id: string): Promise<boolean>;
   
   // Payments
-  getAllPayments(companyId?: string): Promise<Payment[]>;
+  getAllPayments(): Promise<Payment[]>;
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentsByInvoice(invoiceId: string): Promise<Payment[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -171,7 +165,7 @@ export interface IStorage {
   deletePayment(id: string): Promise<boolean>;
   
   // Inspections
-  getAllInspections(companyId?: string): Promise<Inspection[]>;
+  getAllInspections(): Promise<Inspection[]>;
   getInspection(id: string): Promise<Inspection | undefined>;
   getInspectionsByTruck(truckId: string): Promise<Inspection[]>;
   getInspectionsByDriver(driverId: string): Promise<Inspection[]>;
@@ -180,7 +174,7 @@ export interface IStorage {
   deleteInspection(id: string): Promise<boolean>;
   
   // Accidents
-  getAllAccidents(companyId?: string): Promise<Accident[]>;
+  getAllAccidents(): Promise<Accident[]>;
   getAccident(id: string): Promise<Accident | undefined>;
   getAccidentsByDriver(driverId: string): Promise<Accident[]>;
   createAccident(accident: InsertAccident): Promise<Accident>;
@@ -188,7 +182,7 @@ export interface IStorage {
   deleteAccident(id: string): Promise<boolean>;
   
   // Violations
-  getAllViolations(companyId?: string): Promise<Violation[]>;
+  getAllViolations(): Promise<Violation[]>;
   getViolation(id: string): Promise<Violation | undefined>;
   getViolationsByDriver(driverId: string): Promise<Violation[]>;
   createViolation(violation: InsertViolation): Promise<Violation>;
@@ -196,7 +190,7 @@ export interface IStorage {
   deleteViolation(id: string): Promise<boolean>;
   
   // Settlements
-  getAllSettlements(companyId?: string): Promise<Settlement[]>;
+  getAllSettlements(): Promise<Settlement[]>;
   getSettlement(id: string): Promise<Settlement | undefined>;
   getSettlementsByDriver(driverId: string): Promise<Settlement[]>;
   createSettlement(settlement: InsertSettlement): Promise<Settlement>;
@@ -205,7 +199,6 @@ export interface IStorage {
   
   // Settlement Line Items
   getSettlementLineItems(settlementId: string): Promise<SettlementLineItem[]>;
-  getSettlementLineItem(id: string): Promise<SettlementLineItem | undefined>;
   createSettlementLineItem(lineItem: InsertSettlementLineItem): Promise<SettlementLineItem>;
   updateSettlementLineItem(id: string, lineItem: Partial<InsertSettlementLineItem>): Promise<SettlementLineItem | undefined>;
   deleteSettlementLineItem(id: string): Promise<boolean>;
@@ -300,23 +293,6 @@ export interface IStorage {
   // Company Settings
   getCompanySettings(): Promise<CompanySettings | undefined>;
   updateCompanySettings(settings: Partial<InsertCompanySettings>): Promise<CompanySettings | undefined>;
-
-  // Companies (Multi-tenant)
-  getAllCompanies(): Promise<Company[]>;
-  getCompany(id: string): Promise<Company | undefined>;
-  getCompanyByName(name: string): Promise<Company | undefined>;
-  createCompany(company: InsertCompany): Promise<Company>;
-  updateCompany(id: string, company: Partial<InsertCompany>): Promise<Company | undefined>;
-  deleteCompany(id: string): Promise<boolean>;
-
-  // Company Users (User-Company associations)
-  getCompanyUsersByUserId(userId: string): Promise<CompanyUser[]>;
-  getCompanyUsersByCompanyId(companyId: string): Promise<CompanyUser[]>;
-  createCompanyUser(companyUser: InsertCompanyUser): Promise<CompanyUser>;
-  updateCompanyUser(id: string, companyUser: Partial<InsertCompanyUser>): Promise<CompanyUser | undefined>;
-  deleteCompanyUser(id: string): Promise<boolean>;
-  getUserPrimaryCompany(userId: string): Promise<Company | undefined>;
-  getCompaniesByUserId(userId: string): Promise<Company[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -558,12 +534,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getAllLoads(companyId?: string): Promise<Load[]> {
-    if (companyId) {
-      return await db.select().from(loads)
-        .where(eq(loads.companyId, companyId))
-        .orderBy(desc(loads.createdAt));
-    }
+  async getAllLoads(): Promise<Load[]> {
     return await db.select().from(loads).orderBy(desc(loads.createdAt));
   }
 
@@ -606,10 +577,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllTrucks(companyId?: string): Promise<Truck[]> {
-    if (companyId) {
-      return await db.select().from(trucks).where(eq(trucks.companyId, companyId));
-    }
+  async getAllTrucks(): Promise<Truck[]> {
     return await db.select().from(trucks);
   }
 
@@ -640,10 +608,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllTrailers(companyId?: string): Promise<Trailer[]> {
-    if (companyId) {
-      return await db.select().from(trailers).where(eq(trailers.companyId, companyId));
-    }
+  async getAllTrailers(): Promise<Trailer[]> {
     return await db.select().from(trailers);
   }
 
@@ -674,10 +639,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllDrivers(companyId?: string): Promise<Driver[]> {
-    if (companyId) {
-      return await db.select().from(drivers).where(eq(drivers.companyId, companyId));
-    }
+  async getAllDrivers(): Promise<Driver[]> {
     return await db.select().from(drivers);
   }
 
@@ -792,10 +754,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllCustomers(companyId?: string): Promise<Customer[]> {
-    if (companyId) {
-      return await db.select().from(customers).where(eq(customers.companyId, companyId));
-    }
+  async getAllCustomers(): Promise<Customer[]> {
     return await db.select().from(customers);
   }
 
@@ -839,12 +798,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Expenses
-  async getAllExpenses(companyId?: string): Promise<Expense[]> {
-    if (companyId) {
-      return await db.select().from(expenses)
-        .where(eq(expenses.companyId, companyId))
-        .orderBy(desc(expenses.expenseDate));
-    }
+  async getAllExpenses(): Promise<Expense[]> {
     return await db.select().from(expenses).orderBy(desc(expenses.expenseDate));
   }
 
@@ -887,12 +841,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Invoices
-  async getAllInvoices(companyId?: string): Promise<Invoice[]> {
-    if (companyId) {
-      return await db.select().from(invoices)
-        .where(eq(invoices.companyId, companyId))
-        .orderBy(desc(invoices.invoiceDate));
-    }
+  async getAllInvoices(): Promise<Invoice[]> {
     return await db.select().from(invoices).orderBy(desc(invoices.invoiceDate));
   }
 
@@ -935,12 +884,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Payments
-  async getAllPayments(companyId?: string): Promise<Payment[]> {
-    if (companyId) {
-      return await db.select().from(payments)
-        .where(eq(payments.companyId, companyId))
-        .orderBy(desc(payments.paymentDate));
-    }
+  async getAllPayments(): Promise<Payment[]> {
     return await db.select().from(payments).orderBy(desc(payments.paymentDate));
   }
 
@@ -983,12 +927,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Inspections
-  async getAllInspections(companyId?: string): Promise<Inspection[]> {
-    if (companyId) {
-      return await db.select().from(inspections)
-        .where(eq(inspections.companyId, companyId))
-        .orderBy(desc(inspections.inspectionDate));
-    }
+  async getAllInspections(): Promise<Inspection[]> {
     return await db.select().from(inspections).orderBy(desc(inspections.inspectionDate));
   }
 
@@ -1035,12 +974,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Accidents
-  async getAllAccidents(companyId?: string): Promise<Accident[]> {
-    if (companyId) {
-      return await db.select().from(accidents)
-        .where(eq(accidents.companyId, companyId))
-        .orderBy(desc(accidents.accidentDate));
-    }
+  async getAllAccidents(): Promise<Accident[]> {
     return await db.select().from(accidents).orderBy(desc(accidents.accidentDate));
   }
 
@@ -1083,12 +1017,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Violations
-  async getAllViolations(companyId?: string): Promise<Violation[]> {
-    if (companyId) {
-      return await db.select().from(violations)
-        .where(eq(violations.companyId, companyId))
-        .orderBy(desc(violations.violationDate));
-    }
+  async getAllViolations(): Promise<Violation[]> {
     return await db.select().from(violations).orderBy(desc(violations.violationDate));
   }
 
@@ -1135,12 +1064,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Settlements
-  async getAllSettlements(companyId?: string): Promise<Settlement[]> {
-    if (companyId) {
-      return await db.select().from(settlements)
-        .where(eq(settlements.companyId, companyId))
-        .orderBy(desc(settlements.periodEnd));
-    }
+  async getAllSettlements(): Promise<Settlement[]> {
     return await db.select().from(settlements).orderBy(desc(settlements.periodEnd));
   }
 
@@ -1198,11 +1122,6 @@ export class DatabaseStorage implements IStorage {
   // Settlement Line Items
   async getSettlementLineItems(settlementId: string): Promise<SettlementLineItem[]> {
     return await db.select().from(settlementLineItems).where(eq(settlementLineItems.settlementId, settlementId));
-  }
-
-  async getSettlementLineItem(id: string): Promise<SettlementLineItem | undefined> {
-    const [lineItem] = await db.select().from(settlementLineItems).where(eq(settlementLineItems.id, id));
-    return lineItem || undefined;
   }
 
   async createSettlementLineItem(lineItem: InsertSettlementLineItem): Promise<SettlementLineItem> {
@@ -1713,114 +1632,6 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
-  }
-
-  // Companies (Multi-tenant) Implementation
-  async getAllCompanies(): Promise<Company[]> {
-    return await db.select().from(companies).orderBy(companies.name);
-  }
-
-  async getCompany(id: string): Promise<Company | undefined> {
-    const [company] = await db.select().from(companies).where(eq(companies.id, id));
-    return company || undefined;
-  }
-
-  async getCompanyByName(name: string): Promise<Company | undefined> {
-    const [company] = await db.select().from(companies).where(eq(companies.name, name));
-    return company || undefined;
-  }
-
-  async createCompany(insertCompany: InsertCompany): Promise<Company> {
-    const [company] = await db
-      .insert(companies)
-      .values(insertCompany)
-      .returning();
-    return company;
-  }
-
-  async updateCompany(id: string, updateData: Partial<InsertCompany>): Promise<Company | undefined> {
-    const [company] = await db
-      .update(companies)
-      .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(companies.id, id))
-      .returning();
-    return company || undefined;
-  }
-
-  async deleteCompany(id: string): Promise<boolean> {
-    const result = await db.delete(companies).where(eq(companies.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
-  }
-
-  // Company Users Implementation
-  async getCompanyUsersByUserId(userId: string): Promise<CompanyUser[]> {
-    return await db.select().from(companyUsers).where(eq(companyUsers.userId, userId));
-  }
-
-  async getCompanyUsersByCompanyId(companyId: string): Promise<CompanyUser[]> {
-    return await db.select().from(companyUsers).where(eq(companyUsers.companyId, companyId));
-  }
-
-  async createCompanyUser(insertCompanyUser: InsertCompanyUser): Promise<CompanyUser> {
-    const [companyUser] = await db
-      .insert(companyUsers)
-      .values(insertCompanyUser)
-      .returning();
-    return companyUser;
-  }
-
-  async updateCompanyUser(id: string, updateData: Partial<InsertCompanyUser>): Promise<CompanyUser | undefined> {
-    const [companyUser] = await db
-      .update(companyUsers)
-      .set(updateData)
-      .where(eq(companyUsers.id, id))
-      .returning();
-    return companyUser || undefined;
-  }
-
-  async deleteCompanyUser(id: string): Promise<boolean> {
-    const result = await db.delete(companyUsers).where(eq(companyUsers.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
-  }
-
-  async getUserPrimaryCompany(userId: string): Promise<Company | undefined> {
-    const [primaryCompanyUser] = await db
-      .select()
-      .from(companyUsers)
-      .where(and(eq(companyUsers.userId, userId), eq(companyUsers.isPrimary, "true")));
-    
-    if (primaryCompanyUser) {
-      return await this.getCompany(primaryCompanyUser.companyId);
-    }
-    
-    // If no primary, return the first company the user belongs to
-    const [firstCompanyUser] = await db
-      .select()
-      .from(companyUsers)
-      .where(eq(companyUsers.userId, userId));
-    
-    if (firstCompanyUser) {
-      return await this.getCompany(firstCompanyUser.companyId);
-    }
-    
-    return undefined;
-  }
-
-  async getCompaniesByUserId(userId: string): Promise<Company[]> {
-    const userCompanies = await db
-      .select()
-      .from(companyUsers)
-      .where(eq(companyUsers.userId, userId));
-    
-    const companyIds = userCompanies.map(cu => cu.companyId);
-    if (companyIds.length === 0) return [];
-    
-    const result: Company[] = [];
-    for (const companyId of companyIds) {
-      const company = await this.getCompany(companyId);
-      if (company) result.push(company);
-    }
-    return result;
   }
 }
 

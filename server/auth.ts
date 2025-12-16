@@ -105,23 +105,7 @@ export async function setupAuth(app: Express) {
           return done(null, false, { message: 'Invalid email or password' });
         }
 
-        // Get user's primary company (or first company if no primary)
-        const primaryCompany = await storage.getUserPrimaryCompany(user.id);
-        const userCompanies = await storage.getCompaniesByUserId(user.id);
-        const activeCompanyId = primaryCompany?.id || userCompanies[0]?.id || null;
-        
-        console.log("[DEBUG LOGIN] User:", user.email);
-        console.log("[DEBUG LOGIN] Primary company:", primaryCompany?.name, primaryCompany?.id);
-        console.log("[DEBUG LOGIN] All companies:", userCompanies.map(c => `${c.name}(${c.id})`).join(", "));
-        console.log("[DEBUG LOGIN] Active company ID:", activeCompanyId);
-
-        return done(null, { 
-          id: user.id, 
-          email: user.email, 
-          type: 'admin', 
-          role: userRole,
-          activeCompanyId 
-        });
+        return done(null, { id: user.id, email: user.email, type: 'admin', role: userRole });
       } catch (error) {
         return done(error);
       }
@@ -151,12 +135,7 @@ export async function setupAuth(app: Express) {
           return done(null, false, { message: 'Invalid email or password' });
         }
 
-        return done(null, { 
-          id: driver.id, 
-          email: driver.email, 
-          type: 'driver',
-          activeCompanyId: driver.companyId || null 
-        });
+        return done(null, { id: driver.id, email: driver.email, type: 'driver' });
       } catch (error) {
         return done(error);
       }
@@ -191,11 +170,4 @@ export const isDriver: RequestHandler = (req, res, next) => {
     return next();
   }
   res.status(403).json({ message: "Forbidden: Driver access required" });
-};
-
-export const requireActiveCompany: RequestHandler = (req, res, next) => {
-  if (req.isAuthenticated() && (req.user as any).activeCompanyId) {
-    return next();
-  }
-  res.status(400).json({ message: "No active company selected. Please select a company." });
 };

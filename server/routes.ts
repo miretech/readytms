@@ -22,7 +22,7 @@ import {
   insertShortPaySchema,
   insertChargeBackSchema
 } from "@shared/schema";
-import { setupAuth, isAuthenticated, isAdmin, isDriver, requireActiveCompany } from "./auth";
+import { setupAuth, isAuthenticated, isAdmin, isDriver } from "./auth";
 import passport from "passport";
 import bcrypt from "bcrypt";
 import { extractLoadFromDocument } from "./aiExtraction";
@@ -144,11 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
-        return res.json({ 
-          ...userWithoutPassword, 
-          type: 'admin',
-          activeCompanyId: sessionUser.activeCompanyId 
-        });
+        return res.json({ ...userWithoutPassword, type: 'admin' });
       } else if (sessionUser.type === 'driver') {
         const driver = await storage.getDriver(sessionUser.id);
         if (!driver) {
@@ -156,11 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         // Remove password from response
         const { password, ...driverWithoutPassword } = driver;
-        return res.json({ 
-          ...driverWithoutPassword, 
-          type: 'driver',
-          activeCompanyId: sessionUser.activeCompanyId 
-        });
+        return res.json({ ...driverWithoutPassword, type: 'driver' });
       }
       
       res.status(404).json({ message: "User not found" });
@@ -178,85 +170,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ message: "Logged out successfully" });
     });
-  });
-
-  // Company Routes - Get user's companies
-  app.get("/api/companies", isAuthenticated, async (req: any, res) => {
-    try {
-      const sessionUser = req.user;
-      console.log("[DEBUG] /api/companies - Session user:", JSON.stringify(sessionUser));
-      
-      if (sessionUser.type === 'admin') {
-        console.log("[DEBUG] Looking up companies for userId:", sessionUser.id);
-        const companies = await storage.getCompaniesByUserId(sessionUser.id);
-        console.log("[DEBUG] Found", companies.length, "companies:", companies.map(c => c.name).join(", "));
-        return res.json(companies);
-      } else if (sessionUser.type === 'driver') {
-        // Drivers belong to one company via their driver record
-        const driver = await storage.getDriver(sessionUser.id);
-        if (driver?.companyId) {
-          const company = await storage.getCompany(driver.companyId);
-          return res.json(company ? [company] : []);
-        }
-        return res.json([]);
-      }
-      
-      res.json([]);
-    } catch (error) {
-      console.error("Error fetching companies:", error);
-      res.status(500).json({ message: "Failed to fetch companies" });
-    }
-  });
-
-  // Get current active company
-  app.get("/api/companies/current", isAuthenticated, async (req: any, res) => {
-    try {
-      const sessionUser = req.user;
-      
-      if (!sessionUser.activeCompanyId) {
-        return res.json(null);
-      }
-      
-      const company = await storage.getCompany(sessionUser.activeCompanyId);
-      res.json(company || null);
-    } catch (error) {
-      console.error("Error fetching current company:", error);
-      res.status(500).json({ message: "Failed to fetch current company" });
-    }
-  });
-
-  // Switch active company
-  app.post("/api/companies/switch", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { companyId } = req.body;
-      const sessionUser = req.user;
-      
-      if (!companyId) {
-        return res.status(400).json({ message: "Company ID is required" });
-      }
-      
-      // Verify user has access to this company
-      const userCompanies = await storage.getCompaniesByUserId(sessionUser.id);
-      const hasAccess = userCompanies.some(c => c.id === companyId);
-      
-      if (!hasAccess) {
-        return res.status(403).json({ message: "You don't have access to this company" });
-      }
-      
-      // Update session with new active company
-      req.user.activeCompanyId = companyId;
-      
-      // Re-login to persist session changes
-      req.login(req.user, (err: any) => {
-        if (err) {
-          return res.status(500).json({ message: "Failed to switch company" });
-        }
-        res.json({ message: "Company switched successfully", activeCompanyId: companyId });
-      });
-    } catch (error) {
-      console.error("Error switching company:", error);
-      res.status(500).json({ message: "Failed to switch company" });
-    }
   });
 
   // Password Reset - Request reset email
@@ -371,29 +284,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/loads", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const loads = await storage.getAllLoads(companyId);
+  app.get("/api/loads", async (_req, res) => {
+    const loads = await storage.getAllLoads();
     res.json(loads);
   });
 
-  app.get("/api/loads/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/loads/:id", async (req, res) => {
     const load = await storage.getLoad(req.params.id);
     if (!load) {
       return res.status(404).json({ error: "Load not found" });
     }
-    // Validate company ownership
-    if (companyId && load.companyId && load.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this load" });
-    }
     res.json(load);
   });
 
-  app.post("/api/loads", isAuthenticated, async (req: any, res) => {
+  app.post("/api/loads", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertLoadSchema.parse({ ...req.body, companyId });
+      const validatedData = insertLoadSchema.parse(req.body);
       const load = await storage.createLoad(validatedData);
       res.status(201).json(load);
     } catch (error) {
@@ -401,17 +307,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/loads/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/loads/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
       // Get the old load data before update
       const oldLoad = await storage.getLoad(req.params.id);
       if (!oldLoad) {
         return res.status(404).json({ error: "Load not found" });
-      }
-      // Validate company ownership
-      if (companyId && oldLoad.companyId && oldLoad.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this load" });
       }
       
       const validatedData = insertLoadSchema.partial().parse(req.body);
@@ -436,16 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/loads/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const load = await storage.getLoad(req.params.id);
-    if (!load) {
-      return res.status(404).json({ error: "Load not found" });
-    }
-    // Validate company ownership
-    if (companyId && load.companyId && load.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this load" });
-    }
+  app.delete("/api/loads/:id", async (req, res) => {
     const deleted = await storage.deleteLoad(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Load not found" });
@@ -574,28 +466,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/trucks", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const trucks = await storage.getAllTrucks(companyId);
+  app.get("/api/trucks", async (_req, res) => {
+    const trucks = await storage.getAllTrucks();
     res.json(trucks);
   });
 
-  app.get("/api/trucks/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/trucks/:id", async (req, res) => {
     const truck = await storage.getTruck(req.params.id);
     if (!truck) {
       return res.status(404).json({ error: "Truck not found" });
     }
-    if (companyId && truck.companyId && truck.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this truck" });
-    }
     res.json(truck);
   });
 
-  app.post("/api/trucks", isAuthenticated, async (req: any, res) => {
+  app.post("/api/trucks", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertTruckSchema.parse({ ...req.body, companyId });
+      const validatedData = insertTruckSchema.parse(req.body);
       const truck = await storage.createTruck(validatedData);
       res.status(201).json(truck);
     } catch (error) {
@@ -603,16 +489,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/trucks/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/trucks/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingTruck = await storage.getTruck(req.params.id);
-      if (!existingTruck) {
-        return res.status(404).json({ error: "Truck not found" });
-      }
-      if (companyId && existingTruck.companyId && existingTruck.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this truck" });
-      }
       const validatedData = insertTruckSchema.partial().parse(req.body);
       const truck = await storage.updateTruck(req.params.id, validatedData);
       if (!truck) {
@@ -624,15 +502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/trucks/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const truck = await storage.getTruck(req.params.id);
-    if (!truck) {
-      return res.status(404).json({ error: "Truck not found" });
-    }
-    if (companyId && truck.companyId && truck.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this truck" });
-    }
+  app.delete("/api/trucks/:id", async (req, res) => {
     const deleted = await storage.deleteTruck(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Truck not found" });
@@ -640,30 +510,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/trailers", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    console.log("[DEBUG TRAILERS] User:", req.user?.email, "ActiveCompanyId:", companyId);
-    const trailers = await storage.getAllTrailers(companyId);
-    console.log("[DEBUG TRAILERS] Found", trailers.length, "trailers for company", companyId);
+  app.get("/api/trailers", async (_req, res) => {
+    const trailers = await storage.getAllTrailers();
     res.json(trailers);
   });
 
-  app.get("/api/trailers/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/trailers/:id", async (req, res) => {
     const trailer = await storage.getTrailer(req.params.id);
     if (!trailer) {
       return res.status(404).json({ error: "Trailer not found" });
     }
-    if (companyId && trailer.companyId && trailer.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this trailer" });
-    }
     res.json(trailer);
   });
 
-  app.post("/api/trailers", isAuthenticated, async (req: any, res) => {
+  app.post("/api/trailers", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertTrailerSchema.parse({ ...req.body, companyId });
+      const validatedData = insertTrailerSchema.parse(req.body);
       const trailer = await storage.createTrailer(validatedData);
       res.status(201).json(trailer);
     } catch (error) {
@@ -672,16 +534,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/trailers/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/trailers/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingTrailer = await storage.getTrailer(req.params.id);
-      if (!existingTrailer) {
-        return res.status(404).json({ error: "Trailer not found" });
-      }
-      if (companyId && existingTrailer.companyId && existingTrailer.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this trailer" });
-      }
       const validatedData = insertTrailerSchema.partial().parse(req.body);
       const trailer = await storage.updateTrailer(req.params.id, validatedData);
       if (!trailer) {
@@ -694,15 +548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/trailers/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const trailer = await storage.getTrailer(req.params.id);
-    if (!trailer) {
-      return res.status(404).json({ error: "Trailer not found" });
-    }
-    if (companyId && trailer.companyId && trailer.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this trailer" });
-    }
+  app.delete("/api/trailers/:id", async (req, res) => {
     const deleted = await storage.deleteTrailer(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Trailer not found" });
@@ -710,20 +556,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/drivers", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const drivers = await storage.getAllDrivers(companyId);
+  app.get("/api/drivers", async (_req, res) => {
+    const drivers = await storage.getAllDrivers();
     res.json(drivers);
   });
 
-  app.get("/api/drivers/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/drivers/:id", async (req, res) => {
     const driver = await storage.getDriver(req.params.id);
     if (!driver) {
       return res.status(404).json({ error: "Driver not found" });
-    }
-    if (companyId && driver.companyId && driver.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this driver" });
     }
     res.json(driver);
   });
@@ -764,10 +605,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/drivers", isAuthenticated, async (req: any, res) => {
+  app.post("/api/drivers", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertDriverSchema.parse({ ...req.body, companyId });
+      const validatedData = insertDriverSchema.parse(req.body);
       
       // If password is provided, hash it
       if (validatedData.password) {
@@ -782,16 +622,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/drivers/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/drivers/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingDriver = await storage.getDriver(req.params.id);
-      if (!existingDriver) {
-        return res.status(404).json({ error: "Driver not found" });
-      }
-      if (companyId && existingDriver.companyId && existingDriver.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this driver" });
-      }
       const validatedData = insertDriverSchema.partial().parse(req.body);
       
       // If password is being updated, hash it
@@ -810,15 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/drivers/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const driver = await storage.getDriver(req.params.id);
-    if (!driver) {
-      return res.status(404).json({ error: "Driver not found" });
-    }
-    if (companyId && driver.companyId && driver.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this driver" });
-    }
+  app.delete("/api/drivers/:id", async (req, res) => {
     const deleted = await storage.deleteDriver(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Driver not found" });
@@ -826,28 +650,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/customers", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const customers = await storage.getAllCustomers(companyId);
+  app.get("/api/customers", async (_req, res) => {
+    const customers = await storage.getAllCustomers();
     res.json(customers);
   });
 
-  app.get("/api/customers/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/customers/:id", async (req, res) => {
     const customer = await storage.getCustomer(req.params.id);
     if (!customer) {
       return res.status(404).json({ error: "Customer not found" });
     }
-    if (companyId && customer.companyId && customer.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this customer" });
-    }
     res.json(customer);
   });
 
-  app.post("/api/customers", isAuthenticated, async (req: any, res) => {
+  app.post("/api/customers", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertCustomerSchema.parse({ ...req.body, companyId });
+      const validatedData = insertCustomerSchema.parse(req.body);
       const customer = await storage.createCustomer(validatedData);
       res.status(201).json(customer);
     } catch (error) {
@@ -855,16 +673,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/customers/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/customers/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingCustomer = await storage.getCustomer(req.params.id);
-      if (!existingCustomer) {
-        return res.status(404).json({ error: "Customer not found" });
-      }
-      if (companyId && existingCustomer.companyId && existingCustomer.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this customer" });
-      }
       const validatedData = insertCustomerSchema.partial().parse(req.body);
       const customer = await storage.updateCustomer(req.params.id, validatedData);
       if (!customer) {
@@ -876,15 +686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/customers/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const customer = await storage.getCustomer(req.params.id);
-    if (!customer) {
-      return res.status(404).json({ error: "Customer not found" });
-    }
-    if (companyId && customer.companyId && customer.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this customer" });
-    }
+  app.delete("/api/customers/:id", async (req, res) => {
     const deleted = await storage.deleteCustomer(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Customer not found" });
@@ -1020,42 +822,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Expenses Routes
-  app.get("/api/expenses", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const expenses = await storage.getAllExpenses(companyId);
+  app.get("/api/expenses", async (_req, res) => {
+    const expenses = await storage.getAllExpenses();
     res.json(expenses);
   });
 
-  app.get("/api/expenses/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/expenses/:id", async (req, res) => {
     const expense = await storage.getExpense(req.params.id);
     if (!expense) {
       return res.status(404).json({ error: "Expense not found" });
     }
-    if (companyId && expense.companyId && expense.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this expense" });
-    }
     res.json(expense);
   });
 
-  app.get("/api/expenses/load/:loadId", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    // Validate load belongs to company first
-    const load = await storage.getLoad(req.params.loadId);
-    if (!load) {
-      return res.status(404).json({ error: "Load not found" });
-    }
-    if (companyId && load.companyId && load.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this load" });
-    }
+  app.get("/api/expenses/load/:loadId", async (req, res) => {
     const expenses = await storage.getExpensesByLoad(req.params.loadId);
     res.json(expenses);
   });
 
-  app.post("/api/expenses", isAuthenticated, async (req: any, res) => {
+  app.post("/api/expenses", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertExpenseSchema.parse({ ...req.body, companyId });
+      const validatedData = insertExpenseSchema.parse(req.body);
       const expense = await storage.createExpense(validatedData);
       res.status(201).json(expense);
     } catch (error) {
@@ -1063,16 +850,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/expenses/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/expenses/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingExpense = await storage.getExpense(req.params.id);
-      if (!existingExpense) {
-        return res.status(404).json({ error: "Expense not found" });
-      }
-      if (companyId && existingExpense.companyId && existingExpense.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this expense" });
-      }
       const validatedData = insertExpenseSchema.partial().parse(req.body);
       const expense = await storage.updateExpense(req.params.id, validatedData);
       if (!expense) {
@@ -1084,15 +863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/expenses/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const expense = await storage.getExpense(req.params.id);
-    if (!expense) {
-      return res.status(404).json({ error: "Expense not found" });
-    }
-    if (companyId && expense.companyId && expense.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this expense" });
-    }
+  app.delete("/api/expenses/:id", async (req, res) => {
     const deleted = await storage.deleteExpense(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Expense not found" });
@@ -1101,28 +872,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoices Routes
-  app.get("/api/invoices", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const invoices = await storage.getAllInvoices(companyId);
+  app.get("/api/invoices", async (_req, res) => {
+    const invoices = await storage.getAllInvoices();
     res.json(invoices);
   });
 
-  app.get("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/invoices/:id", async (req, res) => {
     const invoice = await storage.getInvoice(req.params.id);
     if (!invoice) {
       return res.status(404).json({ error: "Invoice not found" });
     }
-    if (companyId && invoice.companyId && invoice.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this invoice" });
-    }
     res.json(invoice);
   });
 
-  app.post("/api/invoices", isAuthenticated, async (req: any, res) => {
+  app.post("/api/invoices", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertInvoiceSchema.parse({ ...req.body, companyId });
+      const validatedData = insertInvoiceSchema.parse(req.body);
       const invoice = await storage.createInvoice(validatedData);
       res.status(201).json(invoice);
     } catch (error) {
@@ -1130,16 +895,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/invoices/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingInvoice = await storage.getInvoice(req.params.id);
-      if (!existingInvoice) {
-        return res.status(404).json({ error: "Invoice not found" });
-      }
-      if (companyId && existingInvoice.companyId && existingInvoice.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this invoice" });
-      }
       const validatedData = insertInvoiceSchema.partial().parse(req.body);
       const invoice = await storage.updateInvoice(req.params.id, validatedData);
       if (!invoice) {
@@ -1151,15 +908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const invoice = await storage.getInvoice(req.params.id);
-    if (!invoice) {
-      return res.status(404).json({ error: "Invoice not found" });
-    }
-    if (companyId && invoice.companyId && invoice.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this invoice" });
-    }
+  app.delete("/api/invoices/:id", async (req, res) => {
     const deleted = await storage.deleteInvoice(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Invoice not found" });
@@ -1274,42 +1023,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payments Routes
-  app.get("/api/payments", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const payments = await storage.getAllPayments(companyId);
+  app.get("/api/payments", async (_req, res) => {
+    const payments = await storage.getAllPayments();
     res.json(payments);
   });
 
-  app.get("/api/payments/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/payments/:id", async (req, res) => {
     const payment = await storage.getPayment(req.params.id);
     if (!payment) {
       return res.status(404).json({ error: "Payment not found" });
     }
-    if (companyId && payment.companyId && payment.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this payment" });
-    }
     res.json(payment);
   });
 
-  app.get("/api/payments/invoice/:invoiceId", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    // Validate invoice belongs to company first
-    const invoice = await storage.getInvoice(req.params.invoiceId);
-    if (!invoice) {
-      return res.status(404).json({ error: "Invoice not found" });
-    }
-    if (companyId && invoice.companyId && invoice.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this invoice" });
-    }
+  app.get("/api/payments/invoice/:invoiceId", async (req, res) => {
     const payments = await storage.getPaymentsByInvoice(req.params.invoiceId);
     res.json(payments);
   });
 
-  app.post("/api/payments", isAuthenticated, async (req: any, res) => {
+  app.post("/api/payments", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertPaymentSchema.parse({ ...req.body, companyId });
+      const validatedData = insertPaymentSchema.parse(req.body);
       const payment = await storage.createPayment(validatedData);
       res.status(201).json(payment);
     } catch (error) {
@@ -1317,16 +1051,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/payments/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/payments/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingPayment = await storage.getPayment(req.params.id);
-      if (!existingPayment) {
-        return res.status(404).json({ error: "Payment not found" });
-      }
-      if (companyId && existingPayment.companyId && existingPayment.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this payment" });
-      }
       const validatedData = insertPaymentSchema.partial().parse(req.body);
       const payment = await storage.updatePayment(req.params.id, validatedData);
       if (!payment) {
@@ -1338,15 +1064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/payments/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const payment = await storage.getPayment(req.params.id);
-    if (!payment) {
-      return res.status(404).json({ error: "Payment not found" });
-    }
-    if (companyId && payment.companyId && payment.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this payment" });
-    }
+  app.delete("/api/payments/:id", async (req, res) => {
     const deleted = await storage.deletePayment(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Payment not found" });
@@ -1355,56 +1073,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inspections Routes
-  app.get("/api/inspections", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const inspections = await storage.getAllInspections(companyId);
+  app.get("/api/inspections", async (_req, res) => {
+    const inspections = await storage.getAllInspections();
     res.json(inspections);
   });
 
-  app.get("/api/inspections/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/inspections/:id", async (req, res) => {
     const inspection = await storage.getInspection(req.params.id);
     if (!inspection) {
       return res.status(404).json({ error: "Inspection not found" });
     }
-    if (companyId && inspection.companyId && inspection.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this inspection" });
-    }
     res.json(inspection);
   });
 
-  app.get("/api/inspections/truck/:truckId", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    // Validate truck belongs to company first
-    const truck = await storage.getTruck(req.params.truckId);
-    if (!truck) {
-      return res.status(404).json({ error: "Truck not found" });
-    }
-    if (companyId && truck.companyId && truck.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this truck" });
-    }
+  app.get("/api/inspections/truck/:truckId", async (req, res) => {
     const inspections = await storage.getInspectionsByTruck(req.params.truckId);
     res.json(inspections);
   });
 
-  app.get("/api/inspections/driver/:driverId", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    // Validate driver belongs to company first
-    const driver = await storage.getDriver(req.params.driverId);
-    if (!driver) {
-      return res.status(404).json({ error: "Driver not found" });
-    }
-    if (companyId && driver.companyId && driver.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this driver" });
-    }
+  app.get("/api/inspections/driver/:driverId", async (req, res) => {
     const inspections = await storage.getInspectionsByDriver(req.params.driverId);
     res.json(inspections);
   });
 
-  app.post("/api/inspections", isAuthenticated, async (req: any, res) => {
+  app.post("/api/inspections", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertInspectionSchema.parse({ ...req.body, companyId });
+      const validatedData = insertInspectionSchema.parse(req.body);
       const inspection = await storage.createInspection(validatedData);
       res.status(201).json(inspection);
     } catch (error) {
@@ -1412,16 +1106,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/inspections/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/inspections/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingInspection = await storage.getInspection(req.params.id);
-      if (!existingInspection) {
-        return res.status(404).json({ error: "Inspection not found" });
-      }
-      if (companyId && existingInspection.companyId && existingInspection.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this inspection" });
-      }
       const validatedData = insertInspectionSchema.partial().parse(req.body);
       const inspection = await storage.updateInspection(req.params.id, validatedData);
       if (!inspection) {
@@ -1433,15 +1119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/inspections/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const inspection = await storage.getInspection(req.params.id);
-    if (!inspection) {
-      return res.status(404).json({ error: "Inspection not found" });
-    }
-    if (companyId && inspection.companyId && inspection.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this inspection" });
-    }
+  app.delete("/api/inspections/:id", async (req, res) => {
     const deleted = await storage.deleteInspection(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Inspection not found" });
@@ -1450,42 +1128,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Accidents Routes
-  app.get("/api/accidents", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const accidents = await storage.getAllAccidents(companyId);
+  app.get("/api/accidents", async (_req, res) => {
+    const accidents = await storage.getAllAccidents();
     res.json(accidents);
   });
 
-  app.get("/api/accidents/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/accidents/:id", async (req, res) => {
     const accident = await storage.getAccident(req.params.id);
     if (!accident) {
       return res.status(404).json({ error: "Accident not found" });
     }
-    if (companyId && accident.companyId && accident.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this accident" });
-    }
     res.json(accident);
   });
 
-  app.get("/api/accidents/driver/:driverId", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    // Validate driver belongs to company first
-    const driver = await storage.getDriver(req.params.driverId);
-    if (!driver) {
-      return res.status(404).json({ error: "Driver not found" });
-    }
-    if (companyId && driver.companyId && driver.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this driver" });
-    }
+  app.get("/api/accidents/driver/:driverId", async (req, res) => {
     const accidents = await storage.getAccidentsByDriver(req.params.driverId);
     res.json(accidents);
   });
 
-  app.post("/api/accidents", isAuthenticated, async (req: any, res) => {
+  app.post("/api/accidents", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertAccidentSchema.parse({ ...req.body, companyId });
+      const validatedData = insertAccidentSchema.parse(req.body);
       const accident = await storage.createAccident(validatedData);
       res.status(201).json(accident);
     } catch (error) {
@@ -1493,16 +1156,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/accidents/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/accidents/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingAccident = await storage.getAccident(req.params.id);
-      if (!existingAccident) {
-        return res.status(404).json({ error: "Accident not found" });
-      }
-      if (companyId && existingAccident.companyId && existingAccident.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this accident" });
-      }
       const validatedData = insertAccidentSchema.partial().parse(req.body);
       const accident = await storage.updateAccident(req.params.id, validatedData);
       if (!accident) {
@@ -1514,15 +1169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/accidents/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const accident = await storage.getAccident(req.params.id);
-    if (!accident) {
-      return res.status(404).json({ error: "Accident not found" });
-    }
-    if (companyId && accident.companyId && accident.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this accident" });
-    }
+  app.delete("/api/accidents/:id", async (req, res) => {
     const deleted = await storage.deleteAccident(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Accident not found" });
@@ -1531,42 +1178,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Violations Routes
-  app.get("/api/violations", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const violations = await storage.getAllViolations(companyId);
+  app.get("/api/violations", async (_req, res) => {
+    const violations = await storage.getAllViolations();
     res.json(violations);
   });
 
-  app.get("/api/violations/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/violations/:id", async (req, res) => {
     const violation = await storage.getViolation(req.params.id);
     if (!violation) {
       return res.status(404).json({ error: "Violation not found" });
     }
-    if (companyId && violation.companyId && violation.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this violation" });
-    }
     res.json(violation);
   });
 
-  app.get("/api/violations/driver/:driverId", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    // Validate driver belongs to company first
-    const driver = await storage.getDriver(req.params.driverId);
-    if (!driver) {
-      return res.status(404).json({ error: "Driver not found" });
-    }
-    if (companyId && driver.companyId && driver.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this driver" });
-    }
+  app.get("/api/violations/driver/:driverId", async (req, res) => {
     const violations = await storage.getViolationsByDriver(req.params.driverId);
     res.json(violations);
   });
 
-  app.post("/api/violations", isAuthenticated, async (req: any, res) => {
+  app.post("/api/violations", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertViolationSchema.parse({ ...req.body, companyId });
+      const validatedData = insertViolationSchema.parse(req.body);
       const violation = await storage.createViolation(validatedData);
       res.status(201).json(violation);
     } catch (error) {
@@ -1574,16 +1206,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/violations/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/violations/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingViolation = await storage.getViolation(req.params.id);
-      if (!existingViolation) {
-        return res.status(404).json({ error: "Violation not found" });
-      }
-      if (companyId && existingViolation.companyId && existingViolation.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this violation" });
-      }
       const validatedData = insertViolationSchema.partial().parse(req.body);
       const violation = await storage.updateViolation(req.params.id, validatedData);
       if (!violation) {
@@ -1595,15 +1219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/violations/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const violation = await storage.getViolation(req.params.id);
-    if (!violation) {
-      return res.status(404).json({ error: "Violation not found" });
-    }
-    if (companyId && violation.companyId && violation.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this violation" });
-    }
+  app.delete("/api/violations/:id", async (req, res) => {
     const deleted = await storage.deleteViolation(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Violation not found" });
@@ -1612,42 +1228,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Settlements Routes
-  app.get("/api/settlements", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const settlements = await storage.getAllSettlements(companyId);
+  app.get("/api/settlements", async (_req, res) => {
+    const settlements = await storage.getAllSettlements();
     res.json(settlements);
   });
 
-  app.get("/api/settlements/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
+  app.get("/api/settlements/:id", async (req, res) => {
     const settlement = await storage.getSettlement(req.params.id);
     if (!settlement) {
       return res.status(404).json({ error: "Settlement not found" });
     }
-    if (companyId && settlement.companyId && settlement.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this settlement" });
-    }
     res.json(settlement);
   });
 
-  app.get("/api/settlements/driver/:driverId", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    // Validate driver belongs to company first
-    const driver = await storage.getDriver(req.params.driverId);
-    if (!driver) {
-      return res.status(404).json({ error: "Driver not found" });
-    }
-    if (companyId && driver.companyId && driver.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this driver" });
-    }
+  app.get("/api/settlements/driver/:driverId", async (req, res) => {
     const settlements = await storage.getSettlementsByDriver(req.params.driverId);
     res.json(settlements);
   });
 
-  app.post("/api/settlements", isAuthenticated, async (req: any, res) => {
+  app.post("/api/settlements", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const validatedData = insertSettlementSchema.parse({ ...req.body, companyId });
+      const validatedData = insertSettlementSchema.parse(req.body);
       const settlement = await storage.createSettlement(validatedData);
       res.status(201).json(settlement);
     } catch (error) {
@@ -1659,16 +1260,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/settlements/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/settlements/:id", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      const existingSettlement = await storage.getSettlement(req.params.id);
-      if (!existingSettlement) {
-        return res.status(404).json({ error: "Settlement not found" });
-      }
-      if (companyId && existingSettlement.companyId && existingSettlement.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this settlement" });
-      }
       const validatedData = insertSettlementSchema.partial().parse(req.body);
       const settlement = await storage.updateSettlement(req.params.id, validatedData);
       if (!settlement) {
@@ -1684,15 +1277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/settlements/:id", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    const settlement = await storage.getSettlement(req.params.id);
-    if (!settlement) {
-      return res.status(404).json({ error: "Settlement not found" });
-    }
-    if (companyId && settlement.companyId && settlement.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this settlement" });
-    }
+  app.delete("/api/settlements/:id", async (req, res) => {
     const deleted = await storage.deleteSettlement(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Settlement not found" });
@@ -1701,31 +1286,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Settlement Line Items Routes
-  app.get("/api/settlements/:settlementId/line-items", isAuthenticated, async (req: any, res) => {
-    const companyId = req.user?.activeCompanyId;
-    // Validate settlement belongs to company first
-    const settlement = await storage.getSettlement(req.params.settlementId);
-    if (!settlement) {
-      return res.status(404).json({ error: "Settlement not found" });
-    }
-    if (companyId && settlement.companyId && settlement.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this settlement" });
-    }
+  app.get("/api/settlements/:settlementId/line-items", async (req, res) => {
     const lineItems = await storage.getSettlementLineItems(req.params.settlementId);
     res.json(lineItems);
   });
 
-  app.post("/api/settlements/:settlementId/line-items", isAuthenticated, async (req: any, res) => {
+  app.post("/api/settlements/:settlementId/line-items", async (req, res) => {
     try {
-      const companyId = req.user?.activeCompanyId;
-      // Validate settlement belongs to company first
-      const settlement = await storage.getSettlement(req.params.settlementId);
-      if (!settlement) {
-        return res.status(404).json({ error: "Settlement not found" });
-      }
-      if (companyId && settlement.companyId && settlement.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this settlement" });
-      }
       const { insertSettlementLineItemSchema } = await import("@shared/schema");
       const validatedData = insertSettlementLineItemSchema.parse({
         ...req.body,
@@ -1739,22 +1306,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/settlement-line-items/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/settlement-line-items/:id", async (req, res) => {
     try {
-      // Get line item first to find settlement
-      const existingLineItem = await storage.getSettlementLineItem(req.params.id);
-      if (!existingLineItem) {
-        return res.status(404).json({ error: "Line item not found" });
-      }
-      const companyId = req.user?.activeCompanyId;
-      // Validate settlement belongs to company
-      const settlement = await storage.getSettlement(existingLineItem.settlementId);
-      if (!settlement) {
-        return res.status(404).json({ error: "Settlement not found" });
-      }
-      if (companyId && settlement.companyId && settlement.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied to this settlement" });
-      }
       const { insertSettlementLineItemSchema } = await import("@shared/schema");
       const validatedData = insertSettlementLineItemSchema.partial().parse(req.body);
       const lineItem = await storage.updateSettlementLineItem(req.params.id, validatedData);
@@ -1767,21 +1320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/settlement-line-items/:id", isAuthenticated, async (req: any, res) => {
-    // Get line item first to find settlement
-    const existingLineItem = await storage.getSettlementLineItem(req.params.id);
-    if (!existingLineItem) {
-      return res.status(404).json({ error: "Line item not found" });
-    }
-    const companyId = req.user?.activeCompanyId;
-    // Validate settlement belongs to company
-    const settlement = await storage.getSettlement(existingLineItem.settlementId);
-    if (!settlement) {
-      return res.status(404).json({ error: "Settlement not found" });
-    }
-    if (companyId && settlement.companyId && settlement.companyId !== companyId) {
-      return res.status(403).json({ error: "Access denied to this settlement" });
-    }
+  app.delete("/api/settlement-line-items/:id", async (req, res) => {
     const deleted = await storage.deleteSettlementLineItem(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Line item not found" });
