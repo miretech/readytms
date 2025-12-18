@@ -910,6 +910,15 @@ export class DatabaseStorage implements IStorage {
     if (updateData.dueDate) {
       values.dueDate = new Date(updateData.dueDate);
     }
+    
+    // Preserve existing attachment fields if not explicitly provided in update
+    const existingInvoice = await this.getInvoice(id);
+    if (existingInvoice) {
+      if (values.attachments === undefined) {
+        values.attachments = existingInvoice.attachments;
+      }
+    }
+    
     const [invoice] = await db
       .update(invoices)
       .set(values)
@@ -1000,6 +1009,15 @@ export class DatabaseStorage implements IStorage {
     if (updateData.inspectionDate) {
       values.inspectionDate = new Date(updateData.inspectionDate);
     }
+    
+    // Preserve existing attachment fields if not explicitly provided in update
+    const existingInspection = await this.getInspection(id);
+    if (existingInspection) {
+      if (values.attachments === undefined) {
+        values.attachments = existingInspection.attachments;
+      }
+    }
+    
     const [inspection] = await db
       .update(inspections)
       .set(values)
@@ -1043,6 +1061,15 @@ export class DatabaseStorage implements IStorage {
     if (updateData.accidentDate) {
       values.accidentDate = new Date(updateData.accidentDate);
     }
+    
+    // Preserve existing attachment fields if not explicitly provided in update
+    const existingAccident = await this.getAccident(id);
+    if (existingAccident) {
+      if (values.attachments === undefined) {
+        values.attachments = existingAccident.attachments;
+      }
+    }
+    
     const [accident] = await db
       .update(accidents)
       .set(values)
@@ -1090,6 +1117,15 @@ export class DatabaseStorage implements IStorage {
     if (updateData.dueDate) {
       values.dueDate = new Date(updateData.dueDate);
     }
+    
+    // Preserve existing attachment fields if not explicitly provided in update
+    const existingViolation = await this.getViolation(id);
+    if (existingViolation) {
+      if (values.attachments === undefined) {
+        values.attachments = existingViolation.attachments;
+      }
+    }
+    
     const [violation] = await db
       .update(violations)
       .set(values)
@@ -1282,6 +1318,15 @@ export class DatabaseStorage implements IStorage {
     if (updateData.nextServiceDate) {
       values.nextServiceDate = new Date(updateData.nextServiceDate);
     }
+    
+    // Preserve existing attachment fields if not explicitly provided in update
+    const existingMaintenance = await this.getMaintenance(id);
+    if (existingMaintenance) {
+      if (values.attachments === undefined) {
+        values.attachments = existingMaintenance.attachments;
+      }
+    }
+    
     const [record] = await db
       .update(maintenance)
       .set(values)
