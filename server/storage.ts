@@ -564,6 +564,17 @@ export class DatabaseStorage implements IStorage {
       values.deliveryDate = new Date(updateData.deliveryDate);
     }
     
+    // Preserve existing attachment fields if not explicitly provided in update
+    const existingLoad = await this.getLoad(id);
+    if (existingLoad) {
+      if (values.podAttachments === undefined) {
+        values.podAttachments = existingLoad.podAttachments;
+      }
+      if (values.rateConfirmationAttachments === undefined) {
+        values.rateConfirmationAttachments = existingLoad.rateConfirmationAttachments;
+      }
+    }
+    
     const [load] = await db
       .update(loads)
       .set(values)
