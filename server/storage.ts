@@ -570,9 +570,6 @@ export class DatabaseStorage implements IStorage {
       if (values.podAttachments === undefined) {
         values.podAttachments = existingLoad.podAttachments;
       }
-      if (values.rateConfirmationAttachments === undefined) {
-        values.rateConfirmationAttachments = existingLoad.rateConfirmationAttachments;
-      }
     }
     
     const [load] = await db
@@ -600,7 +597,7 @@ export class DatabaseStorage implements IStorage {
   async createTruck(insertTruck: InsertTruck): Promise<Truck> {
     const [truck] = await db
       .insert(trucks)
-      .values(insertTruck)
+      .values(insertTruck as any)
       .returning();
     return truck;
   }
@@ -608,21 +605,22 @@ export class DatabaseStorage implements IStorage {
   async updateTruck(id: string, updateData: Partial<InsertTruck>): Promise<Truck | undefined> {
     // Preserve existing attachment fields if not explicitly provided in update
     const existingTruck = await this.getTruck(id);
+    const values: any = { ...updateData };
     if (existingTruck) {
-      if (updateData.cabCardAttachments === undefined) {
-        updateData.cabCardAttachments = existingTruck.cabCardAttachments as any;
+      if (values.cabCardAttachments === undefined) {
+        values.cabCardAttachments = existingTruck.cabCardAttachments;
       }
-      if (updateData.dotInspectionAttachments === undefined) {
-        updateData.dotInspectionAttachments = existingTruck.dotInspectionAttachments as any;
+      if (values.dotInspectionAttachments === undefined) {
+        values.dotInspectionAttachments = existingTruck.dotInspectionAttachments;
       }
-      if (updateData.repairReceiptAttachments === undefined) {
-        updateData.repairReceiptAttachments = existingTruck.repairReceiptAttachments as any;
+      if (values.repairReceiptAttachments === undefined) {
+        values.repairReceiptAttachments = existingTruck.repairReceiptAttachments;
       }
     }
     
     const [truck] = await db
       .update(trucks)
-      .set(updateData)
+      .set(values)
       .where(eq(trucks.id, id))
       .returning();
     return truck || undefined;
@@ -645,7 +643,7 @@ export class DatabaseStorage implements IStorage {
   async createTrailer(insertTrailer: InsertTrailer): Promise<Trailer> {
     const [trailer] = await db
       .insert(trailers)
-      .values(insertTrailer)
+      .values(insertTrailer as any)
       .returning();
     return trailer;
   }
@@ -653,22 +651,23 @@ export class DatabaseStorage implements IStorage {
   async updateTrailer(id: string, updateData: Partial<InsertTrailer>): Promise<Trailer | undefined> {
     // Preserve existing attachment fields if not explicitly provided in update
     const existingTrailer = await this.getTrailer(id);
+    const values: any = { ...updateData };
     if (existingTrailer) {
       // Only preserve attachments if they're undefined in the update (not explicitly set to null/empty)
-      if (updateData.pickupPictures === undefined) {
-        updateData.pickupPictures = existingTrailer.pickupPictures as any;
+      if (values.pickupPictures === undefined) {
+        values.pickupPictures = existingTrailer.pickupPictures;
       }
-      if (updateData.tollsAttachments === undefined) {
-        updateData.tollsAttachments = existingTrailer.tollsAttachments as any;
+      if (values.tollsAttachments === undefined) {
+        values.tollsAttachments = existingTrailer.tollsAttachments;
       }
-      if (updateData.repairsAttachments === undefined) {
-        updateData.repairsAttachments = existingTrailer.repairsAttachments as any;
+      if (values.repairsAttachments === undefined) {
+        values.repairsAttachments = existingTrailer.repairsAttachments;
       }
     }
     
     const [trailer] = await db
       .update(trailers)
-      .set(updateData)
+      .set(values)
       .where(eq(trailers.id, id))
       .returning();
     return trailer || undefined;
