@@ -586,7 +586,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllTrucks(): Promise<Truck[]> {
-    return await db.select().from(trucks);
+    // Exclude large attachment fields to prevent exceeding response size limits
+    // Attachments are fetched separately via getTruck(id)
+    const results = await db.select({
+      id: trucks.id,
+      truckNumber: trucks.truckNumber,
+      type: trucks.type,
+      status: trucks.status,
+      licensePlate: trucks.licensePlate,
+      vin: trucks.vin,
+      year: trucks.year,
+      make: trucks.make,
+      model: trucks.model,
+      cabCardExpirationDate: trucks.cabCardExpirationDate,
+      dotInspectionDate: trucks.dotInspectionDate,
+      dotInspectionExpirationDate: trucks.dotInspectionExpirationDate,
+      dateAddedToCompany: trucks.dateAddedToCompany,
+      dateTerminated: trucks.dateTerminated,
+      ownerFullName: trucks.ownerFullName,
+      isCompanyTruck: trucks.isCompanyTruck,
+      // Set attachment fields to null in list view for performance
+      cabCardAttachments: sql`null`.as('cab_card_attachments'),
+      dotInspectionAttachments: sql`null`.as('dot_inspection_attachments'),
+      repairReceiptAttachments: sql`null`.as('repair_receipt_attachments'),
+    }).from(trucks);
+    return results as Truck[];
   }
 
   async getTruck(id: string): Promise<Truck | undefined> {
@@ -632,7 +656,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllTrailers(): Promise<Trailer[]> {
-    return await db.select().from(trailers);
+    // Exclude large attachment fields to prevent exceeding response size limits
+    // Attachments are fetched separately via getTrailer(id)
+    const results = await db.select({
+      id: trailers.id,
+      trailerNumber: trailers.trailerNumber,
+      type: trailers.type,
+      status: trailers.status,
+      licensePlate: trailers.licensePlate,
+      vin: trailers.vin,
+      year: trailers.year,
+      make: trailers.make,
+      model: trailers.model,
+      insuranceProvider: trailers.insuranceProvider,
+      insurancePolicyNumber: trailers.insurancePolicyNumber,
+      insuranceExpirationDate: trailers.insuranceExpirationDate,
+      pickupDate: trailers.pickupDate,
+      dropOffDate: trailers.dropOffDate,
+      terminatedDate: trailers.terminatedDate,
+      repairs: trailers.repairs,
+      rentPerMonth: trailers.rentPerMonth,
+      // Set attachment fields to null in list view for performance
+      tollsAttachments: sql`null`.as('tolls_attachments'),
+      repairsAttachments: sql`null`.as('repairs_attachments'),
+      pickupPictures: sql`null`.as('pickup_pictures'),
+    }).from(trailers);
+    return results as Trailer[];
   }
 
   async getTrailer(id: string): Promise<Trailer | undefined> {

@@ -511,8 +511,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/trailers", async (_req, res) => {
-    const trailers = await storage.getAllTrailers();
-    res.json(trailers);
+    try {
+      const trailers = await storage.getAllTrailers();
+      res.json(trailers);
+    } catch (error) {
+      console.error("Error fetching trailers:", error);
+      res.status(500).json({ error: "Failed to fetch trailers", details: error instanceof Error ? error.message : String(error) });
+    }
   });
 
   app.get("/api/trailers/:id", async (req, res) => {
