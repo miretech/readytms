@@ -115,11 +115,16 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         repairs: trailerData.repairs || "",
         rentPerMonth: trailerData.rentPerMonth || "",
       });
-      // Only set attachments from full trailer data (which has actual attachment data)
+      // Clear attachments immediately when entity changes, then populate from full data when available
       if (fullTrailer) {
         setTollsFiles((fullTrailer.tollsAttachments as FileAttachment[]) || []);
         setPickupPictures((fullTrailer.pickupPictures as FileAttachment[]) || []);
         setRepairsAttachments((fullTrailer.repairsAttachments as FileAttachment[]) || []);
+      } else {
+        // Clear while waiting for full data to prevent stale attachment leakage
+        setTollsFiles([]);
+        setPickupPictures([]);
+        setRepairsAttachments([]);
       }
     } else {
       form.reset({

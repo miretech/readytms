@@ -112,11 +112,16 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
         ownerFullName: (truckData as any).ownerFullName || "",
         isCompanyTruck: (truckData as any).isCompanyTruck || false,
       });
-      // Only set attachments from full truck data (which has actual attachment data)
+      // Clear attachments immediately when entity changes, then populate from full data when available
       if (fullTruck) {
         setCabCardFiles((fullTruck.cabCardAttachments as FileAttachment[]) || []);
         setDotInspectionFiles(((fullTruck as any).dotInspectionAttachments as FileAttachment[]) || []);
         setRepairReceiptFiles(((fullTruck as any).repairReceiptAttachments as FileAttachment[]) || []);
+      } else {
+        // Clear while waiting for full data to prevent stale attachment leakage
+        setCabCardFiles([]);
+        setDotInspectionFiles([]);
+        setRepairReceiptFiles([]);
       }
     } else {
       form.reset({

@@ -79,6 +79,12 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
   const isEditing = !!maintenance;
   const [attachments, setAttachments] = useState<Array<{ filename: string; data: string; type: string }>>([]);
 
+  // Fetch full maintenance data including attachments when editing
+  const { data: fullMaintenance } = useQuery<Maintenance>({
+    queryKey: ['/api/maintenance', maintenance?.id],
+    enabled: open && isEditing && !!maintenance?.id,
+  });
+
   const { data: trucks = [] } = useQuery<Truck[]>({
     queryKey: ["/api/trucks"],
   });
@@ -102,24 +108,32 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
   });
 
   useEffect(() => {
-    if (maintenance) {
+    // Use fullMaintenance (with attachments) when available, otherwise use maintenance from list
+    const maintenanceData = fullMaintenance || maintenance;
+    if (maintenanceData) {
       form.reset({
-        truckId: maintenance.truckId,
-        maintenanceType: maintenance.maintenanceType,
-        serviceDate: new Date(maintenance.serviceDate).toISOString().split("T")[0],
-        mileage: maintenance.mileage?.toString() || "",
-        cost: maintenance.cost,
-        vendor: maintenance.vendor || "",
-        description: maintenance.description,
-        nextServiceMileage: maintenance.nextServiceMileage?.toString() || "",
-        nextServiceDate: maintenance.nextServiceDate
-          ? new Date(maintenance.nextServiceDate).toISOString().split("T")[0]
+        truckId: maintenanceData.truckId,
+        maintenanceType: maintenanceData.maintenanceType,
+        serviceDate: new Date(maintenanceData.serviceDate).toISOString().split("T")[0],
+        mileage: maintenanceData.mileage?.toString() || "",
+        cost: maintenanceData.cost,
+        vendor: maintenanceData.vendor || "",
+        description: maintenanceData.description,
+        nextServiceMileage: maintenanceData.nextServiceMileage?.toString() || "",
+        nextServiceDate: maintenanceData.nextServiceDate
+          ? new Date(maintenanceData.nextServiceDate).toISOString().split("T")[0]
           : "",
-        status: maintenance.status,
-        invoiceNumber: maintenance.invoiceNumber || "",
-        notes: maintenance.notes || "",
+        status: maintenanceData.status,
+        invoiceNumber: maintenanceData.invoiceNumber || "",
+        notes: maintenanceData.notes || "",
       });
-      setAttachments((maintenance.attachments as any) || []);
+      // Clear attachments immediately when entity changes, then populate from full data when available
+      if (fullMaintenance) {
+        setAttachments((fullMaintenance.attachments as any) || []);
+      } else {
+        // Clear while waiting for full data to prevent stale attachment leakage
+        setAttachments([]);
+      }
     } else {
       form.reset({
         truckId: "",
@@ -137,7 +151,7 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
       });
       setAttachments([]);
     }
-  }, [maintenance, form]);
+  }, [maintenance, fullMaintenance, form]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;

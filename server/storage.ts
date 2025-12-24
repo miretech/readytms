@@ -535,7 +535,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllLoads(): Promise<Load[]> {
-    return await db.select().from(loads).orderBy(desc(loads.createdAt));
+    // Exclude large attachment fields to prevent exceeding response size limits
+    // Attachments are fetched separately via getLoad(id)
+    const results = await db.select({
+      id: loads.id,
+      loadNumber: loads.loadNumber,
+      customerId: loads.customerId,
+      status: loads.status,
+      pickupLocation: loads.pickupLocation,
+      pickupDate: loads.pickupDate,
+      deliveryLocation: loads.deliveryLocation,
+      deliveryDate: loads.deliveryDate,
+      assignedDriverId: loads.assignedDriverId,
+      assignedTruckId: loads.assignedTruckId,
+      rate: loads.rate,
+      expenses: loads.expenses,
+      weight: loads.weight,
+      commodity: loads.commodity,
+      notes: loads.notes,
+      createdAt: loads.createdAt,
+      // Set attachment fields to null in list view for performance
+      invoiceAttachment: sql`null`.as('invoice_attachment'),
+      podAttachment: sql`null`.as('pod_attachment'),
+      podAttachments: sql`null`.as('pod_attachments'),
+    }).from(loads).orderBy(desc(loads.createdAt));
+    return results as Load[];
   }
 
   async getLoad(id: string): Promise<Load | undefined> {
@@ -728,7 +752,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllDrivers(): Promise<Driver[]> {
-    return await db.select().from(drivers);
+    // Exclude large attachment fields to prevent exceeding response size limits
+    // Attachments are fetched separately via getDriver(id)
+    const results = await db.select({
+      id: drivers.id,
+      name: drivers.name,
+      email: drivers.email,
+      password: drivers.password,
+      phone: drivers.phone,
+      address: drivers.address,
+      licenseNumber: drivers.licenseNumber,
+      licenseExpiration: drivers.licenseExpiration,
+      licenseIssuedPlace: drivers.licenseIssuedPlace,
+      medicalCardNumber: drivers.medicalCardNumber,
+      medicalCardExpiration: drivers.medicalCardExpiration,
+      medicalCardIssuedDate: drivers.medicalCardIssuedDate,
+      socialSecurityNumber: drivers.socialSecurityNumber,
+      status: drivers.status,
+      isActive: drivers.isActive,
+      dateHired: drivers.dateHired,
+      dateTerminated: drivers.dateTerminated,
+      assignedTruckId: drivers.assignedTruckId,
+      gpsEnabled: drivers.gpsEnabled,
+      lastGpsUpdate: drivers.lastGpsUpdate,
+      lastGpsNotificationSent: drivers.lastGpsNotificationSent,
+      gpsNotificationsEnabled: drivers.gpsNotificationsEnabled,
+      driverType: drivers.driverType,
+      // Set attachment fields to null in list view for performance
+      licenseAttachment: sql`null`.as('license_attachment'),
+      medicalCardAttachment: sql`null`.as('medical_card_attachment'),
+      socialSecurityAttachment: sql`null`.as('social_security_attachment'),
+    }).from(drivers);
+    return results as Driver[];
   }
 
   async getDriver(id: string): Promise<Driver | undefined> {
@@ -1025,7 +1080,23 @@ export class DatabaseStorage implements IStorage {
 
   // Inspections
   async getAllInspections(): Promise<Inspection[]> {
-    return await db.select().from(inspections).orderBy(desc(inspections.inspectionDate));
+    // Exclude large attachment fields to prevent exceeding response size limits
+    // Attachments are fetched separately via getInspection(id)
+    const results = await db.select({
+      id: inspections.id,
+      truckId: inspections.truckId,
+      driverId: inspections.driverId,
+      inspectionType: inspections.inspectionType,
+      inspectionDate: inspections.inspectionDate,
+      status: inspections.status,
+      defects: inspections.defects,
+      notes: inspections.notes,
+      performedBy: inspections.performedBy,
+      createdAt: inspections.createdAt,
+      // Set attachment fields to null in list view for performance
+      attachments: sql`null`.as('attachments'),
+    }).from(inspections).orderBy(desc(inspections.inspectionDate));
+    return results as Inspection[];
   }
 
   async getInspection(id: string): Promise<Inspection | undefined> {
@@ -1081,7 +1152,27 @@ export class DatabaseStorage implements IStorage {
 
   // Accidents
   async getAllAccidents(): Promise<Accident[]> {
-    return await db.select().from(accidents).orderBy(desc(accidents.accidentDate));
+    // Exclude large attachment fields to prevent exceeding response size limits
+    // Attachments are fetched separately via getAccident(id)
+    const results = await db.select({
+      id: accidents.id,
+      driverId: accidents.driverId,
+      truckId: accidents.truckId,
+      loadId: accidents.loadId,
+      accidentDate: accidents.accidentDate,
+      location: accidents.location,
+      severity: accidents.severity,
+      description: accidents.description,
+      injuriesReported: accidents.injuriesReported,
+      policeReportNumber: accidents.policeReportNumber,
+      insuranceClaimNumber: accidents.insuranceClaimNumber,
+      estimatedCost: accidents.estimatedCost,
+      status: accidents.status,
+      createdAt: accidents.createdAt,
+      // Set attachment fields to null in list view for performance
+      attachments: sql`null`.as('attachments'),
+    }).from(accidents).orderBy(desc(accidents.accidentDate));
+    return results as Accident[];
   }
 
   async getAccident(id: string): Promise<Accident | undefined> {
@@ -1133,7 +1224,26 @@ export class DatabaseStorage implements IStorage {
 
   // Violations
   async getAllViolations(): Promise<Violation[]> {
-    return await db.select().from(violations).orderBy(desc(violations.violationDate));
+    // Exclude large attachment fields to prevent exceeding response size limits
+    // Attachments are fetched separately via getViolation(id)
+    const results = await db.select({
+      id: violations.id,
+      driverId: violations.driverId,
+      truckId: violations.truckId,
+      violationType: violations.violationType,
+      violationDate: violations.violationDate,
+      location: violations.location,
+      description: violations.description,
+      citationNumber: violations.citationNumber,
+      fineAmount: violations.fineAmount,
+      points: violations.points,
+      status: violations.status,
+      dueDate: violations.dueDate,
+      createdAt: violations.createdAt,
+      // Set attachment fields to null in list view for performance
+      attachments: sql`null`.as('attachments'),
+    }).from(violations).orderBy(desc(violations.violationDate));
+    return results as Violation[];
   }
 
   async getViolation(id: string): Promise<Violation | undefined> {
@@ -1334,7 +1444,27 @@ export class DatabaseStorage implements IStorage {
 
   // Maintenance
   async getAllMaintenance(): Promise<Maintenance[]> {
-    return await db.select().from(maintenance).orderBy(desc(maintenance.serviceDate));
+    // Exclude large attachment fields to prevent exceeding response size limits
+    // Attachments are fetched separately via getMaintenance(id)
+    const results = await db.select({
+      id: maintenance.id,
+      truckId: maintenance.truckId,
+      maintenanceType: maintenance.maintenanceType,
+      serviceDate: maintenance.serviceDate,
+      mileage: maintenance.mileage,
+      cost: maintenance.cost,
+      vendor: maintenance.vendor,
+      description: maintenance.description,
+      nextServiceMileage: maintenance.nextServiceMileage,
+      nextServiceDate: maintenance.nextServiceDate,
+      status: maintenance.status,
+      invoiceNumber: maintenance.invoiceNumber,
+      notes: maintenance.notes,
+      createdAt: maintenance.createdAt,
+      // Set attachment fields to null in list view for performance
+      attachments: sql`null`.as('attachments'),
+    }).from(maintenance).orderBy(desc(maintenance.serviceDate));
+    return results as Maintenance[];
   }
 
   async getMaintenance(id: string): Promise<Maintenance | undefined> {

@@ -68,6 +68,12 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   const [viewingPod, setViewingPod] = useState<{ filename: string; data: string; type: string } | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
+  // Fetch full load data including attachments when editing
+  const { data: fullLoad } = useQuery<Load>({
+    queryKey: ['/api/loads', load?.id],
+    enabled: open && isEditing && !!load?.id,
+  });
+
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
   });
@@ -124,27 +130,29 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   }, [customerId, customers, form]);
 
   useEffect(() => {
-    if (load) {
+    // Use fullLoad (with attachments) when available, otherwise use load from list
+    const loadData = fullLoad || load;
+    if (loadData) {
       // Find the customer for this load
-      const customer = customers.find(c => c.id === load.customerId);
+      const customer = customers.find(c => c.id === loadData.customerId);
       
       form.reset({
-        loadNumber: load.loadNumber,
-        customerId: load.customerId || "",
-        status: load.status,
-        pickupLocation: load.pickupLocation,
-        pickupDate: new Date(load.pickupDate).toISOString().split("T")[0],
-        deliveryLocation: load.deliveryLocation,
-        deliveryDate: new Date(load.deliveryDate).toISOString().split("T")[0],
-        assignedDriverId: load.assignedDriverId || "",
-        assignedTruckId: load.assignedTruckId || "",
-        rate: load.rate.toString(),
-        expenses: load.expenses?.toString() || "0",
-        weight: load.weight || 0,
-        commodity: load.commodity || "",
-        notes: load.notes || "",
-        invoiceAttachment: load.invoiceAttachment || "",
-        podAttachment: load.podAttachment || "",
+        loadNumber: loadData.loadNumber,
+        customerId: loadData.customerId || "",
+        status: loadData.status,
+        pickupLocation: loadData.pickupLocation,
+        pickupDate: new Date(loadData.pickupDate).toISOString().split("T")[0],
+        deliveryLocation: loadData.deliveryLocation,
+        deliveryDate: new Date(loadData.deliveryDate).toISOString().split("T")[0],
+        assignedDriverId: loadData.assignedDriverId || "",
+        assignedTruckId: loadData.assignedTruckId || "",
+        rate: loadData.rate.toString(),
+        expenses: loadData.expenses?.toString() || "0",
+        weight: loadData.weight || 0,
+        commodity: loadData.commodity || "",
+        notes: loadData.notes || "",
+        invoiceAttachment: loadData.invoiceAttachment || "",
+        podAttachment: loadData.podAttachment || "",
         brokerName: customer?.name || "",
         brokerAddress: customer?.address || "",
         brokerPhone: customer?.phone || "",
@@ -174,7 +182,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
         brokerEmail: "",
       });
     }
-  }, [load, form, customers]);
+  }, [load, fullLoad, form, customers]);
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -959,7 +967,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
               </div>
 
               {/* POD Gallery - Show uploaded PODs from drivers */}
-              {load?.podAttachments && Array.isArray(load.podAttachments) && (load.podAttachments as any[]).length > 0 && (
+              {fullLoad?.podAttachments && Array.isArray(fullLoad.podAttachments) && (fullLoad.podAttachments as any[]).length > 0 && (
                 <Card className="border-primary/20 bg-primary/5">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -973,13 +981,13 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                         </CardDescription>
                       </div>
                       <Badge variant="secondary" data-testid="badge-pod-count">
-                        {(load.podAttachments as any[]).length} {(load.podAttachments as any[]).length === 1 ? 'file' : 'files'}
+                        {(fullLoad.podAttachments as any[]).length} {(fullLoad.podAttachments as any[]).length === 1 ? 'file' : 'files'}
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                      {(load.podAttachments as any[]).map((pod: any, index: number) => {
+                      {(fullLoad.podAttachments as any[]).map((pod: any, index: number) => {
                         const isPdf = pod.type?.includes('pdf');
                         const isImage = pod.type?.includes('image');
                         

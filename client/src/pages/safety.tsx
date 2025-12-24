@@ -116,6 +116,12 @@ function InspectionDialog({ open, onOpenChange, inspection }: InspectionDialogPr
   const isEditing = !!inspection;
   const [attachments, setAttachments] = useState<Array<{ filename: string; data: string; type: string }>>([]);
 
+  // Fetch full inspection data including attachments when editing
+  const { data: fullInspection } = useQuery<Inspection>({
+    queryKey: ['/api/inspections', inspection?.id],
+    enabled: open && isEditing && !!inspection?.id,
+  });
+
   const { data: trucks = [] } = useQuery<Truck[]>({
     queryKey: ["/api/trucks"],
   });
@@ -139,18 +145,26 @@ function InspectionDialog({ open, onOpenChange, inspection }: InspectionDialogPr
   });
 
   useEffect(() => {
-    if (inspection) {
+    // Use fullInspection (with attachments) when available, otherwise use inspection from list
+    const inspectionData = fullInspection || inspection;
+    if (inspectionData) {
       form.reset({
-        truckId: inspection.truckId,
-        driverId: inspection.driverId,
-        inspectionType: inspection.inspectionType,
-        inspectionDate: new Date(inspection.inspectionDate).toISOString().split("T")[0],
-        status: inspection.status,
-        defects: inspection.defects ?? "",
-        notes: inspection.notes ?? "",
-        performedBy: inspection.performedBy ?? "",
+        truckId: inspectionData.truckId,
+        driverId: inspectionData.driverId,
+        inspectionType: inspectionData.inspectionType,
+        inspectionDate: new Date(inspectionData.inspectionDate).toISOString().split("T")[0],
+        status: inspectionData.status,
+        defects: inspectionData.defects ?? "",
+        notes: inspectionData.notes ?? "",
+        performedBy: inspectionData.performedBy ?? "",
       });
-      setAttachments((inspection.attachments as any) || []);
+      // Clear attachments immediately when entity changes, then populate from full data when available
+      if (fullInspection) {
+        setAttachments((fullInspection.attachments as any) || []);
+      } else {
+        // Clear while waiting for full data to prevent stale attachment leakage
+        setAttachments([]);
+      }
     } else {
       form.reset({
         truckId: "",
@@ -164,7 +178,7 @@ function InspectionDialog({ open, onOpenChange, inspection }: InspectionDialogPr
       });
       setAttachments([]);
     }
-  }, [inspection, form]);
+  }, [inspection, fullInspection, form]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -527,6 +541,12 @@ function AccidentDialog({ open, onOpenChange, accident }: AccidentDialogProps) {
   const isEditing = !!accident;
   const [attachments, setAttachments] = useState<Array<{ filename: string; data: string; type: string }>>([]);
 
+  // Fetch full accident data including attachments when editing
+  const { data: fullAccident } = useQuery<Accident>({
+    queryKey: ['/api/accidents', accident?.id],
+    enabled: open && isEditing && !!accident?.id,
+  });
+
   const { data: drivers = [] } = useQuery<Driver[]>({
     queryKey: ["/api/drivers"],
   });
@@ -558,22 +578,30 @@ function AccidentDialog({ open, onOpenChange, accident }: AccidentDialogProps) {
   });
 
   useEffect(() => {
-    if (accident) {
+    // Use fullAccident (with attachments) when available, otherwise use accident from list
+    const accidentData = fullAccident || accident;
+    if (accidentData) {
       form.reset({
-        driverId: accident.driverId,
-        truckId: accident.truckId ?? "",
-        loadId: accident.loadId ?? "",
-        accidentDate: new Date(accident.accidentDate).toISOString().split("T")[0],
-        location: accident.location,
-        severity: accident.severity,
-        description: accident.description,
-        injuriesReported: accident.injuriesReported ?? 0,
-        policeReportNumber: accident.policeReportNumber ?? "",
-        insuranceClaimNumber: accident.insuranceClaimNumber ?? "",
-        estimatedCost: accident.estimatedCost?.toString() ?? "",
-        status: accident.status,
+        driverId: accidentData.driverId,
+        truckId: accidentData.truckId ?? "",
+        loadId: accidentData.loadId ?? "",
+        accidentDate: new Date(accidentData.accidentDate).toISOString().split("T")[0],
+        location: accidentData.location,
+        severity: accidentData.severity,
+        description: accidentData.description,
+        injuriesReported: accidentData.injuriesReported ?? 0,
+        policeReportNumber: accidentData.policeReportNumber ?? "",
+        insuranceClaimNumber: accidentData.insuranceClaimNumber ?? "",
+        estimatedCost: accidentData.estimatedCost?.toString() ?? "",
+        status: accidentData.status,
       });
-      setAttachments((accident.attachments as any) || []);
+      // Clear attachments immediately when entity changes, then populate from full data when available
+      if (fullAccident) {
+        setAttachments((fullAccident.attachments as any) || []);
+      } else {
+        // Clear while waiting for full data to prevent stale attachment leakage
+        setAttachments([]);
+      }
     } else {
       form.reset({
         driverId: "",
@@ -591,7 +619,7 @@ function AccidentDialog({ open, onOpenChange, accident }: AccidentDialogProps) {
       });
       setAttachments([]);
     }
-  }, [accident, form]);
+  }, [accident, fullAccident, form]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -1025,6 +1053,12 @@ function ViolationDialog({ open, onOpenChange, violation }: ViolationDialogProps
   const isEditing = !!violation;
   const [attachments, setAttachments] = useState<Array<{ filename: string; data: string; type: string }>>([]);
 
+  // Fetch full violation data including attachments when editing
+  const { data: fullViolation } = useQuery<Violation>({
+    queryKey: ['/api/violations', violation?.id],
+    enabled: open && isEditing && !!violation?.id,
+  });
+
   const { data: drivers = [] } = useQuery<Driver[]>({
     queryKey: ["/api/drivers"],
   });
@@ -1051,21 +1085,29 @@ function ViolationDialog({ open, onOpenChange, violation }: ViolationDialogProps
   });
 
   useEffect(() => {
-    if (violation) {
+    // Use fullViolation (with attachments) when available, otherwise use violation from list
+    const violationData = fullViolation || violation;
+    if (violationData) {
       form.reset({
-        driverId: violation.driverId,
-        truckId: violation.truckId ?? "",
-        violationType: violation.violationType,
-        violationDate: new Date(violation.violationDate).toISOString().split("T")[0],
-        location: violation.location,
-        description: violation.description,
-        citationNumber: violation.citationNumber ?? "",
-        fineAmount: violation.fineAmount?.toString() ?? "",
-        points: violation.points ?? 0,
-        status: violation.status,
-        dueDate: violation.dueDate ? new Date(violation.dueDate).toISOString().split("T")[0] : "",
+        driverId: violationData.driverId,
+        truckId: violationData.truckId ?? "",
+        violationType: violationData.violationType,
+        violationDate: new Date(violationData.violationDate).toISOString().split("T")[0],
+        location: violationData.location,
+        description: violationData.description,
+        citationNumber: violationData.citationNumber ?? "",
+        fineAmount: violationData.fineAmount?.toString() ?? "",
+        points: violationData.points ?? 0,
+        status: violationData.status,
+        dueDate: violationData.dueDate ? new Date(violationData.dueDate).toISOString().split("T")[0] : "",
       });
-      setAttachments((violation.attachments as any) || []);
+      // Clear attachments immediately when entity changes, then populate from full data when available
+      if (fullViolation) {
+        setAttachments((fullViolation.attachments as any) || []);
+      } else {
+        // Clear while waiting for full data to prevent stale attachment leakage
+        setAttachments([]);
+      }
     } else {
       form.reset({
         driverId: "",
@@ -1082,7 +1124,7 @@ function ViolationDialog({ open, onOpenChange, violation }: ViolationDialogProps
       });
       setAttachments([]);
     }
-  }, [violation, form]);
+  }, [violation, fullViolation, form]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;

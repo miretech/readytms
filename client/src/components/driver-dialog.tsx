@@ -54,6 +54,12 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
   const { toast } = useToast();
   const isEditing = !!driver;
 
+  // Fetch full driver data including attachments when editing
+  const { data: fullDriver } = useQuery<Driver>({
+    queryKey: ['/api/drivers', driver?.id],
+    enabled: open && isEditing && !!driver?.id,
+  });
+
   const { data: trucks = [] } = useQuery<Truck[]>({
     queryKey: ["/api/trucks"],
   });
@@ -90,33 +96,43 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
   });
 
   useEffect(() => {
-    if (driver) {
+    // Use fullDriver (with attachments) when available, otherwise use driver from list
+    const driverData = fullDriver || driver;
+    if (driverData) {
       form.reset({
-        name: driver.name,
-        email: driver.email,
-        phone: driver.phone,
+        name: driverData.name,
+        email: driverData.email,
+        phone: driverData.phone,
         password: "", // Don't show existing password for security
-        address: driver.address || "",
-        licenseNumber: driver.licenseNumber,
-        licenseExpiration: driver.licenseExpiration ? new Date(driver.licenseExpiration).toISOString().split('T')[0] : "",
-        licenseIssuedPlace: driver.licenseIssuedPlace || "",
-        licenseAttachment: driver.licenseAttachment || "",
-        medicalCardNumber: driver.medicalCardNumber || "",
-        medicalCardExpiration: driver.medicalCardExpiration ? new Date(driver.medicalCardExpiration).toISOString().split('T')[0] : "",
-        medicalCardIssuedDate: driver.medicalCardIssuedDate ? new Date(driver.medicalCardIssuedDate).toISOString().split('T')[0] : "",
-        medicalCardAttachment: driver.medicalCardAttachment || "",
-        socialSecurityNumber: driver.socialSecurityNumber || "",
-        socialSecurityAttachment: driver.socialSecurityAttachment || "",
-        status: driver.status,
-        isActive: driver.isActive || "true",
-        dateHired: driver.dateHired ? new Date(driver.dateHired).toISOString().split('T')[0] : "",
-        dateTerminated: driver.dateTerminated ? new Date(driver.dateTerminated).toISOString().split('T')[0] : "",
-        assignedTruckId: driver.assignedTruckId || "",
-        driverType: (driver.driverType || "company-driver") as "company-driver" | "owner-operator",
+        address: driverData.address || "",
+        licenseNumber: driverData.licenseNumber,
+        licenseExpiration: driverData.licenseExpiration ? new Date(driverData.licenseExpiration).toISOString().split('T')[0] : "",
+        licenseIssuedPlace: driverData.licenseIssuedPlace || "",
+        licenseAttachment: driverData.licenseAttachment || "",
+        medicalCardNumber: driverData.medicalCardNumber || "",
+        medicalCardExpiration: driverData.medicalCardExpiration ? new Date(driverData.medicalCardExpiration).toISOString().split('T')[0] : "",
+        medicalCardIssuedDate: driverData.medicalCardIssuedDate ? new Date(driverData.medicalCardIssuedDate).toISOString().split('T')[0] : "",
+        medicalCardAttachment: driverData.medicalCardAttachment || "",
+        socialSecurityNumber: driverData.socialSecurityNumber || "",
+        socialSecurityAttachment: driverData.socialSecurityAttachment || "",
+        status: driverData.status,
+        isActive: driverData.isActive || "true",
+        dateHired: driverData.dateHired ? new Date(driverData.dateHired).toISOString().split('T')[0] : "",
+        dateTerminated: driverData.dateTerminated ? new Date(driverData.dateTerminated).toISOString().split('T')[0] : "",
+        assignedTruckId: driverData.assignedTruckId || "",
+        driverType: (driverData.driverType || "company-driver") as "company-driver" | "owner-operator",
       });
-      setLicenseFile(driver.licenseAttachment || null);
-      setMedicalCardFile(driver.medicalCardAttachment || null);
-      setSsnFile(driver.socialSecurityAttachment || null);
+      // Clear attachments immediately when entity changes, then populate from full data when available
+      if (fullDriver) {
+        setLicenseFile(fullDriver.licenseAttachment || null);
+        setMedicalCardFile(fullDriver.medicalCardAttachment || null);
+        setSsnFile(fullDriver.socialSecurityAttachment || null);
+      } else {
+        // Clear while waiting for full data to prevent stale attachment leakage
+        setLicenseFile(null);
+        setMedicalCardFile(null);
+        setSsnFile(null);
+      }
     } else {
       form.reset({
         name: "",
@@ -145,7 +161,7 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       setMedicalCardFile(null);
       setSsnFile(null);
     }
-  }, [driver, form]);
+  }, [driver, fullDriver, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
