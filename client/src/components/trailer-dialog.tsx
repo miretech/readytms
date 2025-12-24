@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { useDropzone } from "react-dropzone";
 import { insertTrailerSchema, type Trailer } from "@shared/schema";
@@ -65,6 +65,12 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
   const [pickupPictures, setPickupPictures] = useState<FileAttachment[]>([]);
   const [repairsAttachments, setRepairsAttachments] = useState<FileAttachment[]>([]);
 
+  // Fetch full trailer data including attachments when editing
+  const { data: fullTrailer } = useQuery<Trailer>({
+    queryKey: ['/api/trailers', trailer?.id],
+    enabled: open && isEditing && !!trailer?.id,
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -88,28 +94,33 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
   });
 
   useEffect(() => {
-    if (trailer) {
+    // Use fullTrailer (with attachments) when available, otherwise use trailer from list
+    const trailerData = fullTrailer || trailer;
+    if (trailerData) {
       form.reset({
-        trailerNumber: trailer.trailerNumber,
-        type: trailer.type,
-        status: trailer.status,
-        licensePlate: trailer.licensePlate,
-        vin: trailer.vin || "",
-        year: trailer.year || undefined,
-        make: trailer.make || "",
-        model: trailer.model || "",
-        insuranceProvider: trailer.insuranceProvider || "",
-        insurancePolicyNumber: trailer.insurancePolicyNumber || "",
-        insuranceExpirationDate: trailer.insuranceExpirationDate || "",
-        pickupDate: trailer.pickupDate || "",
-        dropOffDate: trailer.dropOffDate || "",
-        terminatedDate: trailer.terminatedDate || "",
-        repairs: trailer.repairs || "",
-        rentPerMonth: trailer.rentPerMonth || "",
+        trailerNumber: trailerData.trailerNumber,
+        type: trailerData.type,
+        status: trailerData.status,
+        licensePlate: trailerData.licensePlate,
+        vin: trailerData.vin || "",
+        year: trailerData.year || undefined,
+        make: trailerData.make || "",
+        model: trailerData.model || "",
+        insuranceProvider: trailerData.insuranceProvider || "",
+        insurancePolicyNumber: trailerData.insurancePolicyNumber || "",
+        insuranceExpirationDate: trailerData.insuranceExpirationDate || "",
+        pickupDate: trailerData.pickupDate || "",
+        dropOffDate: trailerData.dropOffDate || "",
+        terminatedDate: trailerData.terminatedDate || "",
+        repairs: trailerData.repairs || "",
+        rentPerMonth: trailerData.rentPerMonth || "",
       });
-      setTollsFiles((trailer.tollsAttachments as FileAttachment[]) || []);
-      setPickupPictures((trailer.pickupPictures as FileAttachment[]) || []);
-      setRepairsAttachments((trailer.repairsAttachments as FileAttachment[]) || []);
+      // Only set attachments from full trailer data (which has actual attachment data)
+      if (fullTrailer) {
+        setTollsFiles((fullTrailer.tollsAttachments as FileAttachment[]) || []);
+        setPickupPictures((fullTrailer.pickupPictures as FileAttachment[]) || []);
+        setRepairsAttachments((fullTrailer.repairsAttachments as FileAttachment[]) || []);
+      }
     } else {
       form.reset({
         trailerNumber: "",
@@ -133,7 +144,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
       setPickupPictures([]);
       setRepairsAttachments([]);
     }
-  }, [trailer, form, open]);
+  }, [trailer, fullTrailer, form, open]);
 
   const handleFileUpload = useCallback((
     acceptedFiles: File[],

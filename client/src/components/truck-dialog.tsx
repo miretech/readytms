@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { useDropzone } from "react-dropzone";
 import { insertTruckSchema, type Truck } from "@shared/schema";
@@ -64,6 +64,12 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
   const [dotInspectionFiles, setDotInspectionFiles] = useState<FileAttachment[]>([]);
   const [repairReceiptFiles, setRepairReceiptFiles] = useState<FileAttachment[]>([]);
 
+  // Fetch full truck data including attachments when editing
+  const { data: fullTruck } = useQuery<Truck>({
+    queryKey: ['/api/trucks', truck?.id],
+    enabled: open && isEditing && !!truck?.id,
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -86,27 +92,32 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
   });
 
   useEffect(() => {
-    if (truck) {
+    // Use fullTruck (with attachments) when available, otherwise use truck from list
+    const truckData = fullTruck || truck;
+    if (truckData) {
       form.reset({
-        truckNumber: truck.truckNumber,
-        type: truck.type,
-        status: truck.status,
-        licensePlate: truck.licensePlate,
-        vin: truck.vin || "",
-        year: truck.year || undefined,
-        make: truck.make || "",
-        model: truck.model || "",
-        cabCardExpirationDate: truck.cabCardExpirationDate || "",
-        dotInspectionDate: (truck as any).dotInspectionDate || "",
-        dotInspectionExpirationDate: (truck as any).dotInspectionExpirationDate || "",
-        dateAddedToCompany: (truck as any).dateAddedToCompany || "",
-        dateTerminated: (truck as any).dateTerminated || "",
-        ownerFullName: (truck as any).ownerFullName || "",
-        isCompanyTruck: (truck as any).isCompanyTruck || false,
+        truckNumber: truckData.truckNumber,
+        type: truckData.type,
+        status: truckData.status,
+        licensePlate: truckData.licensePlate,
+        vin: truckData.vin || "",
+        year: truckData.year || undefined,
+        make: truckData.make || "",
+        model: truckData.model || "",
+        cabCardExpirationDate: truckData.cabCardExpirationDate || "",
+        dotInspectionDate: (truckData as any).dotInspectionDate || "",
+        dotInspectionExpirationDate: (truckData as any).dotInspectionExpirationDate || "",
+        dateAddedToCompany: (truckData as any).dateAddedToCompany || "",
+        dateTerminated: (truckData as any).dateTerminated || "",
+        ownerFullName: (truckData as any).ownerFullName || "",
+        isCompanyTruck: (truckData as any).isCompanyTruck || false,
       });
-      setCabCardFiles((truck.cabCardAttachments as FileAttachment[]) || []);
-      setDotInspectionFiles(((truck as any).dotInspectionAttachments as FileAttachment[]) || []);
-      setRepairReceiptFiles(((truck as any).repairReceiptAttachments as FileAttachment[]) || []);
+      // Only set attachments from full truck data (which has actual attachment data)
+      if (fullTruck) {
+        setCabCardFiles((fullTruck.cabCardAttachments as FileAttachment[]) || []);
+        setDotInspectionFiles(((fullTruck as any).dotInspectionAttachments as FileAttachment[]) || []);
+        setRepairReceiptFiles(((fullTruck as any).repairReceiptAttachments as FileAttachment[]) || []);
+      }
     } else {
       form.reset({
         truckNumber: "",
@@ -129,7 +140,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
       setDotInspectionFiles([]);
       setRepairReceiptFiles([]);
     }
-  }, [truck, form, open]);
+  }, [truck, fullTruck, form, open]);
 
   const handleFileUpload = useCallback((
     acceptedFiles: File[],
