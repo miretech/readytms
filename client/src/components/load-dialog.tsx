@@ -38,6 +38,14 @@ import { useToast } from "@/hooks/use-toast";
 import { AILoadUpload } from "@/components/ai-load-upload";
 import { FileUpload } from "@/components/file-upload";
 
+// Helper to extract date part (YYYY-MM-DD) without timezone conversion issues
+function extractDatePart(dateValue: string | Date | null | undefined): string {
+  if (!dateValue) return "";
+  const str = typeof dateValue === 'string' ? dateValue : dateValue.toISOString();
+  // Just extract the date part directly - no timezone conversion
+  return str.split('T')[0];
+}
+
 const formSchema = insertLoadSchema.extend({
   customerId: z.string().optional(), // Optional - can be added via AI extraction later
   status: z.string().min(1, "Status is required"),
@@ -141,9 +149,9 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
         customerId: loadData.customerId || "",
         status: loadData.status,
         pickupLocation: loadData.pickupLocation,
-        pickupDate: new Date(loadData.pickupDate).toISOString().split("T")[0],
+        pickupDate: extractDatePart(loadData.pickupDate),
         deliveryLocation: loadData.deliveryLocation,
-        deliveryDate: new Date(loadData.deliveryDate).toISOString().split("T")[0],
+        deliveryDate: extractDatePart(loadData.deliveryDate),
         assignedDriverId: loadData.assignedDriverId || "",
         assignedTruckId: loadData.assignedTruckId || "",
         rate: loadData.rate.toString(),

@@ -25,6 +25,17 @@ import type { Load } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+// Helper to format date without timezone conversion issues
+function formatDateLocal(dateString: string | Date): string {
+  if (!dateString) return "";
+  const str = typeof dateString === 'string' ? dateString : dateString.toISOString();
+  // Extract just the date part (YYYY-MM-DD) and parse as local date
+  const datePart = str.split('T')[0];
+  const [year, month, day] = datePart.split('-').map(Number);
+  const localDate = new Date(year, month - 1, day);
+  return localDate.toLocaleDateString();
+}
+
 export default function Loads() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -184,8 +195,8 @@ export default function Loads() {
                         <div className="text-muted-foreground">→ {load.deliveryLocation}</div>
                       </div>
                     </TableCell>
-                    <TableCell>{new Date(load.pickupDate).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(load.deliveryDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDateLocal(load.pickupDate)}</TableCell>
+                    <TableCell>{formatDateLocal(load.deliveryDate)}</TableCell>
                     <TableCell className="font-semibold">
                       ${Number(load.rate).toLocaleString()}
                     </TableCell>
