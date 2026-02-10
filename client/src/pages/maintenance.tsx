@@ -217,8 +217,8 @@ function MaintenanceDialog({ open, onOpenChange, maintenance }: MaintenanceDialo
     mutationFn: async (values: MaintenanceFormValues) => {
       const payload: any = {
         ...values,
-        mileage: values.mileage ? Number(values.mileage) : undefined,
-        nextServiceMileage: values.nextServiceMileage ? Number(values.nextServiceMileage) : undefined,
+        mileage: values.mileage ? Math.round(Number(values.mileage)) : undefined,
+        nextServiceMileage: values.nextServiceMileage ? Math.round(Number(values.nextServiceMileage)) : undefined,
         nextServiceDate: values.nextServiceDate || undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
       };
