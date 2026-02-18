@@ -7,12 +7,14 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { CheckCircle, XCircle, Mail, Clock } from "lucide-react";
 import { format } from "date-fns";
+import { type Division } from "@shared/schema";
 
 type PendingAdmin = {
   id: string;
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  divisionId?: string | null;
   createdAt: string;
 };
 
@@ -21,6 +23,10 @@ export default function AdminApprovals() {
 
   const { data: pendingAdmins = [], isLoading } = useQuery<PendingAdmin[]>({
     queryKey: ["/api/admin/pending"],
+  });
+
+  const { data: allDivisions = [] } = useQuery<Division[]>({
+    queryKey: ["/api/divisions"],
   });
 
   const approveMutation = useMutation({
@@ -100,7 +106,14 @@ export default function AdminApprovals() {
                       Registered {format(new Date(admin.createdAt), "PPP 'at' p")}
                     </CardDescription>
                   </div>
-                  <Badge variant="secondary">Pending</Badge>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {admin.divisionId && (
+                      <Badge variant="outline">
+                        {allDivisions.find(d => d.id === admin.divisionId)?.companyName || "Division"}
+                      </Badge>
+                    )}
+                    <Badge variant="secondary">Pending</Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

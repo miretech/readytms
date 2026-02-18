@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Save, Building2, Upload, Plus, Pencil, Trash2, Star, StarOff } from "lucide-react";
+import { Save, Building2, Upload, Plus, Pencil, Trash2, Star, StarOff, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -320,6 +320,9 @@ export default function CompanySettingsPage() {
   const [divisionDialogOpen, setDivisionDialogOpen] = useState(false);
   const [editingDivision, setEditingDivision] = useState<Division | undefined>();
   const [deletingDivision, setDeletingDivision] = useState<Division | undefined>();
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteDivision, setInviteDivision] = useState<Division | undefined>();
+  const [inviteEmail, setInviteEmail] = useState("");
 
   const { data: settings, isLoading } = useQuery<CompanySettings>({
     queryKey: ["/api/company-settings"],
@@ -360,6 +363,28 @@ export default function CompanySettingsPage() {
         description: "The division has been removed.",
       });
       setDeletingDivision(undefined);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async ({ divisionId, email }: { divisionId: string; email: string }) => {
+      return await apiRequest("POST", `/api/divisions/${divisionId}/invite`, { email });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Invitation Sent",
+        description: `An invitation has been sent to ${inviteEmail}.`,
+      });
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteDivision(undefined);
     },
     onError: (error: Error) => {
       toast({
@@ -710,6 +735,18 @@ export default function CompanySettingsPage() {
                         size="icon"
                         variant="ghost"
                         onClick={() => {
+                          setInviteDivision(division);
+                          setInviteDialogOpen(true);
+                        }}
+                        title="Send invitation"
+                        data-testid={`button-invite-division-${division.id}`}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
                           setEditingDivision(division);
                           setDivisionDialogOpen(true);
                         }}
@@ -744,6 +781,63 @@ export default function CompanySettingsPage() {
           division={editingDivision}
         />
       )}
+
+      <Dialog
+        open={inviteDialogOpen}
+        onOpenChange={(open) => {
+          setInviteDialogOpen(open);
+          if (!open) {
+            setInviteDivision(undefined);
+            setInviteEmail("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite to {inviteDivision?.companyName}</DialogTitle>
+            <DialogDescription>
+              Send an invitation email to join this division on Ready TMS.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email Address</label>
+              <Input
+                type="email"
+                placeholder="user@company.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                data-testid="input-invite-email"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setInviteDialogOpen(false);
+                  setInviteEmail("");
+                  setInviteDivision(undefined);
+                }}
+                data-testid="button-cancel-invite"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (inviteDivision && inviteEmail) {
+                    inviteMutation.mutate({ divisionId: inviteDivision.id, email: inviteEmail });
+                  }
+                }}
+                disabled={!inviteEmail || inviteMutation.isPending}
+                data-testid="button-send-invite"
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={!!deletingDivision}

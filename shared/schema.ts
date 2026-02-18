@@ -29,6 +29,7 @@ export const users = pgTable("users", {
   approved: text("approved").notNull().default("false"), // Admin approval status
   approvedBy: varchar("approved_by"), // ID of admin who approved this account
   approvedAt: timestamp("approved_at"), // When the account was approved
+  divisionId: varchar("division_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -908,3 +909,23 @@ export const insertDivisionSchema = createInsertSchema(divisions).omit({
 
 export type InsertDivision = z.infer<typeof insertDivisionSchema>;
 export type Division = typeof divisions.$inferSelect;
+
+export const divisionInvitations = pgTable("division_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  divisionId: varchar("division_id").notNull(),
+  email: text("email").notNull(),
+  token: varchar("token").notNull().unique(),
+  role: text("role").notNull().default("admin"),
+  status: text("status").notNull().default("pending"),
+  invitedBy: varchar("invited_by").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDivisionInvitationSchema = createInsertSchema(divisionInvitations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDivisionInvitation = z.infer<typeof insertDivisionInvitationSchema>;
+export type DivisionInvitation = typeof divisionInvitations.$inferSelect;

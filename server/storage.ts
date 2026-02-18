@@ -55,6 +55,8 @@ import {
   type InsertCompanySettings,
   type Division,
   type InsertDivision,
+  type DivisionInvitation,
+  type InsertDivisionInvitation,
   type PasswordResetToken,
   users,
   loads,
@@ -84,6 +86,7 @@ import {
   tasks,
   companySettings,
   divisions,
+  divisionInvitations,
   passwordResetTokens
 } from "@shared/schema";
 import { db } from "./db";
@@ -303,6 +306,12 @@ export interface IStorage {
   createDivision(division: InsertDivision): Promise<Division>;
   updateDivision(id: string, division: Partial<InsertDivision>): Promise<Division | undefined>;
   deleteDivision(id: string): Promise<boolean>;
+
+  createDivisionInvitation(invitation: InsertDivisionInvitation): Promise<DivisionInvitation>;
+  getDivisionInvitationByToken(token: string): Promise<DivisionInvitation | undefined>;
+  updateDivisionInvitation(id: string, data: Partial<InsertDivisionInvitation>): Promise<DivisionInvitation | undefined>;
+  getDivisionInvitations(divisionId: string): Promise<DivisionInvitation[]>;
+  getPendingUsersByDivision(divisionId: string): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1939,6 +1948,29 @@ export class DatabaseStorage implements IStorage {
   async deleteDivision(id: string): Promise<boolean> {
     const result = await db.delete(divisions).where(eq(divisions.id, id));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async createDivisionInvitation(invitation: InsertDivisionInvitation): Promise<DivisionInvitation> {
+    const [created] = await db.insert(divisionInvitations).values(invitation).returning();
+    return created;
+  }
+
+  async getDivisionInvitationByToken(token: string): Promise<DivisionInvitation | undefined> {
+    const [invitation] = await db.select().from(divisionInvitations).where(eq(divisionInvitations.token, token));
+    return invitation || undefined;
+  }
+
+  async updateDivisionInvitation(id: string, data: Partial<InsertDivisionInvitation>): Promise<DivisionInvitation | undefined> {
+    const [updated] = await db.update(divisionInvitations).set(data).where(eq(divisionInvitations.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getDivisionInvitations(divisionId: string): Promise<DivisionInvitation[]> {
+    return await db.select().from(divisionInvitations).where(eq(divisionInvitations.divisionId, divisionId)).orderBy(desc(divisionInvitations.createdAt));
+  }
+
+  async getPendingUsersByDivision(divisionId: string): Promise<User[]> {
+    return await db.select().from(users).where(and(eq(users.divisionId, divisionId), eq(users.approved, "false")));
   }
 }
 

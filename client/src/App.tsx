@@ -34,6 +34,7 @@ import CompanySettings from "@/pages/company-settings";
 import AdminApprovals from "@/pages/admin-approvals";
 import Login from "@/pages/login";
 import ResetPassword from "@/pages/reset-password";
+import DivisionSignup from "@/pages/division-signup";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -103,6 +104,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/driver-signup" component={DriverSignup} />
+      <Route path="/division-signup/:token" component={DivisionSignup} />
       <Route path="/driver-pod" component={DriverPOD} />
       
       {/* Protected admin routes */}
@@ -133,7 +135,7 @@ function Router() {
 function AppContent() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const isPublicPage = ["/", "/login", "/reset-password", "/driver-signup", "/driver-pod"].includes(location);
+  const isPublicPage = ["/", "/login", "/reset-password", "/driver-signup", "/driver-pod"].includes(location) || location.startsWith("/division-signup/");
 
   const style = {
     "--sidebar-width": "16rem",

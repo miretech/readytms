@@ -2296,6 +2296,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  app.post("/api/divisions/:divisionId/invite", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { divisionId } = req.params;
+      const { email, role } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const division = await storage.getDivision(divisionId);
+      if (!division) {
+        return res.status(404).json({ error: "Division not found" });
+      }
+
+      const crypto = await import('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const invitation = await storage.createDivisionInvitation({
+        divisionId,
+        email,
+        token,
+        role: role || "admin",
+        status: "pending",
+        invitedBy: req.user.id,
+        expiresAt,
+      });
+
+      const { sendEmail } = await import('./notifications');
+      const appUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+        : 'https://readytms.com';
+      const signupLink = `${appUrl}/division-signup/${token}`;
+      
+      await sendEmail({
+        to: email,
+        subject: `You're invited to join ${division.companyName} on Ready TMS`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+              .button { display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+              .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>You're Invited!</h1>
+              </div>
+              <div class="content">
+                <p>You've been invited to join <strong>${division.companyName}</strong> as a subdivision on Ready TMS.</p>
+                <p>Click the button below to create your account and get started:</p>
+                <div style="text-align: center;">
+                  <a href="${signupLink}" class="button">Accept Invitation & Sign Up</a>
+                </div>
+                <p style="color: #6b7280; font-size: 14px;">This invitation link will expire in 7 days.</p>
+                <p style="color: #6b7280; font-size: 14px;">If you can't click the button, copy this link: ${signupLink}</p>
+              </div>
+              <div class="footer">
+                <p>Ready TMS - Transportation Management System</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+      });
+
+      res.status(201).json({ message: "Invitation sent successfully", invitation });
+    } catch (error: any) {
+      console.error("Division invitation error:", error);
+      res.status(500).json({ error: "Failed to send invitation", details: error.message });
+    }
+  });
+
+  app.get("/api/divisions/:divisionId/invitations", isAuthenticated, async (req, res) => {
+    try {
+      const invitations = await storage.getDivisionInvitations(req.params.divisionId);
+      res.json(invitations);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch invitations" });
+    }
+  });
+
+  app.get("/api/division-invite/:token", async (req, res) => {
+    try {
+      const invitation = await storage.getDivisionInvitationByToken(req.params.token);
+      if (!invitation) {
+        return res.status(404).json({ error: "Invalid invitation" });
+      }
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Invitation already used" });
+      }
+      if (new Date(invitation.expiresAt) < new Date()) {
+        return res.status(400).json({ error: "Invitation expired" });
+      }
+      const division = await storage.getDivision(invitation.divisionId);
+      res.json({ invitation, division });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to validate invitation" });
+    }
+  });
+
+  app.post("/api/division-signup", async (req, res) => {
+    try {
+      const { token, email, password, firstName, lastName } = req.body;
+      
+      if (!token || !email || !password) {
+        return res.status(400).json({ error: "Token, email, and password are required" });
+      }
+
+      const invitation = await storage.getDivisionInvitationByToken(token);
+      if (!invitation) {
+        return res.status(404).json({ error: "Invalid invitation" });
+      }
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Invitation already used" });
+      }
+      if (new Date(invitation.expiresAt) < new Date()) {
+        return res.status(400).json({ error: "Invitation expired" });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const user = await storage.createUser({
+        email,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        isAdmin: "true",
+        role: invitation.role || "admin",
+        approved: "false",
+        divisionId: invitation.divisionId,
+      });
+
+      await storage.updateDivisionInvitation(invitation.id, { status: "accepted" });
+
+      const approvedAdmins = await storage.getApprovedAdmins();
+      const division = await storage.getDivision(invitation.divisionId);
+      const { sendEmail } = await import('./notifications');
+      
+      for (const admin of approvedAdmins) {
+        if (!admin.divisionId) {
+          try {
+            await sendEmail({
+              to: admin.email,
+              subject: `New ${division?.companyName || 'Division'} User Pending Approval`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <h2>New User Registration</h2>
+                  <p>A new user has signed up for <strong>${division?.companyName || 'a division'}</strong> and needs your approval:</p>
+                  <ul>
+                    <li><strong>Email:</strong> ${email}</li>
+                    <li><strong>Name:</strong> ${firstName || ''} ${lastName || ''}</li>
+                    <li><strong>Division:</strong> ${division?.companyName || 'Unknown'}</li>
+                    <li><strong>Role:</strong> ${invitation.role}</li>
+                  </ul>
+                  <p>Please log in to Ready TMS to approve or reject this user.</p>
+                </div>
+              `,
+            });
+          } catch (e) {
+            console.error("Failed to send approval notification:", e);
+          }
+        }
+      }
+
+      res.status(201).json({
+        message: "Registration successful. Your account is pending admin approval.",
+        pendingApproval: true,
+      });
+    } catch (error: any) {
+      console.error("Division signup error:", error);
+      res.status(500).json({ error: "Registration failed", details: error.message });
+    }
+  });
+
+  app.get("/api/divisions/:divisionId/pending-users", isAuthenticated, async (req, res) => {
+    try {
+      const pendingUsers = await storage.getPendingUsersByDivision(req.params.divisionId);
+      const sanitized = pendingUsers.map(({ password, ...user }) => user);
+      res.json(sanitized);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch pending users" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
