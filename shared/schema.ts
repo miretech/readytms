@@ -885,3 +885,26 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type CompanySettings = typeof companySettings.$inferSelect;
+
+export const divisions = pgTable("divisions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name").notNull(),
+  address: text("address").notNull(),
+  cityStateZip: text("city_state_zip").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  logoUrl: text("logo_url"),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDivisionSchema = createInsertSchema(divisions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDivision = z.infer<typeof insertDivisionSchema>;
+export type Division = typeof divisions.$inferSelect;
