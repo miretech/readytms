@@ -2247,6 +2247,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Divisions Routes
+  app.get("/api/divisions", async (_req, res) => {
+    const allDivisions = await storage.getAllDivisions();
+    res.json(allDivisions);
+  });
+
+  app.get("/api/divisions/:id", async (req, res) => {
+    const division = await storage.getDivision(req.params.id);
+    if (!division) {
+      return res.status(404).json({ error: "Division not found" });
+    }
+    res.json(division);
+  });
+
+  app.post("/api/divisions", async (req, res) => {
+    try {
+      const { insertDivisionSchema } = await import("@shared/schema");
+      const validatedData = insertDivisionSchema.parse(req.body);
+      const division = await storage.createDivision(validatedData);
+      res.status(201).json(division);
+    } catch (error: any) {
+      console.error("Division creation error:", error);
+      res.status(400).json({ error: "Invalid division data", details: error.message });
+    }
+  });
+
+  app.patch("/api/divisions/:id", async (req, res) => {
+    try {
+      const { insertDivisionSchema } = await import("@shared/schema");
+      const validatedData = insertDivisionSchema.partial().parse(req.body);
+      const division = await storage.updateDivision(req.params.id, validatedData);
+      if (!division) {
+        return res.status(404).json({ error: "Division not found" });
+      }
+      res.json(division);
+    } catch (error: any) {
+      console.error("Division update error:", error);
+      res.status(400).json({ error: "Invalid division data", details: error.message });
+    }
+  });
+
+  app.delete("/api/divisions/:id", async (req, res) => {
+    const deleted = await storage.deleteDivision(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Division not found" });
+    }
+    res.status(204).send();
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

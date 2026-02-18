@@ -53,6 +53,8 @@ import {
   type InsertTask,
   type CompanySettings,
   type InsertCompanySettings,
+  type Division,
+  type InsertDivision,
   type PasswordResetToken,
   users,
   loads,
@@ -81,6 +83,7 @@ import {
   chargeBacks,
   tasks,
   companySettings,
+  divisions,
   passwordResetTokens
 } from "@shared/schema";
 import { db } from "./db";
@@ -293,6 +296,13 @@ export interface IStorage {
   // Company Settings
   getCompanySettings(): Promise<CompanySettings | undefined>;
   updateCompanySettings(settings: Partial<InsertCompanySettings>): Promise<CompanySettings | undefined>;
+
+  // Divisions
+  getAllDivisions(): Promise<Division[]>;
+  getDivision(id: string): Promise<Division | undefined>;
+  createDivision(division: InsertDivision): Promise<Division>;
+  updateDivision(id: string, division: Partial<InsertDivision>): Promise<Division | undefined>;
+  deleteDivision(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1888,13 +1898,47 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updated || undefined;
     } else {
-      // Create new settings if none exist
       const [created] = await db
         .insert(companySettings)
         .values(updateData as InsertCompanySettings)
         .returning();
       return created;
     }
+  }
+
+  // Divisions Implementation
+  async getAllDivisions(): Promise<Division[]> {
+    return await db.select().from(divisions).orderBy(desc(divisions.isPrimary), divisions.companyName);
+  }
+
+  async getDivision(id: string): Promise<Division | undefined> {
+    const [division] = await db.select().from(divisions).where(eq(divisions.id, id));
+    return division || undefined;
+  }
+
+  async createDivision(division: InsertDivision): Promise<Division> {
+    if (division.isPrimary) {
+      await db.update(divisions).set({ isPrimary: false });
+    }
+    const [created] = await db.insert(divisions).values(division).returning();
+    return created;
+  }
+
+  async updateDivision(id: string, updateData: Partial<InsertDivision>): Promise<Division | undefined> {
+    if (updateData.isPrimary) {
+      await db.update(divisions).set({ isPrimary: false });
+    }
+    const [updated] = await db
+      .update(divisions)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(divisions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteDivision(id: string): Promise<boolean> {
+    const result = await db.delete(divisions).where(eq(divisions.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 }
 
