@@ -42,7 +42,7 @@ export default function CompanySettingsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: CompanySettingsFormValues) => {
-      return await apiRequest("/api/company-settings", "PATCH", data);
+      return await apiRequest("PATCH", "/api/company-settings", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] });
