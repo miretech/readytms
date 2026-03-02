@@ -854,6 +854,7 @@ export const tasks = pgTable("tasks", {
   priority: text("priority").notNull().default("medium"), // "low", "medium", "high"
   category: text("category"), // "maintenance", "paperwork", "dispatch", "other"
   completedAt: timestamp("completed_at"),
+  attachments: jsonb("attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -863,6 +864,11 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
 }).extend({
   dueDate: z.string(),
   completedAt: z.string().optional().transform(val => val === "" ? undefined : val),
+  attachments: z.array(z.object({
+    fileName: z.string(),
+    fileData: z.string(),
+    uploadedAt: z.string(),
+  })).optional(),
 });
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;

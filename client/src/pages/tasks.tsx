@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, CheckCircle2, Clock, AlertCircle, Paperclip, X, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -50,7 +50,13 @@ import { z } from "zod";
 import { insertTaskSchema, type Task } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, differenceInDays, isPast, isToday } from "date-fns";
+import { format, isPast, isToday } from "date-fns";
+
+interface Attachment {
+  fileName: string;
+  fileData: string;
+  uploadedAt: string;
+}
 
 const formSchema = insertTaskSchema.extend({
   title: z.string().min(1, "Title is required"),
@@ -63,6 +69,9 @@ export default function Tasks() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
@@ -82,15 +91,17 @@ export default function Tasks() {
       priority: "medium",
       category: "",
       completedAt: "",
+      attachments: [],
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (values: FormValues) => {
+      const payload = { ...values, attachments };
       if (editingTask) {
-        return await apiRequest("PATCH", `/api/tasks/${editingTask.id}`, values);
+        return await apiRequest("PATCH", `/api/tasks/${editingTask.id}`, payload);
       }
-      return await apiRequest("POST", "/api/tasks", values);
+      return await apiRequest("POST", "/api/tasks", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
@@ -100,6 +111,7 @@ export default function Tasks() {
       });
       setIsDialogOpen(false);
       setEditingTask(null);
+      setAttachments([]);
       form.reset();
     },
     onError: () => {
@@ -151,6 +163,8 @@ export default function Tasks() {
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
+    const existingAttachments = (task.attachments as Attachment[] | null) || [];
+    setAttachments(existingAttachments);
     form.reset({
       title: task.title,
       description: task.description || "",
@@ -162,6 +176,7 @@ export default function Tasks() {
       priority: task.priority,
       category: task.category || "",
       completedAt: task.completedAt ? new Date(task.completedAt).toISOString() : "",
+      attachments: existingAttachments,
     });
     setIsDialogOpen(true);
   };
@@ -175,7 +190,66 @@ export default function Tasks() {
   const handleDialogClose = () => {
     setIsDialogOpen(false);
     setEditingTask(null);
+    setAttachments([]);
     form.reset();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const newAttachments: Attachment[] = [];
+
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds the 10MB limit.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      newAttachments.push({
+        fileName: file.name,
+        fileData: base64,
+        uploadedAt: new Date().toISOString(),
+      });
+    }
+
+    setAttachments((prev) => [...prev, ...newAttachments]);
+    setIsUploading(false);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDownloadAttachment = (attachment: Attachment) => {
+    const link = document.createElement("a");
+    link.href = attachment.fileData;
+    link.download = attachment.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.split(".").pop()?.toLowerCase();
+    if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "")) return "image";
+    return "file";
   };
 
   const getStatusIcon = (task: Task) => {
@@ -270,73 +344,87 @@ export default function Tasks() {
                   <TableHead>Priority</TableHead>
                   <TableHead>Assigned To</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Files</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTasks.map((task) => (
-                  <TableRow key={task.id} data-testid={`row-task-${task.id}`}>
-                    <TableCell>
-                      <Checkbox
-                        checked={task.status === "completed"}
-                        onCheckedChange={() => toggleCompleteMutation.mutate({ id: task.id, status: task.status })}
-                        data-testid={`checkbox-complete-${task.id}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-start gap-2">
-                        {getStatusIcon(task)}
-                        <div>
-                          <div className={`font-medium ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
-                            {task.title}
+                {filteredTasks.map((task) => {
+                  const taskAttachments = (task.attachments as Attachment[] | null) || [];
+                  return (
+                    <TableRow key={task.id} data-testid={`row-task-${task.id}`}>
+                      <TableCell>
+                        <Checkbox
+                          checked={task.status === "completed"}
+                          onCheckedChange={() => toggleCompleteMutation.mutate({ id: task.id, status: task.status })}
+                          data-testid={`checkbox-complete-${task.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-start gap-2">
+                          {getStatusIcon(task)}
+                          <div>
+                            <div className={`font-medium ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                              {task.title}
+                            </div>
+                            {task.description && (
+                              <div className="text-sm text-muted-foreground">{task.description}</div>
+                            )}
+                            {task.repeatDaily === "true" && (
+                              <Badge variant="outline" className="mt-1">Repeats Daily</Badge>
+                            )}
                           </div>
-                          {task.description && (
-                            <div className="text-sm text-muted-foreground">{task.description}</div>
-                          )}
-                          {task.repeatDaily === "true" && (
-                            <Badge variant="outline" className="mt-1">Repeats Daily</Badge>
-                          )}
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {format(new Date(task.dueDate), "MMM d, yyyy")}
-                        {task.dueTime && <div className="text-muted-foreground">{task.dueTime}</div>}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getPriorityBadge(task.priority)}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">{task.assignedTo || "Unassigned"}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{getStatusLabel(task)}</div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" data-testid={`button-actions-${task.id}`}>
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(task)} data-testid={`button-edit-${task.id}`}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(task.id)}
-                            className="text-destructive"
-                            data-testid={`button-delete-${task.id}`}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {format(new Date(task.dueDate), "MMM d, yyyy")}
+                          {task.dueTime && <div className="text-muted-foreground">{task.dueTime}</div>}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getPriorityBadge(task.priority)}</TableCell>
+                      <TableCell>
+                        <div className="text-sm">{task.assignedTo || "Unassigned"}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{getStatusLabel(task)}</div>
+                      </TableCell>
+                      <TableCell>
+                        {taskAttachments.length > 0 ? (
+                          <Badge variant="secondary" data-testid={`badge-attachments-${task.id}`}>
+                            <Paperclip className="mr-1 h-3 w-3" />
+                            {taskAttachments.length}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-actions-${task.id}`}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(task)} data-testid={`button-edit-${task.id}`}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(task.id)}
+                              className="text-destructive"
+                              data-testid={`button-delete-${task.id}`}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -344,7 +432,7 @@ export default function Tasks() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingTask ? "Edit Task" : "Add New Task"}</DialogTitle>
             <DialogDescription>
@@ -492,6 +580,104 @@ export default function Tasks() {
                   </FormItem>
                 )}
               />
+
+              {/* Attachments Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <FormLabel>Attachments</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    data-testid="button-upload-attachment"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {isUploading ? "Uploading..." : "Upload Files"}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    data-testid="input-file-attachment"
+                  />
+                </div>
+
+                {attachments.length === 0 ? (
+                  <div
+                    className="flex flex-col items-center justify-center rounded-md border border-dashed p-6 text-center cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                    data-testid="dropzone-attachments"
+                  >
+                    <Paperclip className="mb-2 h-6 w-6 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No attachments yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click to upload PDFs, images, or documents (max 10MB each)</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {attachments.map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between rounded-md border p-3 gap-2"
+                        data-testid={`attachment-item-${index}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{attachment.fileName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(attachment.uploadedAt), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {getFileIcon(attachment.fileName) === "image" && (
+                            <img
+                              src={attachment.fileData}
+                              alt={attachment.fileName}
+                              className="h-8 w-8 rounded object-cover border"
+                            />
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDownloadAttachment(attachment)}
+                            data-testid={`button-download-attachment-${index}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveAttachment(index)}
+                            data-testid={`button-remove-attachment-${index}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      data-testid="button-add-more-attachments"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add More Files
+                    </Button>
+                  </div>
+                )}
+              </div>
 
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={handleDialogClose}>
