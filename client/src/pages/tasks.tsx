@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, CheckCircle2, Clock, AlertCircle, Paperclip, X, Download, Upload } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, CheckCircle2, Clock, AlertCircle, Paperclip, X, Download, Upload, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -44,6 +44,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -68,6 +69,8 @@ type FormValues = z.infer<typeof formSchema>;
 export default function Tasks() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -161,7 +164,14 @@ export default function Tasks() {
     (task.assignedTo?.toLowerCase() || "").includes(searchQuery.toLowerCase())
   );
 
+  const handleRowClick = (task: Task) => {
+    setViewingTask(task);
+    setIsViewDialogOpen(true);
+  };
+
   const handleEdit = (task: Task) => {
+    setIsViewDialogOpen(false);
+    setViewingTask(null);
     setEditingTask(task);
     const existingAttachments = (task.attachments as Attachment[] | null) || [];
     setAttachments(existingAttachments);
@@ -246,28 +256,19 @@ export default function Tasks() {
     document.body.removeChild(link);
   };
 
-  const getFileIcon = (fileName: string) => {
+  const getFileIsImage = (fileName: string) => {
     const ext = fileName.split(".").pop()?.toLowerCase();
-    if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "")) return "image";
-    return "file";
+    return ["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "");
   };
 
   const getStatusIcon = (task: Task) => {
-    if (task.status === "completed") {
-      return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-    }
-    if (task.dueDate && isPast(new Date(task.dueDate)) && task.status !== "completed") {
-      return <AlertCircle className="h-4 w-4 text-red-600" />;
-    }
+    if (task.status === "completed") return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+    if (task.dueDate && isPast(new Date(task.dueDate)) && task.status !== "completed") return <AlertCircle className="h-4 w-4 text-red-600" />;
     return <Clock className="h-4 w-4 text-blue-600" />;
   };
 
   const getPriorityBadge = (priority: string) => {
-    const variants = {
-      low: "outline" as const,
-      medium: "secondary" as const,
-      high: "destructive" as const,
-    };
+    const variants = { low: "outline" as const, medium: "secondary" as const, high: "destructive" as const };
     return <Badge variant={variants[priority as keyof typeof variants] || "secondary"}>{priority}</Badge>;
   };
 
@@ -294,10 +295,7 @@ export default function Tasks() {
           <h1 className="text-3xl font-semibold tracking-tight">Task Manager</h1>
           <p className="text-sm text-muted-foreground">Track daily reminders and recurring tasks</p>
         </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          data-testid="button-create-task"
-        >
+        <Button onClick={() => setIsDialogOpen(true)} data-testid="button-create-task">
           <Plus className="mr-2 h-4 w-4" />
           Add Task
         </Button>
@@ -352,8 +350,13 @@ export default function Tasks() {
                 {filteredTasks.map((task) => {
                   const taskAttachments = (task.attachments as Attachment[] | null) || [];
                   return (
-                    <TableRow key={task.id} data-testid={`row-task-${task.id}`}>
-                      <TableCell>
+                    <TableRow
+                      key={task.id}
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(task)}
+                      data-testid={`row-task-${task.id}`}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={task.status === "completed"}
                           onCheckedChange={() => toggleCompleteMutation.mutate({ id: task.id, status: task.status })}
@@ -368,7 +371,7 @@ export default function Tasks() {
                               {task.title}
                             </div>
                             {task.description && (
-                              <div className="text-sm text-muted-foreground">{task.description}</div>
+                              <div className="text-sm text-muted-foreground line-clamp-1">{task.description}</div>
                             )}
                             {task.repeatDaily === "true" && (
                               <Badge variant="outline" className="mt-1">Repeats Daily</Badge>
@@ -399,7 +402,7 @@ export default function Tasks() {
                           <span className="text-muted-foreground text-sm">—</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" data-testid={`button-actions-${task.id}`}>
@@ -431,6 +434,137 @@ export default function Tasks() {
         )}
       </Card>
 
+      {/* View Task Dialog */}
+      {viewingTask && (
+        <Dialog open={isViewDialogOpen} onOpenChange={(open) => { setIsViewDialogOpen(open); if (!open) setViewingTask(null); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-start justify-between gap-4 pr-6">
+                <div className="flex items-start gap-2 min-w-0">
+                  {getStatusIcon(viewingTask)}
+                  <div className="min-w-0">
+                    <DialogTitle className={`text-xl leading-tight ${viewingTask.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                      {viewingTask.title}
+                    </DialogTitle>
+                    <DialogDescription className="mt-0.5">
+                      {getStatusLabel(viewingTask)}
+                      {viewingTask.repeatDaily === "true" && (
+                        <Badge variant="outline" className="ml-2">Repeats Daily</Badge>
+                      )}
+                    </DialogDescription>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEdit(viewingTask)}
+                  data-testid="button-view-edit"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-2">
+              {/* Details grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Due Date</p>
+                  <p className="text-sm font-medium">
+                    {format(new Date(viewingTask.dueDate), "MMMM d, yyyy")}
+                    {viewingTask.dueTime && <span className="text-muted-foreground ml-1">at {viewingTask.dueTime}</span>}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Priority</p>
+                  {getPriorityBadge(viewingTask.priority)}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assigned To</p>
+                  <p className="text-sm font-medium">{viewingTask.assignedTo || "Unassigned"}</p>
+                </div>
+                {viewingTask.category && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</p>
+                    <p className="text-sm font-medium capitalize">{viewingTask.category}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Description */}
+              {viewingTask.description && (
+                <>
+                  <Separator />
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</p>
+                    <p className="text-sm whitespace-pre-wrap">{viewingTask.description}</p>
+                  </div>
+                </>
+              )}
+
+              {/* Attachments */}
+              <Separator />
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Attachments
+                  {((viewingTask.attachments as Attachment[] | null) || []).length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {((viewingTask.attachments as Attachment[] | null) || []).length}
+                    </Badge>
+                  )}
+                </p>
+
+                {((viewingTask.attachments as Attachment[] | null) || []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No attachments on this task.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {((viewingTask.attachments as Attachment[]) || []).map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between rounded-md border p-3 gap-2"
+                        data-testid={`view-attachment-${index}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {getFileIsImage(attachment.fileName) ? (
+                            <img
+                              src={attachment.fileData}
+                              alt={attachment.fileName}
+                              className="h-10 w-10 rounded object-cover border shrink-0"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded border bg-muted flex items-center justify-center shrink-0">
+                              <Paperclip className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{attachment.fileName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Uploaded {format(new Date(attachment.uploadedAt), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadAttachment(attachment)}
+                          data-testid={`button-view-download-${index}`}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Add / Edit Task Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -635,7 +769,7 @@ export default function Tasks() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          {getFileIcon(attachment.fileName) === "image" && (
+                          {getFileIsImage(attachment.fileName) && (
                             <img
                               src={attachment.fileData}
                               alt={attachment.fileName}
