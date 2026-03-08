@@ -719,6 +719,7 @@ export class DatabaseStorage implements IStorage {
       terminatedDate: trailers.terminatedDate,
       repairs: trailers.repairs,
       rentPerMonth: trailers.rentPerMonth,
+      haulingTruckId: trailers.haulingTruckId,
       // Set attachment fields to null in list view for performance
       tollsAttachments: sql`null`.as('tolls_attachments'),
       repairsAttachments: sql`null`.as('repairs_attachments'),
