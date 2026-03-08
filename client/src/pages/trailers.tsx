@@ -22,9 +22,10 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { TrailerDialog } from "@/components/trailer-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Trailer } from "@shared/schema";
+import type { Trailer, Truck } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Truck as TruckIcon } from "lucide-react";
 
 export default function Trailers() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -35,6 +36,12 @@ export default function Trailers() {
   const { data: trailers = [], isLoading } = useQuery<Trailer[]>({
     queryKey: ["/api/trailers"],
   });
+
+  const { data: trucks = [] } = useQuery<Truck[]>({
+    queryKey: ["/api/trucks"],
+  });
+
+  const truckMap = new Map(trucks.map((t) => [t.id, t.truckNumber]));
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -159,6 +166,7 @@ export default function Trailers() {
                   <TableHead>Trailer #</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Hauling Truck</TableHead>
                   <TableHead>Vehicle Details</TableHead>
                   <TableHead>Insurance</TableHead>
                   <TableHead>Rent/Mo</TableHead>
@@ -173,6 +181,16 @@ export default function Trailers() {
                     <TableCell>{trailer.type}</TableCell>
                     <TableCell>
                       <StatusBadge status={trailer.status as any} type="trailer" />
+                    </TableCell>
+                    <TableCell>
+                      {trailer.haulingTruckId && truckMap.has(trailer.haulingTruckId) ? (
+                        <div className="flex items-center gap-1.5">
+                          <TruckIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm font-medium">{truckMap.get(trailer.haulingTruckId)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { useDropzone } from "react-dropzone";
-import { insertTrailerSchema, type Trailer } from "@shared/schema";
+import { insertTrailerSchema, type Trailer, type Truck } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -71,6 +71,12 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
     enabled: open && isEditing && !!trailer?.id,
   });
 
+  // Fetch trucks for the hauling truck selector
+  const { data: trucks = [] } = useQuery<Truck[]>({
+    queryKey: ['/api/trucks'],
+    enabled: open,
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -90,6 +96,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
       terminatedDate: "",
       repairs: "",
       rentPerMonth: "",
+      haulingTruckId: "",
     },
   });
 
@@ -114,6 +121,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         terminatedDate: trailerData.terminatedDate || "",
         repairs: trailerData.repairs || "",
         rentPerMonth: trailerData.rentPerMonth || "",
+        haulingTruckId: trailerData.haulingTruckId || "",
       });
       // Clear attachments immediately when entity changes, then populate from full data when available
       if (fullTrailer) {
@@ -144,6 +152,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         terminatedDate: "",
         repairs: "",
         rentPerMonth: "",
+        haulingTruckId: "",
       });
       setTollsFiles([]);
       setPickupPictures([]);
@@ -217,6 +226,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         vin: values.vin || undefined,
         make: values.make || undefined,
         model: values.model || undefined,
+        haulingTruckId: values.haulingTruckId || null,
         tollsAttachments: tollsFiles.length > 0 ? tollsFiles : undefined,
         pickupPictures: pickupPictures.length > 0 ? pickupPictures : undefined,
         repairsAttachments: repairsAttachments.length > 0 ? repairsAttachments : undefined,
@@ -331,6 +341,35 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
                               <SelectItem value="maintenance">Maintenance</SelectItem>
                               <SelectItem value="out-of-service">Out of Service</SelectItem>
                               <SelectItem value="terminated">Terminated</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="haulingTruckId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Hauling Truck (Optional)</FormLabel>
+                          <Select
+                            onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
+                            value={field.value || "none"}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-hauling-truck">
+                                <SelectValue placeholder="Select truck" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">— None —</SelectItem>
+                              {trucks.map((truck) => (
+                                <SelectItem key={truck.id} value={truck.id}>
+                                  {truck.truckNumber}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />

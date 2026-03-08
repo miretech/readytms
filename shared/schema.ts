@@ -113,6 +113,8 @@ export const trailers = pgTable("trailers", {
   rentPerMonth: decimal("rent_per_month", { precision: 10, scale: 2 }),
   // Pickup pictures section - stores array of image attachments as JSON
   pickupPictures: jsonb("pickup_pictures").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Truck currently hauling this trailer
+  haulingTruckId: varchar("hauling_truck_id"),
 });
 
 export const insertTrailerSchema = createInsertSchema(trailers).omit({
