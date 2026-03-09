@@ -108,8 +108,16 @@ export default function Landing() {
               Benefits
             </a>
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <ThemeToggle />
+            {nonPrimaryDivisions.map((division) => (
+              <Link key={division.id} href={`/division-login/${division.id}`}>
+                <Button variant="outline" size="sm" className="gap-1.5" data-testid={`button-division-header-${division.id}`}>
+                  <Building2 className="h-3.5 w-3.5" />
+                  {division.companyName}
+                </Button>
+              </Link>
+            ))}
             <Link href="/login">
               <Button variant="outline" size="sm" data-testid="button-admin-login-header">
                 Admin

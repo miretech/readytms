@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { CheckCircle, XCircle, Mail, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Mail, Clock, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { type Division } from "@shared/schema";
+import { useAuth } from "@/lib/auth-context";
 
 type PendingAdmin = {
   id: string;
@@ -20,6 +21,7 @@ type PendingAdmin = {
 
 export default function AdminApprovals() {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: pendingAdmins = [], isLoading } = useQuery<PendingAdmin[]>({
     queryKey: ["/api/admin/pending"],
@@ -28,6 +30,10 @@ export default function AdminApprovals() {
   const { data: allDivisions = [] } = useQuery<Division[]>({
     queryKey: ["/api/divisions"],
   });
+
+  const myDivision = (user as any)?.divisionId
+    ? allDivisions.find((d) => d.id === (user as any).divisionId)
+    : null;
 
   const approveMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -72,8 +78,15 @@ export default function AdminApprovals() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Admin Approvals</h1>
-        <p className="text-muted-foreground">Review and approve pending admin registrations</p>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          {myDivision && <Building2 className="h-7 w-7 text-primary" />}
+          {myDivision ? `${myDivision.companyName} — Approvals` : "Admin Approvals"}
+        </h1>
+        <p className="text-muted-foreground">
+          {myDivision
+            ? `Review and approve pending access requests for ${myDivision.companyName}`
+            : "Review and approve pending admin registrations"}
+        </p>
       </div>
 
       {isLoading ? (

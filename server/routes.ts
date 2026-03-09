@@ -236,11 +236,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Approval Routes
-  app.get("/api/admin/pending", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/pending", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const pendingAdmins = await storage.getPendingAdmins();
+      // Division admins only see pending users from their own division
+      const currentUserDivisionId = req.user?.divisionId || null;
+      const filtered = currentUserDivisionId
+        ? pendingAdmins.filter((u: any) => u.divisionId === currentUserDivisionId)
+        : pendingAdmins;
       // Remove passwords from response
-      const sanitized = pendingAdmins.map(({ password, ...user }) => user);
+      const sanitized = filtered.map(({ password, ...user }: any) => user);
       res.json(sanitized);
     } catch (error) {
       console.error("Error fetching pending admins:", error);
@@ -2484,6 +2489,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Division signup error:", error);
       res.status(500).json({ error: "Registration failed", details: error.message });
+    }
+  });
+
+  // Request access to a division without an invite token
+  app.post("/api/divisions/:divisionId/request-access", async (req, res) => {
+    try {
+      const { divisionId } = req.params;
+      const { email, password, firstName, lastName } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const division = await storage.getDivision(divisionId);
+      if (!division) {
+        return res.status(404).json({ error: "Division not found" });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+      await storage.createUser({
+        email,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        isAdmin: "true",
+        role: "admin",
+        approved: "false",
+        divisionId,
+      });
+
+      // Notify division admins (approved admins with same divisionId)
+      const { sendEmail } = await import('./notifications');
+      const allAdmins = await storage.getApprovedAdmins();
+      const divisionAdmins = allAdmins.filter((a: any) => a.divisionId === divisionId);
+      const notifyList = divisionAdmins.length > 0
+        ? divisionAdmins
+        : allAdmins.filter((a: any) => !a.divisionId); // fall back to primary admins
+
+      for (const admin of notifyList) {
+        try {
+          await sendEmail({
+            to: admin.email,
+            subject: `New Access Request for ${division.companyName}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2>New Access Request</h2>
+                <p>A new user has requested access to <strong>${division.companyName}</strong>:</p>
+                <ul>
+                  <li><strong>Email:</strong> ${email}</li>
+                  <li><strong>Name:</strong> ${firstName || ''} ${lastName || ''}</li>
+                </ul>
+                <p>Log in to Ready TMS and go to <strong>Admin Approvals</strong> to approve or reject this request.</p>
+              </div>
+            `,
+          });
+        } catch (e) {
+          console.error("Failed to send access request notification:", e);
+        }
+      }
+
+      res.status(201).json({
+        message: "Access request submitted. An admin will review your request.",
+        pendingApproval: true,
+      });
+    } catch (error: any) {
+      console.error("Division request-access error:", error);
+      res.status(500).json({ error: "Request failed", details: error.message });
     }
   });
 
