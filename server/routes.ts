@@ -2325,51 +2325,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const { sendEmail } = await import('./notifications');
-      const appUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-        : 'https://readytms.com';
+      const host = req.headers.host || 'readytms.com';
+      const protocol = host.includes('localhost') ? 'http' : 'https';
+      const appUrl = `${protocol}://${host}`;
       const signupLink = `${appUrl}/division-signup/${token}`;
       
-      await sendEmail({
-        to: email,
-        subject: `You're invited to join ${division.companyName} on Ready TMS`,
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-              .button { display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
-              .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>You're Invited!</h1>
-              </div>
-              <div class="content">
-                <p>You've been invited to join <strong>${division.companyName}</strong> as a subdivision on Ready TMS.</p>
-                <p>Click the button below to create your account and get started:</p>
-                <div style="text-align: center;">
-                  <a href="${signupLink}" class="button">Accept Invitation & Sign Up</a>
+      let emailSent = false;
+      try {
+        emailSent = await sendEmail({
+          to: email,
+          subject: `You're invited to join ${division.companyName} on Ready TMS`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+                .button { display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+                .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>You're Invited!</h1>
                 </div>
-                <p style="color: #6b7280; font-size: 14px;">This invitation link will expire in 7 days.</p>
-                <p style="color: #6b7280; font-size: 14px;">If you can't click the button, copy this link: ${signupLink}</p>
+                <div class="content">
+                  <p>You've been invited to join <strong>${division.companyName}</strong> as a subdivision on Ready TMS.</p>
+                  <p>Click the button below to create your account and get started:</p>
+                  <div style="text-align: center;">
+                    <a href="${signupLink}" class="button">Accept Invitation & Sign Up</a>
+                  </div>
+                  <p style="color: #6b7280; font-size: 14px;">This invitation link will expire in 7 days.</p>
+                  <p style="color: #6b7280; font-size: 14px;">If you can't click the button, copy this link: ${signupLink}</p>
+                </div>
+                <div class="footer">
+                  <p>Ready TMS - Transportation Management System</p>
+                </div>
               </div>
-              <div class="footer">
-                <p>Ready TMS - Transportation Management System</p>
-              </div>
-            </div>
-          </body>
-          </html>
-        `,
-      });
+            </body>
+            </html>
+          `,
+        });
+      } catch (emailErr) {
+        console.error("Email sending failed for division invite:", emailErr);
+      }
 
-      res.status(201).json({ message: "Invitation sent successfully", invitation });
+      res.status(201).json({ message: "Invitation created", invitation, emailSent, signupLink });
     } catch (error: any) {
       console.error("Division invitation error:", error);
       res.status(500).json({ error: "Failed to send invitation", details: error.message });

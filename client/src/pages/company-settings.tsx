@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Save, Building2, Upload, Plus, Pencil, Trash2, Star, StarOff, Send } from "lucide-react";
+import { Save, Building2, Upload, Plus, Pencil, Trash2, Star, StarOff, Send, Copy, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -323,6 +323,9 @@ export default function CompanySettingsPage() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteDivision, setInviteDivision] = useState<Division | undefined>();
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteEmailSent, setInviteEmailSent] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const { data: settings, isLoading } = useQuery<CompanySettings>({
     queryKey: ["/api/company-settings"],
@@ -375,16 +378,18 @@ export default function CompanySettingsPage() {
 
   const inviteMutation = useMutation({
     mutationFn: async ({ divisionId, email }: { divisionId: string; email: string }) => {
-      return await apiRequest("POST", `/api/divisions/${divisionId}/invite`, { email });
+      const res = await apiRequest("POST", `/api/divisions/${divisionId}/invite`, { email });
+      return res as { emailSent: boolean; signupLink: string };
     },
-    onSuccess: () => {
-      toast({
-        title: "Invitation Sent",
-        description: `An invitation has been sent to ${inviteEmail}.`,
-      });
-      setInviteDialogOpen(false);
-      setInviteEmail("");
-      setInviteDivision(undefined);
+    onSuccess: (data) => {
+      setInviteEmailSent(data.emailSent);
+      setInviteLink(data.signupLink);
+      if (data.emailSent) {
+        toast({
+          title: "Invitation Sent",
+          description: `An invitation email has been sent to ${inviteEmail}.`,
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -789,6 +794,9 @@ export default function CompanySettingsPage() {
           if (!open) {
             setInviteDivision(undefined);
             setInviteEmail("");
+            setInviteLink(null);
+            setInviteEmailSent(false);
+            setLinkCopied(false);
           }
         }}
       >
@@ -799,43 +807,104 @@ export default function CompanySettingsPage() {
               Send an invitation email to join this division on Ready TMS.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email Address</label>
-              <Input
-                type="email"
-                placeholder="user@company.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                data-testid="input-invite-email"
-              />
+
+          {inviteLink ? (
+            <div className="space-y-4">
+              {inviteEmailSent ? (
+                <div className="flex items-start gap-3 rounded-md bg-green-50 dark:bg-green-950 p-3 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                  <p className="text-green-800 dark:text-green-300">
+                    Invitation email sent to <strong>{inviteEmail}</strong>.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 rounded-md bg-amber-50 dark:bg-amber-950 p-3 text-sm">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-amber-800 dark:text-amber-300">
+                    Email could not be delivered to <strong>{inviteEmail}</strong>. Share the invite link below manually (text, WhatsApp, etc.).
+                  </p>
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Invitation Link</label>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={inviteLink}
+                    className="text-xs font-mono"
+                    data-testid="text-invite-link"
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    data-testid="button-copy-invite-link"
+                    onClick={() => {
+                      navigator.clipboard.writeText(inviteLink);
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 2000);
+                    }}
+                  >
+                    {linkCopied ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">This link expires in 7 days.</p>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => {
+                    setInviteDialogOpen(false);
+                    setInviteDivision(undefined);
+                    setInviteEmail("");
+                    setInviteLink(null);
+                    setInviteEmailSent(false);
+                    setLinkCopied(false);
+                  }}
+                  data-testid="button-close-invite"
+                >
+                  Done
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setInviteDialogOpen(false);
-                  setInviteEmail("");
-                  setInviteDivision(undefined);
-                }}
-                data-testid="button-cancel-invite"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (inviteDivision && inviteEmail) {
-                    inviteMutation.mutate({ divisionId: inviteDivision.id, email: inviteEmail });
-                  }
-                }}
-                disabled={!inviteEmail || inviteMutation.isPending}
-                data-testid="button-send-invite"
-              >
-                <Send className="mr-2 h-4 w-4" />
-                {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
-              </Button>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email Address</label>
+                <Input
+                  type="email"
+                  placeholder="user@company.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  data-testid="input-invite-email"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setInviteDialogOpen(false);
+                    setInviteEmail("");
+                    setInviteDivision(undefined);
+                  }}
+                  data-testid="button-cancel-invite"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (inviteDivision && inviteEmail) {
+                      inviteMutation.mutate({ divisionId: inviteDivision.id, email: inviteEmail });
+                    }
+                  }}
+                  disabled={!inviteEmail || inviteMutation.isPending}
+                  data-testid="button-send-invite"
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 
