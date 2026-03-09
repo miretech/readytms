@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -31,6 +32,13 @@ import {
 } from "@/components/ui/navigation-menu";
 
 export default function Landing() {
+  const { data: divisions = [] } = useQuery<any[]>({
+    queryKey: ["/api/divisions"],
+    retry: false,
+  });
+
+  const nonPrimaryDivisions = divisions.filter((d) => !d.isPrimary);
+
   const allFeatures = [
     { icon: Package, title: "Load Management", description: "AI-powered load extraction with lifecycle tracking" },
     { icon: Truck, title: "Truck Management", description: "Fleet inventory with DOT inspection & cab card tracking" },
@@ -233,6 +241,48 @@ export default function Landing() {
             </div>
           </div>
         </section>
+
+        {nonPrimaryDivisions.length > 0 && (
+          <section className="py-16">
+            <div className="container mx-auto px-4 md:px-8">
+              <div className="text-center mb-10">
+                <h2 className="text-3xl font-bold mb-3">Company Portals</h2>
+                <p className="text-muted-foreground">
+                  Select your company to sign in or request access.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-6 justify-center">
+                {nonPrimaryDivisions.map((division) => (
+                  <Card key={division.id} className="p-8 text-center w-72 hover-elevate transition-all duration-200">
+                    <div className="flex justify-center mb-4">
+                      {division.logoUrl ? (
+                        <img
+                          src={division.logoUrl}
+                          alt={division.companyName}
+                          className="h-16 w-16 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Building2 className="h-8 w-8 text-primary" />
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="text-xl font-bold mb-1">{division.companyName}</h3>
+                    {division.address && (
+                      <p className="text-sm text-muted-foreground mb-4">{division.address}</p>
+                    )}
+                    <Link href={`/division-login/${division.id}`}>
+                      <Button className="w-full gap-2" data-testid={`button-division-login-${division.id}`}>
+                        Sign In
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="py-16 bg-muted/30">
           <div className="container mx-auto px-4 md:px-8">
