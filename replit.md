@@ -62,6 +62,7 @@ The system provides a comprehensive set of modules:
 - **Fuel Tracking & Management**: Fuel card account management with FleetOne (WEX) and Pilot Flying J integration, manual transaction entry, and expense tracking.
 - **Automation & Workflows**: Enterprise-grade automation engine for tasks like auto-invoice generation, expiring document alerts, and load status notifications.
 - **Company Settings**: Editable company branding system for professional document generation, including company name, address, contact, and logo.
+- **Multi-Company Platform**: ReadyTMS is the master platform entity controlling multiple companies. Ready Carrier (isPrimary=true) and North East Express (isPrimary=false) are both divisions/companies under ReadyTMS. Platform admins (no divisionId) see all data; division-specific admins are scoped to their company. Both companies appear as portals on the landing page. The ReadyTMS admin login (/login) is the platform-level access; division portals at /division-login/:id support both Sign In and Request Access tabs.
 
 ### System Design Choices
 - **Development Approach**: Schema-first design with data models defined for type consistency, followed by horizontal layer implementation.

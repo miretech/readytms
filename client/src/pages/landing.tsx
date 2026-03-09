@@ -38,6 +38,7 @@ export default function Landing() {
   });
 
   const nonPrimaryDivisions = divisions.filter((d) => !d.isPrimary);
+  const allCompanyDivisions = divisions; // All companies under ReadyTMS
 
   const allFeatures = [
     { icon: Package, title: "Load Management", description: "AI-powered load extraction with lifecycle tracking" },
@@ -110,7 +111,7 @@ export default function Landing() {
           </nav>
           <div className="flex items-center gap-2 flex-wrap">
             <ThemeToggle />
-            {nonPrimaryDivisions.map((division) => (
+            {allCompanyDivisions.map((division) => (
               <Link key={division.id} href={`/division-login/${division.id}`}>
                 <Button variant="outline" size="sm" className="gap-1.5" data-testid={`button-division-header-${division.id}`}>
                   <Building2 className="h-3.5 w-3.5" />
@@ -120,7 +121,7 @@ export default function Landing() {
             ))}
             <Link href="/login">
               <Button variant="outline" size="sm" data-testid="button-admin-login-header">
-                Admin
+                ReadyTMS Admin
               </Button>
             </Link>
             <Link href="/login?role=dispatch">
@@ -250,17 +251,21 @@ export default function Landing() {
           </div>
         </section>
 
-        {nonPrimaryDivisions.length > 0 && (
-          <section className="py-16">
+        {allCompanyDivisions.length > 0 && (
+          <section className="py-16 bg-muted/20">
             <div className="container mx-auto px-4 md:px-8">
               <div className="text-center mb-10">
+                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1 text-sm font-medium mb-4">
+                  <Truck className="h-3.5 w-3.5" />
+                  Powered by ReadyTMS
+                </div>
                 <h2 className="text-3xl font-bold mb-3">Company Portals</h2>
-                <p className="text-muted-foreground">
-                  Select your company to sign in or request access.
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  ReadyTMS manages multiple companies. Select yours to sign in or request access.
                 </p>
               </div>
               <div className="flex flex-wrap gap-6 justify-center">
-                {nonPrimaryDivisions.map((division) => (
+                {allCompanyDivisions.map((division) => (
                   <Card key={division.id} className="p-8 text-center w-72 hover-elevate transition-all duration-200">
                     <div className="flex justify-center mb-4">
                       {division.logoUrl ? (
@@ -288,6 +293,17 @@ export default function Landing() {
                   </Card>
                 ))}
               </div>
+              <div className="text-center mt-10 pt-8 border-t border-muted">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Platform administrator?
+                </p>
+                <Link href="/login">
+                  <Button variant="outline" className="gap-2" data-testid="button-platform-admin-login">
+                    <Shield className="h-4 w-4" />
+                    ReadyTMS Platform Login
+                  </Button>
+                </Link>
+              </div>
             </div>
           </section>
         )}
@@ -299,13 +315,13 @@ export default function Landing() {
                 <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto mb-4">
                   <Shield className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="text-2xl font-bold mb-3">For Administrators</h3>
+                <h3 className="text-2xl font-bold mb-3">ReadyTMS Platform</h3>
                 <p className="text-muted-foreground mb-6">
-                  Full system access including accounting, settlements, company settings, and user management.
+                  Master platform control — manage all companies, accounting, settlements, and system settings.
                 </p>
                 <Link href="/login">
                   <Button size="lg" className="gap-2 px-8" data-testid="button-admin-login-card">
-                    Admin Login
+                    Platform Login
                     <ArrowRight className="h-5 w-5" />
                   </Button>
                 </Link>
@@ -377,9 +393,16 @@ export default function Landing() {
               &copy; {new Date().getFullYear()} Ready TMS. All rights reserved.
             </p>
             <div className="flex gap-6 flex-wrap justify-center">
+              {allCompanyDivisions.map((d) => (
+                <Link key={d.id} href={`/division-login/${d.id}`}>
+                  <span className="text-sm text-muted-foreground hover:text-foreground cursor-pointer">
+                    {d.companyName}
+                  </span>
+                </Link>
+              ))}
               <Link href="/login">
                 <span className="text-sm text-muted-foreground hover:text-foreground cursor-pointer">
-                  Admin
+                  Platform Login
                 </span>
               </Link>
               <Link href="/login?role=dispatch">
