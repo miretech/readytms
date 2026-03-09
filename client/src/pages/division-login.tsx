@@ -71,7 +71,16 @@ export default function DivisionLogin() {
 
   const loginMutation = useMutation({
     mutationFn: async (values: LoginFormValues) => {
-      return await apiRequest("POST", "/api/admin/login", { ...values, expectedRole: "admin" });
+      const res = await fetch(`/api/divisions/${divisionId}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Sign in failed");
+      }
+      return res.json();
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });

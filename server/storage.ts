@@ -112,35 +112,35 @@ export interface IStorage {
   requestPasswordReset(email: string, userType: "admin" | "driver"): Promise<{ success: boolean; message?: string }>;
   resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message?: string }>;
   
-  getAllLoads(): Promise<Load[]>;
+  getAllLoads(companyId?: string): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
-  createLoad(load: InsertLoad): Promise<Load>;
+  createLoad(load: InsertLoad, companyId?: string): Promise<Load>;
   updateLoad(id: string, load: Partial<InsertLoad>): Promise<Load | undefined>;
   deleteLoad(id: string): Promise<boolean>;
   
-  getAllTrucks(): Promise<Truck[]>;
+  getAllTrucks(companyId?: string): Promise<Truck[]>;
   getTruck(id: string): Promise<Truck | undefined>;
-  createTruck(truck: InsertTruck): Promise<Truck>;
+  createTruck(truck: InsertTruck, companyId?: string): Promise<Truck>;
   updateTruck(id: string, truck: Partial<InsertTruck>): Promise<Truck | undefined>;
   deleteTruck(id: string): Promise<boolean>;
   
-  getAllTrailers(): Promise<Trailer[]>;
+  getAllTrailers(companyId?: string): Promise<Trailer[]>;
   getTrailer(id: string): Promise<Trailer | undefined>;
-  createTrailer(trailer: InsertTrailer): Promise<Trailer>;
+  createTrailer(trailer: InsertTrailer, companyId?: string): Promise<Trailer>;
   updateTrailer(id: string, trailer: Partial<InsertTrailer>): Promise<Trailer | undefined>;
   deleteTrailer(id: string): Promise<boolean>;
   
-  getAllDrivers(): Promise<Driver[]>;
+  getAllDrivers(companyId?: string): Promise<Driver[]>;
   getDriver(id: string): Promise<Driver | undefined>;
   getDriverByEmail(email: string): Promise<Driver | undefined>;
   getDriverByLicense(licenseNumber: string): Promise<Driver | undefined>;
-  createDriver(driver: InsertDriver): Promise<Driver>;
+  createDriver(driver: InsertDriver, companyId?: string): Promise<Driver>;
   updateDriver(id: string, driver: Partial<InsertDriver>): Promise<Driver | undefined>;
   deleteDriver(id: string): Promise<boolean>;
   
-  getAllCustomers(): Promise<Customer[]>;
+  getAllCustomers(companyId?: string): Promise<Customer[]>;
   getCustomer(id: string): Promise<Customer | undefined>;
-  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  createCustomer(customer: InsertCustomer, companyId?: string): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
   deleteCustomer(id: string): Promise<boolean>;
   
@@ -156,9 +156,9 @@ export interface IStorage {
   deleteExpense(id: string): Promise<boolean>;
   
   // Invoices
-  getAllInvoices(): Promise<Invoice[]>;
+  getAllInvoices(companyId?: string): Promise<Invoice[]>;
   getInvoice(id: string): Promise<Invoice | undefined>;
-  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  createInvoice(invoice: InsertInvoice, companyId?: string): Promise<Invoice>;
   updateInvoice(id: string, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
   deleteInvoice(id: string): Promise<boolean>;
   
@@ -196,7 +196,7 @@ export interface IStorage {
   deleteViolation(id: string): Promise<boolean>;
   
   // Settlements
-  getAllSettlements(): Promise<Settlement[]>;
+  getAllSettlements(companyId?: string): Promise<Settlement[]>;
   getSettlement(id: string): Promise<Settlement | undefined>;
   getSettlementsByDriver(driverId: string): Promise<Settlement[]>;
   createSettlement(settlement: InsertSettlement): Promise<Settlement>;
@@ -553,10 +553,10 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getAllLoads(): Promise<Load[]> {
+  async getAllLoads(companyId?: string): Promise<Load[]> {
     // Exclude large attachment fields to prevent exceeding response size limits
     // Attachments are fetched separately via getLoad(id)
-    const results = await db.select({
+    const baseQuery = db.select({
       id: loads.id,
       loadNumber: loads.loadNumber,
       customerId: loads.customerId,
@@ -577,7 +577,10 @@ export class DatabaseStorage implements IStorage {
       invoiceAttachment: sql`null`.as('invoice_attachment'),
       podAttachment: sql`null`.as('pod_attachment'),
       podAttachments: sql`null`.as('pod_attachments'),
-    }).from(loads).orderBy(desc(loads.createdAt));
+    }).from(loads);
+    const results = companyId
+      ? await baseQuery.where(sql`${loads}.company_id = ${companyId}`).orderBy(desc(loads.createdAt))
+      : await baseQuery.orderBy(desc(loads.createdAt));
     return results as Load[];
   }
 
@@ -586,7 +589,7 @@ export class DatabaseStorage implements IStorage {
     return load || undefined;
   }
 
-  async createLoad(insertLoad: InsertLoad): Promise<Load> {
+  async createLoad(insertLoad: InsertLoad, companyId?: string): Promise<Load> {
     const [load] = await db
       .insert(loads)
       .values({
@@ -595,6 +598,9 @@ export class DatabaseStorage implements IStorage {
         deliveryDate: new Date(insertLoad.deliveryDate),
       })
       .returning();
+    if (companyId) {
+      await db.execute(sql`UPDATE loads SET company_id = ${companyId} WHERE id = ${load.id}`);
+    }
     return load;
   }
 
@@ -628,10 +634,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllTrucks(): Promise<Truck[]> {
+  async getAllTrucks(companyId?: string): Promise<Truck[]> {
     // Exclude large attachment fields to prevent exceeding response size limits
     // Attachments are fetched separately via getTruck(id)
-    const results = await db.select({
+    const baseQuery = db.select({
       id: trucks.id,
       truckNumber: trucks.truckNumber,
       type: trucks.type,
@@ -653,6 +659,9 @@ export class DatabaseStorage implements IStorage {
       dotInspectionAttachments: sql`null`.as('dot_inspection_attachments'),
       repairReceiptAttachments: sql`null`.as('repair_receipt_attachments'),
     }).from(trucks);
+    const results = companyId
+      ? await baseQuery.where(sql`${trucks}.company_id = ${companyId}`)
+      : await baseQuery;
     return results as Truck[];
   }
 
@@ -661,11 +670,14 @@ export class DatabaseStorage implements IStorage {
     return truck || undefined;
   }
 
-  async createTruck(insertTruck: InsertTruck): Promise<Truck> {
+  async createTruck(insertTruck: InsertTruck, companyId?: string): Promise<Truck> {
     const [truck] = await db
       .insert(trucks)
       .values(insertTruck as any)
       .returning();
+    if (companyId) {
+      await db.execute(sql`UPDATE trucks SET company_id = ${companyId} WHERE id = ${truck.id}`);
+    }
     return truck;
   }
 
@@ -698,10 +710,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllTrailers(): Promise<Trailer[]> {
+  async getAllTrailers(companyId?: string): Promise<Trailer[]> {
     // Exclude large attachment fields to prevent exceeding response size limits
     // Attachments are fetched separately via getTrailer(id)
-    const results = await db.select({
+    const baseQuery = db.select({
       id: trailers.id,
       trailerNumber: trailers.trailerNumber,
       type: trailers.type,
@@ -725,6 +737,9 @@ export class DatabaseStorage implements IStorage {
       repairsAttachments: sql`null`.as('repairs_attachments'),
       pickupPictures: sql`null`.as('pickup_pictures'),
     }).from(trailers);
+    const results = companyId
+      ? await baseQuery.where(sql`${trailers}.company_id = ${companyId}`)
+      : await baseQuery;
     return results as Trailer[];
   }
 
@@ -733,11 +748,14 @@ export class DatabaseStorage implements IStorage {
     return trailer || undefined;
   }
 
-  async createTrailer(insertTrailer: InsertTrailer): Promise<Trailer> {
+  async createTrailer(insertTrailer: InsertTrailer, companyId?: string): Promise<Trailer> {
     const [trailer] = await db
       .insert(trailers)
       .values(insertTrailer as any)
       .returning();
+    if (companyId) {
+      await db.execute(sql`UPDATE trailers SET company_id = ${companyId} WHERE id = ${trailer.id}`);
+    }
     return trailer;
   }
 
@@ -771,10 +789,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllDrivers(): Promise<Driver[]> {
+  async getAllDrivers(companyId?: string): Promise<Driver[]> {
     // Exclude large attachment fields to prevent exceeding response size limits
     // Attachments are fetched separately via getDriver(id)
-    const results = await db.select({
+    const baseQuery = db.select({
       id: drivers.id,
       name: drivers.name,
       email: drivers.email,
@@ -803,6 +821,9 @@ export class DatabaseStorage implements IStorage {
       medicalCardAttachment: sql`null`.as('medical_card_attachment'),
       socialSecurityAttachment: sql`null`.as('social_security_attachment'),
     }).from(drivers);
+    const results = companyId
+      ? await baseQuery.where(sql`${drivers}.company_id = ${companyId}`)
+      : await baseQuery;
     return results as Driver[];
   }
 
@@ -821,7 +842,7 @@ export class DatabaseStorage implements IStorage {
     return driver || undefined;
   }
 
-  async createDriver(insertDriver: InsertDriver): Promise<Driver> {
+  async createDriver(insertDriver: InsertDriver, companyId?: string): Promise<Driver> {
     const values: any = { ...insertDriver };
     
     if (insertDriver.licenseExpiration && insertDriver.licenseExpiration.trim() !== "") {
@@ -858,6 +879,9 @@ export class DatabaseStorage implements IStorage {
       .insert(drivers)
       .values(values)
       .returning();
+    if (companyId) {
+      await db.execute(sql`UPDATE drivers SET company_id = ${companyId} WHERE id = ${driver.id}`);
+    }
     return driver;
   }
 
@@ -917,7 +941,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllCustomers(): Promise<Customer[]> {
+  async getAllCustomers(companyId?: string): Promise<Customer[]> {
+    if (companyId) {
+      return await db.select().from(customers).where(sql`${customers}.company_id = ${companyId}`);
+    }
     return await db.select().from(customers);
   }
 
@@ -926,11 +953,14 @@ export class DatabaseStorage implements IStorage {
     return customer || undefined;
   }
 
-  async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
+  async createCustomer(insertCustomer: InsertCustomer, companyId?: string): Promise<Customer> {
     const [customer] = await db
       .insert(customers)
       .values(insertCustomer)
       .returning();
+    if (companyId) {
+      await db.execute(sql`UPDATE customers SET company_id = ${companyId} WHERE id = ${customer.id}`);
+    }
     return customer;
   }
 
@@ -1004,7 +1034,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Invoices
-  async getAllInvoices(): Promise<Invoice[]> {
+  async getAllInvoices(companyId?: string): Promise<Invoice[]> {
+    if (companyId) {
+      return await db.select().from(invoices).where(sql`${invoices}.company_id = ${companyId}`).orderBy(desc(invoices.invoiceDate));
+    }
     return await db.select().from(invoices).orderBy(desc(invoices.invoiceDate));
   }
 
@@ -1013,7 +1046,7 @@ export class DatabaseStorage implements IStorage {
     return invoice || undefined;
   }
 
-  async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
+  async createInvoice(insertInvoice: InsertInvoice, companyId?: string): Promise<Invoice> {
     const [invoice] = await db
       .insert(invoices)
       .values({
@@ -1022,6 +1055,9 @@ export class DatabaseStorage implements IStorage {
         dueDate: new Date(insertInvoice.dueDate),
       })
       .returning();
+    if (companyId) {
+      await db.execute(sql`UPDATE invoices SET company_id = ${companyId} WHERE id = ${invoice.id}`);
+    }
     return invoice;
   }
 
@@ -1318,7 +1354,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Settlements
-  async getAllSettlements(): Promise<Settlement[]> {
+  async getAllSettlements(companyId?: string): Promise<Settlement[]> {
+    if (companyId) {
+      return await db.select().from(settlements).where(sql`${settlements}.company_id = ${companyId}`).orderBy(desc(settlements.periodEnd));
+    }
     return await db.select().from(settlements).orderBy(desc(settlements.periodEnd));
   }
 

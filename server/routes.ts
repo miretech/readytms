@@ -289,8 +289,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/loads", async (_req, res) => {
-    const loads = await storage.getAllLoads();
+  app.get("/api/loads", async (req: any, res) => {
+    const loads = await storage.getAllLoads(req.user?.divisionId || undefined);
     res.json(loads);
   });
 
@@ -302,10 +302,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(load);
   });
 
-  app.post("/api/loads", async (req, res) => {
+  app.post("/api/loads", async (req: any, res) => {
     try {
       const validatedData = insertLoadSchema.parse(req.body);
-      const load = await storage.createLoad(validatedData);
+      const load = await storage.createLoad(validatedData, req.user?.divisionId || undefined);
       res.status(201).json(load);
     } catch (error) {
       res.status(400).json({ error: "Invalid load data" });
@@ -471,8 +471,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/trucks", async (_req, res) => {
-    const trucks = await storage.getAllTrucks();
+  app.get("/api/trucks", async (req: any, res) => {
+    const trucks = await storage.getAllTrucks(req.user?.divisionId || undefined);
     res.json(trucks);
   });
 
@@ -484,10 +484,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(truck);
   });
 
-  app.post("/api/trucks", async (req, res) => {
+  app.post("/api/trucks", async (req: any, res) => {
     try {
       const validatedData = insertTruckSchema.parse(req.body);
-      const truck = await storage.createTruck(validatedData);
+      const truck = await storage.createTruck(validatedData, req.user?.divisionId || undefined);
       res.status(201).json(truck);
     } catch (error) {
       res.status(400).json({ error: "Invalid truck data" });
@@ -515,9 +515,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/trailers", async (_req, res) => {
+  app.get("/api/trailers", async (req: any, res) => {
     try {
-      const trailers = await storage.getAllTrailers();
+      const trailers = await storage.getAllTrailers(req.user?.divisionId || undefined);
       res.json(trailers);
     } catch (error) {
       console.error("Error fetching trailers:", error);
@@ -533,10 +533,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(trailer);
   });
 
-  app.post("/api/trailers", async (req, res) => {
+  app.post("/api/trailers", async (req: any, res) => {
     try {
       const validatedData = insertTrailerSchema.parse(req.body);
-      const trailer = await storage.createTrailer(validatedData);
+      const trailer = await storage.createTrailer(validatedData, req.user?.divisionId || undefined);
       res.status(201).json(trailer);
     } catch (error) {
       console.error("Trailer validation error:", error);
@@ -566,8 +566,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/drivers", async (_req, res) => {
-    const drivers = await storage.getAllDrivers();
+  app.get("/api/drivers", async (req: any, res) => {
+    const drivers = await storage.getAllDrivers(req.user?.divisionId || undefined);
     res.json(drivers);
   });
 
@@ -615,7 +615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/drivers", async (req, res) => {
+  app.post("/api/drivers", async (req: any, res) => {
     try {
       const validatedData = insertDriverSchema.parse(req.body);
       
@@ -624,7 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.password = await bcrypt.hash(validatedData.password, 12);
       }
       
-      const driver = await storage.createDriver(validatedData);
+      const driver = await storage.createDriver(validatedData, req.user?.divisionId || undefined);
       res.status(201).json(driver);
     } catch (error: any) {
       console.error("Driver validation error:", error);
@@ -660,8 +660,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
-  app.get("/api/customers", async (_req, res) => {
-    const customers = await storage.getAllCustomers();
+  app.get("/api/customers", async (req: any, res) => {
+    const customers = await storage.getAllCustomers(req.user?.divisionId || undefined);
     res.json(customers);
   });
 
@@ -673,10 +673,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(customer);
   });
 
-  app.post("/api/customers", async (req, res) => {
+  app.post("/api/customers", async (req: any, res) => {
     try {
       const validatedData = insertCustomerSchema.parse(req.body);
-      const customer = await storage.createCustomer(validatedData);
+      const customer = await storage.createCustomer(validatedData, req.user?.divisionId || undefined);
       res.status(201).json(customer);
     } catch (error) {
       res.status(400).json({ error: "Invalid customer data" });
@@ -785,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             contactPerson: null,
             mcNumber: null,
             notes: "Auto-created from AI extraction",
-          });
+          }, (req as any).user?.divisionId || undefined);
           customerId = newCustomer.id;
           console.log(`[AI Extract] Created new customer: ${newCustomer.name} (ID: ${newCustomer.id})`);
         }
@@ -882,8 +882,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoices Routes
-  app.get("/api/invoices", async (_req, res) => {
-    const invoices = await storage.getAllInvoices();
+  app.get("/api/invoices", async (req: any, res) => {
+    const invoices = await storage.getAllInvoices(req.user?.divisionId || undefined);
     res.json(invoices);
   });
 
@@ -895,10 +895,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(invoice);
   });
 
-  app.post("/api/invoices", async (req, res) => {
+  app.post("/api/invoices", async (req: any, res) => {
     try {
       const validatedData = insertInvoiceSchema.parse(req.body);
-      const invoice = await storage.createInvoice(validatedData);
+      const invoice = await storage.createInvoice(validatedData, req.user?.divisionId || undefined);
       res.status(201).json(invoice);
     } catch (error) {
       res.status(400).json({ error: "Invalid invoice data" });
@@ -1238,8 +1238,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Settlements Routes
-  app.get("/api/settlements", async (_req, res) => {
-    const settlements = await storage.getAllSettlements();
+  app.get("/api/settlements", async (req: any, res) => {
+    const settlements = await storage.getAllSettlements(req.user?.divisionId || undefined);
     res.json(settlements);
   });
 
@@ -2492,6 +2492,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Division-scoped login — only allows users belonging to this division
+  app.post("/api/divisions/:divisionId/login", async (req, res, next) => {
+    try {
+      const { divisionId } = req.params;
+      const { email, password } = req.body;
+
+      const division = await storage.getDivision(divisionId);
+      if (!division) {
+        return res.status(404).json({ error: "Division not found" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Validate password
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Enforce division scoping — user must belong to this division
+      if (user.divisionId !== divisionId) {
+        return res.status(403).json({ error: "You do not have access to this company portal" });
+      }
+
+      if (user.approved !== "true") {
+        return res.status(403).json({ error: "Your account is pending approval" });
+      }
+
+      // Log user in
+      req.login(user, (err) => {
+        if (err) return next(err);
+        const { password: _pw, ...safeUser } = user as any;
+        return res.json({ user: safeUser });
+      });
+    } catch (error: any) {
+      console.error("Division login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
   // Request access to a division without an invite token
   app.post("/api/divisions/:divisionId/request-access", async (req, res) => {
     try {
@@ -2528,14 +2571,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sendEmail } = await import('./notifications');
       const allAdmins = await storage.getApprovedAdmins();
       const divisionAdmins = allAdmins.filter((a: any) => a.divisionId === divisionId);
-      const notifyList = divisionAdmins.length > 0
-        ? divisionAdmins
-        : allAdmins.filter((a: any) => !a.divisionId); // fall back to primary admins
 
-      for (const admin of notifyList) {
+      // Build notification email list: division email first, then division admins, then platform admins as fallback
+      const notifyEmails = new Set<string>();
+      if (division.email) notifyEmails.add(division.email); // Always notify division contact email
+      if (divisionAdmins.length > 0) {
+        divisionAdmins.forEach((a: any) => notifyEmails.add(a.email));
+      } else {
+        // Fall back to platform admins if no division-specific admins exist
+        allAdmins.filter((a: any) => !a.divisionId).forEach((a: any) => notifyEmails.add(a.email));
+      }
+
+      for (const notifyEmail of notifyEmails) {
         try {
           await sendEmail({
-            to: admin.email,
+            to: notifyEmail,
             subject: `New Access Request for ${division.companyName}`,
             html: `
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
