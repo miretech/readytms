@@ -1,0 +1,299 @@
+PROJECT GOAL:
+Refactor the existing ReadyTMS application so it supports multiple separate companies (multi-tenant architecture) without breaking the current Ready Carrier setup.
+
+BUSINESSES TO SUPPORT:
+1. Ready Carrier = existing trucking/dispatch company
+2. North East Express = second separate trucking company with its own users, approvals, and branding
+3. ReadyTMS = the software platform itself, which should become a standalone SaaS product that can later be sold to outside companies
+
+IMPORTANT RULES:
+- Do NOT rebuild the whole app from scratch
+- Do NOT break current Ready Carrier functionality
+- Do NOT duplicate the whole codebase into multiple apps
+- Make changes in safe phases
+- Keep backward compatibility where possible
+- Before each major change, explain what files/tables will be changed
+- After each phase, run tests and summarize what still works and what needs attention
+
+OVERALL ARCHITECTURE TARGET:
+- One shared platform/app
+- Multiple separate company workspaces
+- Each company only sees its own data
+- Each company has its own branding, users, approval workflow, and settings
+- ReadyTMS becomes the parent platform
+- Ready Carrier and North East Express become tenants/accounts inside the platform
+
+PHASE 0 — ANALYZE CURRENT APP FIRST
+Step 0.1:
+Scan the existing codebase and identify:
+- current framework and stack
+- authentication method
+- database schema
+- all places where “Ready Carrier” is hardcoded
+- all major business entities (users, drivers, loads, approvals, invoices, documents, settings, etc.)
+- all routes/pages/components that assume only one company exists
+
+Step 0.2:
+Create a short audit report before changing code:
+- list of files with hardcoded branding
+- list of database tables that need company separation
+- list of risky areas
+- migration strategy proposal
+
+Do not start refactoring until this audit is shown.
+
+PHASE 1 — MAKE BRANDING DYNAMIC
+Goal:
+Remove hardcoded Ready Carrier identity and replace it with company-based branding settings.
+
+Step 1.1:
+Create a new database table called companies with fields similar to:
+- id
+- legal_name
+- display_name
+- slug
+- logo_url
+- primary_color
+- support_email
+- support_phone
+- website
+- approval_workflow_type
+- is_active
+- created_at
+- updated_at
+
+Step 1.2:
+Create a default company record for the current business:
+- Ready Carrier
+
+Step 1.3:
+Find all places in the app where these are hardcoded and refactor them to read from company settings:
+- company name
+- logo
+- email
+- phone
+- colors
+- page titles
+- dashboard labels
+- onboarding text
+- approval text
+- contract/company references
+
+Step 1.4:
+Keep the current UI looking the same for Ready Carrier after this change.
+
+Step 1.5:
+Show a summary of all places changed.
+
+PHASE 2 — ADD COMPANY RELATIONSHIPS TO DATA
+Goal:
+Attach users and business records to a company so data can be separated safely.
+
+Step 2.1:
+Review all core tables and identify which ones must receive a company_id field.
+Likely tables include:
+- users
+- drivers
+- owner_operators
+- carriers
+- loads
+- dispatches
+- invoices
+- documents
+- approvals
+- notifications
+- settings
+- tasks
+- contracts
+- messages
+- anything operationally tied to a company
+
+Step 2.2:
+Add company_id to the appropriate tables.
+
+Step 2.3:
+Backfill existing Ready Carrier data so all current records are assigned to the Ready Carrier company.
+
+Step 2.4:
+Update backend queries so records are filtered by company_id.
+
+Step 2.5:
+Update frontend pages so logged-in users only see records from their own company.
+
+Step 2.6:
+Do not change business logic yet beyond safe data isolation.
+
+Step 2.7:
+After this phase, verify:
+- existing Ready Carrier users still can log in
+- existing Ready Carrier data is still visible
+- users cannot access another company’s data
+
+PHASE 3 — ATTACH USERS TO COMPANY AND ROLES
+Goal:
+Each user belongs to a company and only works inside that company.
+
+Step 3.1:
+Update the users table so each user belongs to one company at minimum.
+If the current schema supports multiple companies per user, explain whether that is needed now. Prefer simple one-company-per-user unless there is a strong reason not to.
+
+Step 3.2:
+Review role system and support roles such as:
+- platform_admin
+- company_admin
+- dispatcher
+- safety
+- accounting
+- driver or contractor portal user if applicable
+
+Step 3.3:
+Make sure permissions are enforced inside company boundaries.
+
+Step 3.4:
+Platform admins can manage all companies.
+Company admins can manage only their company.
+Regular users can access only allowed sections within their company.
+
+PHASE 4 — CREATE NORTH EAST EXPRESS AS SECOND TENANT
+Goal:
+Add North East Express as a fully separate company using the same shared app.
+
+Step 4.1:
+Create a second company record:
+- North East Express
+
+Step 4.2:
+Add branding/settings for North East Express:
+- name
+- logo placeholder
+- support email placeholder
+- phone placeholder
+- approval workflow type
+- default onboarding text
+
+Step 4.3:
+Create a test admin user for North East Express.
+
+Step 4.4:
+Verify that when logged in as North East Express:
+- only North East Express data is visible
+- branding shows North East Express identity
+- Ready Carrier data is hidden
+- approvals are scoped only to North East Express
+
+PHASE 5 — SEPARATE APPROVAL WORKFLOWS
+Goal:
+North East Express must have its own approval flow, independent from Ready Carrier.
+
+Step 5.1:
+Audit the current approval logic and identify all assumptions that only one company exists.
+
+Step 5.2:
+Move approval rules into company settings or workflow configuration.
+Examples:
+- required documents
+- approval stages
+- status names
+- required checks
+- notification triggers
+- email templates
+- onboarding requirements
+
+Step 5.3:
+Make workflow selection company-specific.
+Example:
+- Ready Carrier may use workflow A
+- North East Express may use workflow B
+
+Step 5.4:
+Do not over-engineer. Use a practical configuration-based approach unless a rules engine is already present.
+
+PHASE 6 — REBRAND CORE PLATFORM AS READYTMS
+Goal:
+The app itself should no longer look like it is only for Ready Carrier.
+
+Step 6.1:
+Change shared/global product identity from Ready Carrier to ReadyTMS in platform-level places:
+- app name
+- login page title
+- admin/system labels
+- SaaS references
+- metadata where appropriate
+
+Step 6.2:
+Keep tenant/company branding separate from platform branding.
+Meaning:
+- platform name = ReadyTMS
+- tenant name shown inside workspace = Ready Carrier or North East Express
+
+Step 6.3:
+If appropriate, separate:
+- marketing/public site branding
+- application branding
+
+PHASE 7 — DOMAIN AND LOGIN STRUCTURE
+Goal:
+Prepare for clean company access without making the app too complex right now.
+
+Step 7.1:
+Recommend the safest login structure with minimal code change.
+Preferred initial structure:
+- one app login at app.readytms.com
+
+Step 7.2:
+After login, determine user company and load the correct workspace branding.
+
+Step 7.3:
+If subdomain-based tenant routing is possible later, note it as a future enhancement:
+- readycarrier.readytms.com
+- northeastexpress.readytms.com
+
+But do not implement this yet unless the current architecture already supports it cleanly.
+
+PHASE 8 — SAFE MIGRATION AND TESTING
+Goal:
+Avoid mistakes and protect current production behavior.
+
+Step 8.1:
+Before database migrations, create backup instructions or snapshots.
+
+Step 8.2:
+Implement migrations safely and explain rollback steps.
+
+Step 8.3:
+After each phase, test at least:
+- login
+- dashboard loading
+- core CRUD operations
+- approval flow
+- data visibility restrictions
+- branding display
+
+Step 8.4:
+At the end, provide a final checklist of what was completed and what still remains for production readiness.
+
+DELIVERABLE FORMAT I WANT FROM YOU:
+For each phase:
+1. Explain what you will change
+2. Show the files/schema involved
+3. Make the change
+4. Summarize what was done
+5. List any risks or follow-up items
+
+IMPORTANT IMPLEMENTATION NOTES:
+- Prefer incremental refactoring over massive rewrites
+- Prefer configuration-driven branding/workflows
+- Keep current Ready Carrier functionality intact during transition
+- Use company_id as the main tenant boundary unless the existing architecture strongly suggests another safe approach
+- Flag any place where cross-company data leakage could happen
+- If any part of the current design is incompatible with multi-tenancy, explain clearly before changing it
+
+FIRST ACTION:
+Do Phase 0 only.
+Do not start coding the full refactor immediately.
+First audit the current system and present:
+- the current architecture
+- hardcoded Ready Carrier dependencies
+- tables/models needing company_id
+- proposed migration sequence
+- main risks
