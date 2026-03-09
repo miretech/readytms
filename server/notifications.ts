@@ -92,14 +92,15 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       }));
     }
 
+    console.log('[Notifications] Sending email from:', emailPayload.from, 'to:', emailPayload.to);
     const { data, error } = await resend.emails.send(emailPayload);
 
     if (error) {
-      console.error('[Notifications] Email send error:', error);
+      console.error('[Notifications] Email send error:', JSON.stringify(error));
       return false;
     }
 
-    console.log('[Notifications] Email sent successfully:', data?.id);
+    console.log('[Notifications] Email sent successfully. ID:', data?.id, '| To:', emailPayload.to);
     return true;
   } catch (error) {
     console.error('[Notifications] Email send exception:', error);
