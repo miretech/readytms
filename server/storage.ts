@@ -474,7 +474,7 @@ export class DatabaseStorage implements IStorage {
       console.log(`[Password Reset] Reset URL: ${resetUrl}`);
       
       const emailResult = await resend.emails.send({
-        from: 'Ready TMS <noreply@resend.dev>',
+        from: 'Ready TMS <noreply@readytms.com>',
         to: email,
         subject: 'Password Reset Request - Ready TMS',
         html: `
