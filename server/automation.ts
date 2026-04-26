@@ -229,6 +229,11 @@ export async function notifyLoadStatusChange(load: Load, oldStatus: string, newS
   }
 }
 
+// Parse a comma-separated email string into an array of trimmed, non-empty emails
+function parseEmails(raw: string): string[] {
+  return raw.split(",").map((e) => e.trim()).filter(Boolean);
+}
+
 // Send an immediate reminder email for a single task (used on create/update)
 export async function sendSingleTaskReminder(task: { title: string; dueDate: Date | string | null; dueTime?: string | null; priority: string; category?: string | null; assignedTo?: string | null; reminderEmail: string }) {
   try {
@@ -256,16 +261,20 @@ export async function sendSingleTaskReminder(task: { title: string; dueDate: Dat
         </div>
       </div>`;
 
-    const sent = await sendEmail({
-      to: task.reminderEmail,
-      subject: `[Ready TMS] Task Reminder: ${task.title}`,
-      html,
-    });
-
-    if (sent) {
-      console.log(`[Automation] Sent immediate task reminder to ${task.reminderEmail} for task "${task.title}"`);
+    const emails = parseEmails(task.reminderEmail);
+    let anySuccess = false;
+    for (const email of emails) {
+      const sent = await sendEmail({
+        to: email,
+        subject: `[Ready TMS] Task Reminder: ${task.title}`,
+        html,
+      });
+      if (sent) {
+        console.log(`[Automation] Sent immediate task reminder to ${email} for task "${task.title}"`);
+        anySuccess = true;
+      }
     }
-    return sent;
+    return anySuccess;
   } catch (error) {
     console.error("[Automation] Error sending single task reminder:", error);
     return false;
@@ -290,12 +299,15 @@ export async function sendDailyTaskReminders() {
       return;
     }
 
-    // Group tasks by reminder email
+    // Build a map: email → tasks that should be sent to that address
+    // Each task may have multiple comma-separated emails
     const byEmail: Record<string, typeof dailyTasks> = {};
     for (const task of dailyTasks) {
-      const email = task.reminderEmail!;
-      if (!byEmail[email]) byEmail[email] = [];
-      byEmail[email].push(task);
+      const emails = parseEmails(task.reminderEmail!);
+      for (const email of emails) {
+        if (!byEmail[email]) byEmail[email] = [];
+        byEmail[email].push(task);
+      }
     }
 
     for (const [email, tasks] of Object.entries(byEmail)) {

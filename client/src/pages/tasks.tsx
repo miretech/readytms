@@ -62,10 +62,14 @@ interface Attachment {
 const formSchema = insertTaskSchema.extend({
   title: z.string().min(1, "Title is required"),
   dueDate: z.string().min(1, "Due date is required"),
-  reminderEmail: z.string().email("Must be a valid email").or(z.literal("")).optional(),
+  reminderEmail: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
 
 export default function Tasks() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,6 +81,11 @@ export default function Tasks() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Multi-email state
+  const [reminderEmails, setReminderEmails] = useState<string[]>([]);
+  const [emailInput, setEmailInput] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
@@ -100,9 +109,37 @@ export default function Tasks() {
     },
   });
 
+  const handleAddEmail = () => {
+    const trimmed = emailInput.trim();
+    if (!trimmed) return;
+    if (!isValidEmail(trimmed)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+    if (reminderEmails.includes(trimmed)) {
+      setEmailError("This email has already been added");
+      return;
+    }
+    setReminderEmails((prev) => [...prev, trimmed]);
+    setEmailInput("");
+    setEmailError("");
+  };
+
+  const handleEmailKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddEmail();
+    }
+  };
+
+  const handleRemoveEmail = (email: string) => {
+    setReminderEmails((prev) => prev.filter((e) => e !== email));
+  };
+
   const createMutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      const payload = { ...values, attachments };
+      const reminderEmail = reminderEmails.join(", ");
+      const payload = { ...values, reminderEmail, attachments };
       if (editingTask) {
         return await apiRequest("PATCH", `/api/tasks/${editingTask.id}`, payload);
       }
@@ -117,6 +154,9 @@ export default function Tasks() {
       setIsDialogOpen(false);
       setEditingTask(null);
       setAttachments([]);
+      setReminderEmails([]);
+      setEmailInput("");
+      setEmailError("");
       form.reset();
     },
     onError: () => {
@@ -177,13 +217,20 @@ export default function Tasks() {
     setEditingTask(task);
     const existingAttachments = (task.attachments as Attachment[] | null) || [];
     setAttachments(existingAttachments);
+    // Parse stored comma-separated emails
+    const storedEmails = task.reminderEmail
+      ? task.reminderEmail.split(",").map((e) => e.trim()).filter(Boolean)
+      : [];
+    setReminderEmails(storedEmails);
+    setEmailInput("");
+    setEmailError("");
     form.reset({
       title: task.title,
       description: task.description || "",
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "",
       dueTime: task.dueTime || "",
       repeatDaily: task.repeatDaily || "false",
-      reminderEmail: task.reminderEmail || "",
+      reminderEmail: "",
       assignedTo: task.assignedTo || "",
       status: task.status,
       priority: task.priority,
@@ -204,6 +251,9 @@ export default function Tasks() {
     setIsDialogOpen(false);
     setEditingTask(null);
     setAttachments([]);
+    setReminderEmails([]);
+    setEmailInput("");
+    setEmailError("");
     form.reset();
   };
 
@@ -281,6 +331,9 @@ export default function Tasks() {
     if (task.dueDate && isToday(new Date(task.dueDate))) return "Due Today";
     return "Pending";
   };
+
+  const parseEmails = (raw: string | null | undefined): string[] =>
+    raw ? raw.split(",").map((e) => e.trim()).filter(Boolean) : [];
 
   if (isLoading) {
     return (
@@ -494,12 +547,19 @@ export default function Tasks() {
                   </div>
                 )}
                 {viewingTask.repeatDaily === "true" && viewingTask.reminderEmail && (
-                  <div className="space-y-1 col-span-2">
+                  <div className="space-y-2 col-span-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                       <Mail className="h-3 w-3" />
-                      Daily Reminder Email
+                      Daily Reminder Emails
                     </p>
-                    <p className="text-sm font-medium">{viewingTask.reminderEmail}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {parseEmails(viewingTask.reminderEmail).map((email) => (
+                        <Badge key={email} variant="secondary" className="text-xs">
+                          <Mail className="mr-1 h-3 w-3" />
+                          {email}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -727,30 +787,68 @@ export default function Tasks() {
                 )}
               />
 
+              {/* Multi-email section — only shown when repeatDaily is checked */}
               {form.watch("repeatDaily") === "true" && (
-                <FormField
-                  control={form.control}
-                  name="reminderEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                        Daily Reminder Email (Optional)
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value || ""}
-                          type="email"
-                          placeholder="email@example.com"
-                          data-testid="input-task-reminder-email"
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">A daily reminder email will be sent to this address each morning.</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium flex items-center gap-1.5 mb-1.5">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                      Daily Reminder Emails (Optional)
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      A morning reminder will be sent to all addresses below each day.
+                    </p>
+
+                    {/* Existing email tags */}
+                    {reminderEmails.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {reminderEmails.map((email) => (
+                          <div
+                            key={email}
+                            className="flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1 text-sm"
+                            data-testid={`email-tag-${email}`}
+                          >
+                            <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <span className="font-medium">{email}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEmail(email)}
+                              className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                              data-testid={`button-remove-email-${email}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add new email input */}
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="Add email address..."
+                        value={emailInput}
+                        onChange={(e) => { setEmailInput(e.target.value); setEmailError(""); }}
+                        onKeyDown={handleEmailKeyDown}
+                        className={emailError ? "border-destructive" : ""}
+                        data-testid="input-task-reminder-email"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAddEmail}
+                        data-testid="button-add-reminder-email"
+                      >
+                        <Plus className="mr-1 h-4 w-4" />
+                        Add
+                      </Button>
+                    </div>
+                    {emailError && (
+                      <p className="text-xs text-destructive mt-1">{emailError}</p>
+                    )}
+                  </div>
+                </div>
               )}
 
               {/* Attachments Section */}
