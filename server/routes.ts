@@ -2741,7 +2741,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid feedback data", details: parsed.error });
       }
-      const feedback = await storage.createFeedback(parsed.data as any);
+      const { personName, note, attachmentFileName, attachmentFileData } = parsed.data;
+      const feedback = await storage.createFeedback({
+        personName,
+        note,
+        attachmentFileName: attachmentFileName ?? null,
+        attachmentFileData: attachmentFileData ?? null,
+      });
       res.status(201).json(feedback);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create feedback" });
