@@ -851,6 +851,7 @@ export const tasks = pgTable("tasks", {
   dueDate: timestamp("due_date").notNull(),
   dueTime: text("due_time"), // HH:MM format like "09:00"
   repeatDaily: text("repeat_daily").notNull().default("false"), // "true" or "false"
+  reminderEmail: text("reminder_email"), // Email address to send daily reminders to
   assignedTo: text("assigned_to"), // Person/department responsible
   status: text("status").notNull().default("pending"), // "pending", "completed", "overdue"
   priority: text("priority").notNull().default("medium"), // "low", "medium", "high"

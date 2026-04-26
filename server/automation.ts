@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import type { Load, Driver } from "@shared/schema";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, format } from "date-fns";
+import { sendEmail } from "./notifications";
 
 /**
  * Automation Engine for Ready TMS
@@ -225,6 +226,88 @@ export async function notifyLoadStatusChange(load: Load, oldStatus: string, newS
     });
   } catch (error) {
     console.error("Error notifying load status change:", error);
+  }
+}
+
+// Send daily email reminders for tasks with repeatDaily = "true" and a reminderEmail set
+export async function sendDailyTaskReminders() {
+  try {
+    const allTasks = await storage.getAllTasks();
+    const today = new Date();
+
+    const dailyTasks = allTasks.filter(
+      (t) =>
+        t.repeatDaily === "true" &&
+        t.reminderEmail &&
+        t.status !== "completed"
+    );
+
+    if (dailyTasks.length === 0) {
+      console.log("[Automation] No daily task reminders to send today");
+      return;
+    }
+
+    // Group tasks by reminder email
+    const byEmail: Record<string, typeof dailyTasks> = {};
+    for (const task of dailyTasks) {
+      const email = task.reminderEmail!;
+      if (!byEmail[email]) byEmail[email] = [];
+      byEmail[email].push(task);
+    }
+
+    for (const [email, tasks] of Object.entries(byEmail)) {
+      const taskRows = tasks
+        .map((t) => {
+          const due = t.dueDate ? format(new Date(t.dueDate), "MMM d, yyyy") : "—";
+          const priority = t.priority.charAt(0).toUpperCase() + t.priority.slice(1);
+          const category = t.category ? ` [${t.category}]` : "";
+          return `
+            <tr>
+              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${t.title}${category}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${due}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${priority}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${t.assignedTo || "—"}</td>
+            </tr>`;
+        })
+        .join("");
+
+      const html = `
+        <div style="font-family:sans-serif;max-width:640px;margin:0 auto;">
+          <div style="background:#1d4ed8;padding:24px 32px;border-radius:8px 8px 0 0;">
+            <h1 style="color:#fff;margin:0;font-size:22px;">Daily Task Reminder</h1>
+            <p style="color:#bfdbfe;margin:4px 0 0;">${format(today, "EEEE, MMMM d, yyyy")}</p>
+          </div>
+          <div style="background:#f9fafb;padding:24px 32px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
+            <p style="color:#374151;margin:0 0 16px;">You have <strong>${tasks.length} recurring task${tasks.length !== 1 ? "s" : ""}</strong> scheduled as daily reminders:</p>
+            <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+              <thead>
+                <tr style="background:#f3f4f6;">
+                  <th style="padding:10px 12px;text-align:left;font-size:13px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Task</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:13px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Due Date</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:13px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Priority</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:13px;color:#6b7280;border-bottom:1px solid #e5e7eb;">Assigned To</th>
+                </tr>
+              </thead>
+              <tbody>${taskRows}</tbody>
+            </table>
+            <p style="color:#6b7280;font-size:13px;margin:20px 0 0;">Log in to Ready TMS to update or complete these tasks.</p>
+          </div>
+        </div>`;
+
+      const sent = await sendEmail({
+        to: email,
+        subject: `[Ready TMS] Daily Task Reminder – ${tasks.length} task${tasks.length !== 1 ? "s" : ""} (${format(today, "MMM d")})`,
+        html,
+      });
+
+      if (sent) {
+        console.log(`[Automation] Sent daily task reminder to ${email} (${tasks.length} tasks)`);
+      } else {
+        console.error(`[Automation] Failed to send daily task reminder to ${email}`);
+      }
+    }
+  } catch (error) {
+    console.error("[Automation] Error sending daily task reminders:", error);
   }
 }
 

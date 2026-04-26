@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { initializeAutomationSettings } from "./automation";
+import { initializeAutomationSettings, sendDailyTaskReminders } from "./automation";
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -40,6 +40,18 @@ app.use((req, res, next) => {
 (async () => {
   // Initialize automation settings
   await initializeAutomationSettings();
+
+  // Schedule daily task reminders — runs at 8 AM every day
+  let lastReminderDate = "";
+  setInterval(async () => {
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0];
+    const hour = now.getHours();
+    if (hour >= 8 && lastReminderDate !== dateStr) {
+      lastReminderDate = dateStr;
+      await sendDailyTaskReminders();
+    }
+  }, 60 * 60 * 1000); // check every hour
   
   const server = await registerRoutes(app);
 

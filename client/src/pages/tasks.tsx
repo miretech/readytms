@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, CheckCircle2, Clock, AlertCircle, Paperclip, X, Download, Upload, Eye } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, CheckCircle2, Clock, AlertCircle, Paperclip, X, Download, Upload, Eye, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -62,6 +62,7 @@ interface Attachment {
 const formSchema = insertTaskSchema.extend({
   title: z.string().min(1, "Title is required"),
   dueDate: z.string().min(1, "Due date is required"),
+  reminderEmail: z.string().email("Must be a valid email").or(z.literal("")).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -89,6 +90,7 @@ export default function Tasks() {
       dueDate: "",
       dueTime: "",
       repeatDaily: "false",
+      reminderEmail: "",
       assignedTo: "",
       status: "pending",
       priority: "medium",
@@ -181,6 +183,7 @@ export default function Tasks() {
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "",
       dueTime: task.dueTime || "",
       repeatDaily: task.repeatDaily || "false",
+      reminderEmail: task.reminderEmail || "",
       assignedTo: task.assignedTo || "",
       status: task.status,
       priority: task.priority,
@@ -490,6 +493,15 @@ export default function Tasks() {
                     <p className="text-sm font-medium capitalize">{viewingTask.category}</p>
                   </div>
                 )}
+                {viewingTask.repeatDaily === "true" && viewingTask.reminderEmail && (
+                  <div className="space-y-1 col-span-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      Daily Reminder Email
+                    </p>
+                    <p className="text-sm font-medium">{viewingTask.reminderEmail}</p>
+                  </div>
+                )}
               </div>
 
               {/* Description */}
@@ -714,6 +726,32 @@ export default function Tasks() {
                   </FormItem>
                 )}
               />
+
+              {form.watch("repeatDaily") === "true" && (
+                <FormField
+                  control={form.control}
+                  name="reminderEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                        Daily Reminder Email (Optional)
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          type="email"
+                          placeholder="email@example.com"
+                          data-testid="input-task-reminder-email"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">A daily reminder email will be sent to this address each morning.</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Attachments Section */}
               <div className="space-y-3">
