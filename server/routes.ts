@@ -20,7 +20,8 @@ import {
   insertFuelTransactionSchema,
   insertGpsLocationSchema,
   insertShortPaySchema,
-  insertChargeBackSchema
+  insertChargeBackSchema,
+  insertFeedbackSchema
 } from "@shared/schema";
 import { setupAuth, isAuthenticated, isAdmin, isDriver } from "./auth";
 import passport from "passport";
@@ -2685,6 +2686,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(sanitized);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch pending users" });
+    }
+  });
+
+  // Feedback routes
+  app.get("/api/feedbacks", isAuthenticated, async (req, res) => {
+    try {
+      const allFeedbacks = await storage.getAllFeedbacks();
+      res.json(allFeedbacks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch feedbacks" });
+    }
+  });
+
+  app.post("/api/feedbacks", isAuthenticated, async (req, res) => {
+    try {
+      const parsed = insertFeedbackSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid feedback data", details: parsed.error });
+      }
+      const feedback = await storage.createFeedback(parsed.data);
+      res.status(201).json(feedback);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create feedback" });
     }
   });
 

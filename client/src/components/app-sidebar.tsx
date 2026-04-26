@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   CheckSquare,
   Settings,
-  UserCheck
+  UserCheck,
+  MessageSquare
 } from "lucide-react";
 import {
   Sidebar,
@@ -132,6 +133,12 @@ const menuItems = [
     url: "/recurring-expenses",
     icon: Calendar,
     access: "admin",
+  },
+  {
+    title: "Feedback",
+    url: "/feedback",
+    icon: MessageSquare,
+    access: "all",
   },
   {
     title: "Tasks",

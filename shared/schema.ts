@@ -957,3 +957,21 @@ export const insertDivisionInvitationSchema = createInsertSchema(divisionInvitat
 
 export type InsertDivisionInvitation = z.infer<typeof insertDivisionInvitationSchema>;
 export type DivisionInvitation = typeof divisionInvitations.$inferSelect;
+
+// Feedback table — anyone can submit a name, note, and optional attachment
+export const feedbacks = pgTable("feedbacks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  personName: text("person_name").notNull(),
+  note: text("note").notNull(),
+  attachmentFileName: text("attachment_file_name"),
+  attachmentFileData: text("attachment_file_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+export type Feedback = typeof feedbacks.$inferSelect;

@@ -30,6 +30,7 @@ import DriverSignup from "@/pages/driver-signup";
 import ShortPays from "@/pages/short-pays";
 import ChargeBacks from "@/pages/charge-backs";
 import Tasks from "@/pages/tasks";
+import Feedback from "@/pages/feedback";
 import CompanySettings from "@/pages/company-settings";
 import AdminApprovals from "@/pages/admin-approvals";
 import Login from "@/pages/login";
@@ -127,6 +128,7 @@ function Router() {
       <Route path="/settlements">{() => <ProtectedRoute component={Settlements} />}</Route>
       <Route path="/recurring-expenses">{() => <ProtectedRoute component={RecurringExpenses} />}</Route>
       <Route path="/tasks">{() => <ProtectedRoute component={Tasks} />}</Route>
+      <Route path="/feedback">{() => <ProtectedRoute component={Feedback} />}</Route>
       <Route path="/company-settings">{() => <ProtectedRoute component={CompanySettings} />}</Route>
       <Route path="/admin/approvals">{() => <ProtectedRoute component={AdminApprovals} />}</Route>
       <Route component={NotFound} />

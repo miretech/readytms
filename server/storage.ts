@@ -60,6 +60,8 @@ import {
   type PasswordResetToken,
   type TrailerTruckAssignment,
   type InsertTrailerTruckAssignment,
+  type Feedback,
+  type InsertFeedback,
   users,
   loads,
   trucks,
@@ -90,7 +92,8 @@ import {
   companySettings,
   divisions,
   divisionInvitations,
-  passwordResetTokens
+  passwordResetTokens,
+  feedbacks,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
@@ -320,6 +323,10 @@ export interface IStorage {
   updateDivisionInvitation(id: string, data: Partial<InsertDivisionInvitation>): Promise<DivisionInvitation | undefined>;
   getDivisionInvitations(divisionId: string): Promise<DivisionInvitation[]>;
   getPendingUsersByDivision(divisionId: string): Promise<User[]>;
+
+  // Feedback
+  getAllFeedbacks(): Promise<Feedback[]>;
+  createFeedback(feedback: InsertFeedback): Promise<Feedback>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2062,6 +2069,15 @@ export class DatabaseStorage implements IStorage {
 
   async getPendingUsersByDivision(divisionId: string): Promise<User[]> {
     return await db.select().from(users).where(and(eq(users.divisionId, divisionId), eq(users.approved, "false")));
+  }
+
+  async getAllFeedbacks(): Promise<Feedback[]> {
+    return await db.select().from(feedbacks).orderBy(desc(feedbacks.createdAt));
+  }
+
+  async createFeedback(feedback: InsertFeedback): Promise<Feedback> {
+    const [created] = await db.insert(feedbacks).values(feedback).returning();
+    return created;
   }
 }
 
