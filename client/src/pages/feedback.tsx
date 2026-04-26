@@ -76,10 +76,25 @@ export default function FeedbackPage() {
     submitMutation.mutate();
   };
 
+  const ALLOWED_MIME = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/gif",
+    "application/pdf",
+  ];
+
+  const isSafeDataUri = (uri: string): boolean => {
+    const match = uri.match(/^data:([^;]+);base64,/);
+    if (!match) return false;
+    return ALLOWED_MIME.includes(match[1].toLowerCase());
+  };
+
   const isImage = (fileName: string) =>
     /\.(png|jpg|jpeg|gif)$/i.test(fileName);
 
   const handleDownload = (fileData: string, fileName: string) => {
+    if (!isSafeDataUri(fileData)) return;
     const link = document.createElement("a");
     link.href = fileData;
     link.download = fileName;
@@ -246,7 +261,7 @@ export default function FeedbackPage() {
                     {fb.note}
                   </p>
 
-                  {fb.attachmentFileName && fb.attachmentFileData && (
+                  {fb.attachmentFileName && fb.attachmentFileData && isSafeDataUri(fb.attachmentFileData) && (
                     <div className="flex items-center gap-2 pt-1">
                       {isImage(fb.attachmentFileName) ? (
                         <div className="space-y-2">

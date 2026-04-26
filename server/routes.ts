@@ -2689,6 +2689,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Allowed MIME types for feedback attachments
+  const ALLOWED_ATTACHMENT_MIME = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/gif",
+    "application/pdf",
+  ];
+
+  const feedbackPostSchema = insertFeedbackSchema.extend({
+    attachmentFileData: z
+      .string()
+      .nullable()
+      .optional()
+      .refine(
+        (val) => {
+          if (!val) return true;
+          // Must be a data: URI
+          const match = val.match(/^data:([^;]+);base64,/);
+          if (!match) return false;
+          const mime = match[1].toLowerCase();
+          return ALLOWED_ATTACHMENT_MIME.includes(mime);
+        },
+        { message: "Attachment must be a base64 data URI of type image (PNG, JPG, GIF) or PDF" }
+      )
+      .refine(
+        (val) => {
+          if (!val) return true;
+          // Enforce ~10 MB limit on the base64 string length (base64 ≈ 4/3 raw bytes)
+          return val.length <= 14 * 1024 * 1024;
+        },
+        { message: "Attachment exceeds 10 MB limit" }
+      ),
+    attachmentFileName: z.string().nullable().optional(),
+  });
+
   // Feedback routes
   app.get("/api/feedbacks", isAuthenticated, async (req, res) => {
     try {
@@ -2701,11 +2737,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/feedbacks", isAuthenticated, async (req, res) => {
     try {
-      const parsed = insertFeedbackSchema.safeParse(req.body);
+      const parsed = feedbackPostSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid feedback data", details: parsed.error });
       }
-      const feedback = await storage.createFeedback(parsed.data);
+      const feedback = await storage.createFeedback(parsed.data as any);
       res.status(201).json(feedback);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create feedback" });
