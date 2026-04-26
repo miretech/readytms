@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, AlertTriangle, CheckCircle2, Users, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -28,8 +28,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { format, differenceInDays } from "date-fns";
 
+type TabType = "active" | "inactive";
+
 export default function Drivers() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<TabType>("active");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const { toast } = useToast();
@@ -58,7 +61,12 @@ export default function Drivers() {
     },
   });
 
-  const filteredDrivers = drivers.filter((driver) =>
+  const activeDrivers = drivers.filter((d) => d.isActive !== "false");
+  const inactiveDrivers = drivers.filter((d) => d.isActive === "false");
+
+  const baseList = activeTab === "active" ? activeDrivers : inactiveDrivers;
+
+  const filteredDrivers = baseList.filter((driver) =>
     driver.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     driver.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     driver.licenseNumber.toLowerCase().includes(searchQuery.toLowerCase())
@@ -126,12 +134,50 @@ export default function Drivers() {
         </Button>
       </div>
 
+      {/* Active / Inactive tabs */}
+      <div className="flex gap-2" data-testid="tabs-driver-status">
+        <button
+          onClick={() => { setActiveTab("active"); setSearchQuery(""); }}
+          data-testid="tab-active-drivers"
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium border transition-colors ${
+            activeTab === "active"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-muted-foreground border-border hover-elevate"
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          Active Drivers
+          <span className={`ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+            activeTab === "active" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+          }`}>
+            {activeDrivers.length}
+          </span>
+        </button>
+        <button
+          onClick={() => { setActiveTab("inactive"); setSearchQuery(""); }}
+          data-testid="tab-inactive-drivers"
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium border transition-colors ${
+            activeTab === "inactive"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-muted-foreground border-border hover-elevate"
+          }`}
+        >
+          <UserX className="h-4 w-4" />
+          Inactive Drivers
+          <span className={`ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+            activeTab === "inactive" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+          }`}>
+            {inactiveDrivers.length}
+          </span>
+        </button>
+      </div>
+
       <Card className="p-6">
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search drivers..."
+              placeholder={`Search ${activeTab} drivers...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -143,13 +189,27 @@ export default function Drivers() {
         {filteredDrivers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="rounded-full bg-muted p-4 mb-4">
-              <Plus className="h-8 w-8 text-muted-foreground" />
+              {activeTab === "active" ? (
+                <Users className="h-8 w-8 text-muted-foreground" />
+              ) : (
+                <UserX className="h-8 w-8 text-muted-foreground" />
+              )}
             </div>
-            <h3 className="mb-2 text-lg font-medium">No drivers found</h3>
+            <h3 className="mb-2 text-lg font-medium">
+              {searchQuery
+                ? "No drivers match your search"
+                : activeTab === "active"
+                ? "No active drivers"
+                : "No inactive drivers"}
+            </h3>
             <p className="mb-4 text-sm text-muted-foreground">
-              {searchQuery ? "Try adjusting your search" : "Get started by adding your first driver"}
+              {searchQuery
+                ? "Try adjusting your search"
+                : activeTab === "active"
+                ? "Add your first driver to get started"
+                : "All drivers are currently active"}
             </p>
-            {!searchQuery && (
+            {!searchQuery && activeTab === "active" && (
               <Button onClick={() => setIsDialogOpen(true)} data-testid="button-empty-create-driver">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Driver
