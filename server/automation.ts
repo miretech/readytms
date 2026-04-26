@@ -229,6 +229,49 @@ export async function notifyLoadStatusChange(load: Load, oldStatus: string, newS
   }
 }
 
+// Send an immediate reminder email for a single task (used on create/update)
+export async function sendSingleTaskReminder(task: { title: string; dueDate: Date | string | null; dueTime?: string | null; priority: string; category?: string | null; assignedTo?: string | null; reminderEmail: string }) {
+  try {
+    const today = new Date();
+    const due = task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : "—";
+    const priority = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
+    const category = task.category ? ` [${task.category}]` : "";
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:640px;margin:0 auto;">
+        <div style="background:#1d4ed8;padding:24px 32px;border-radius:8px 8px 0 0;">
+          <h1 style="color:#fff;margin:0;font-size:22px;">Task Reminder</h1>
+          <p style="color:#bfdbfe;margin:4px 0 0;">${format(today, "EEEE, MMMM d, yyyy")}</p>
+        </div>
+        <div style="background:#f9fafb;padding:24px 32px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
+          <p style="color:#374151;margin:0 0 16px;">You have a recurring daily task reminder:</p>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:16px 20px;">
+            <h2 style="margin:0 0 8px;font-size:16px;color:#111827;">${task.title}${category}</h2>
+            <p style="margin:0;color:#6b7280;font-size:14px;">
+              <strong>Due:</strong> ${due}${task.dueTime ? " at " + task.dueTime : ""} &nbsp;&bull;&nbsp;
+              <strong>Priority:</strong> ${priority}${task.assignedTo ? " &nbsp;&bull;&nbsp; <strong>Assigned to:</strong> " + task.assignedTo : ""}
+            </p>
+          </div>
+          <p style="color:#6b7280;font-size:13px;margin:20px 0 0;">This task is set to repeat daily. You will receive a reminder each morning. Log in to Ready TMS to update or complete it.</p>
+        </div>
+      </div>`;
+
+    const sent = await sendEmail({
+      to: task.reminderEmail,
+      subject: `[Ready TMS] Task Reminder: ${task.title}`,
+      html,
+    });
+
+    if (sent) {
+      console.log(`[Automation] Sent immediate task reminder to ${task.reminderEmail} for task "${task.title}"`);
+    }
+    return sent;
+  } catch (error) {
+    console.error("[Automation] Error sending single task reminder:", error);
+    return false;
+  }
+}
+
 // Send daily email reminders for tasks with repeatDaily = "true" and a reminderEmail set
 export async function sendDailyTaskReminders() {
   try {

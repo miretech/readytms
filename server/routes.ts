@@ -2197,8 +2197,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks", async (req, res) => {
     try {
       const { insertTaskSchema } = await import("@shared/schema");
+      const { sendSingleTaskReminder } = await import("./automation");
       const validatedData = insertTaskSchema.parse(req.body);
       const task = await storage.createTask(validatedData);
+      // Send immediate reminder when daily repeat + email is configured
+      if (task.repeatDaily === "true" && task.reminderEmail) {
+        sendSingleTaskReminder(task).catch(console.error);
+      }
       res.status(201).json(task);
     } catch (error: any) {
       console.error("Task creation error:", error);
@@ -2209,10 +2214,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tasks/:id", async (req, res) => {
     try {
       const { insertTaskSchema } = await import("@shared/schema");
+      const { sendSingleTaskReminder } = await import("./automation");
       const validatedData = insertTaskSchema.partial().parse(req.body);
+      const existingTask = await storage.getTask(req.params.id);
       const task = await storage.updateTask(req.params.id, validatedData);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
+      }
+      // Send reminder if daily repeat + email was just turned on
+      const justEnabled =
+        task.repeatDaily === "true" &&
+        task.reminderEmail &&
+        (existingTask?.repeatDaily !== "true" || existingTask?.reminderEmail !== task.reminderEmail);
+      if (justEnabled) {
+        sendSingleTaskReminder(task).catch(console.error);
       }
       res.json(task);
     } catch (error: any) {
