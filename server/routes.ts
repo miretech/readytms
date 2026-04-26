@@ -1161,8 +1161,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertAccidentSchema.parse(req.body);
       const accident = await storage.createAccident(validatedData);
       res.status(201).json(accident);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid accident data" });
+    } catch (error: any) {
+      console.error("[Accident] Create error:", error?.message, error?.issues ?? "");
+      res.status(400).json({ error: "Invalid accident data", details: error?.message });
     }
   });
 

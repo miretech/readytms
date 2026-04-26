@@ -1246,6 +1246,12 @@ export class DatabaseStorage implements IStorage {
       .values({
         ...insertAccident,
         accidentDate: new Date(insertAccident.accidentDate),
+        estimatedCost: insertAccident.estimatedCost && insertAccident.estimatedCost !== "" ? insertAccident.estimatedCost : null,
+        truckId: insertAccident.truckId || null,
+        loadId: insertAccident.loadId || null,
+        policeReportNumber: insertAccident.policeReportNumber || null,
+        insuranceClaimNumber: insertAccident.insuranceClaimNumber || null,
+        injuriesReported: insertAccident.injuriesReported ?? 0,
       })
       .returning();
     return accident;
@@ -1256,6 +1262,11 @@ export class DatabaseStorage implements IStorage {
     if (updateData.accidentDate) {
       values.accidentDate = new Date(updateData.accidentDate);
     }
+    if ("estimatedCost" in values) values.estimatedCost = values.estimatedCost && values.estimatedCost !== "" ? values.estimatedCost : null;
+    if ("truckId" in values) values.truckId = values.truckId || null;
+    if ("loadId" in values) values.loadId = values.loadId || null;
+    if ("policeReportNumber" in values) values.policeReportNumber = values.policeReportNumber || null;
+    if ("insuranceClaimNumber" in values) values.insuranceClaimNumber = values.insuranceClaimNumber || null;
     
     // Preserve existing attachment fields if not explicitly provided in update
     const existingAccident = await this.getAccident(id);
@@ -1317,7 +1328,11 @@ export class DatabaseStorage implements IStorage {
       .values({
         ...insertViolation,
         violationDate: new Date(insertViolation.violationDate),
-        dueDate: insertViolation.dueDate ? new Date(insertViolation.dueDate) : undefined,
+        dueDate: insertViolation.dueDate && insertViolation.dueDate !== "" ? new Date(insertViolation.dueDate) : null,
+        fineAmount: insertViolation.fineAmount && insertViolation.fineAmount !== "" ? insertViolation.fineAmount : null,
+        points: insertViolation.points ?? null,
+        truckId: insertViolation.truckId || null,
+        citationNumber: insertViolation.citationNumber || null,
       })
       .returning();
     return violation;
@@ -1328,9 +1343,10 @@ export class DatabaseStorage implements IStorage {
     if (updateData.violationDate) {
       values.violationDate = new Date(updateData.violationDate);
     }
-    if (updateData.dueDate) {
-      values.dueDate = new Date(updateData.dueDate);
-    }
+    if ("dueDate" in values) values.dueDate = values.dueDate && values.dueDate !== "" ? new Date(values.dueDate) : null;
+    if ("fineAmount" in values) values.fineAmount = values.fineAmount && values.fineAmount !== "" ? values.fineAmount : null;
+    if ("truckId" in values) values.truckId = values.truckId || null;
+    if ("citationNumber" in values) values.citationNumber = values.citationNumber || null;
     
     // Preserve existing attachment fields if not explicitly provided in update
     const existingViolation = await this.getViolation(id);
