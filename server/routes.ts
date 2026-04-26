@@ -2699,6 +2699,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   ];
 
   const feedbackPostSchema = insertFeedbackSchema.extend({
+    personName: z.string().trim().min(1, { message: "Name is required" }),
+    note: z.string().trim().min(1, { message: "Feedback note is required" }),
     attachmentFileData: z
       .string()
       .nullable()
@@ -2722,8 +2724,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         { message: "Attachment exceeds 10 MB limit" }
       ),
+    // Enforce that both filename and data are provided together, or both are absent
     attachmentFileName: z.string().nullable().optional(),
-  });
+  }).refine(
+    (data) => {
+      const hasData = !!data.attachmentFileData;
+      const hasName = !!data.attachmentFileName;
+      return hasData === hasName;
+    },
+    { message: "Attachment filename and file data must both be provided or both be absent" }
+  );
 
   // Feedback routes
   app.get("/api/feedbacks", isAuthenticated, async (req, res) => {
