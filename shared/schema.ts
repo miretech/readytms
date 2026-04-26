@@ -124,6 +124,25 @@ export const insertTrailerSchema = createInsertSchema(trailers).omit({
 export type InsertTrailer = z.infer<typeof insertTrailerSchema>;
 export type Trailer = typeof trailers.$inferSelect;
 
+// Trailer Truck Assignment History - tracks all truck assignments for each trailer over time
+export const trailerTruckAssignments = pgTable("trailer_truck_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trailerId: varchar("trailer_id").notNull(),
+  truckId: varchar("truck_id").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date"), // null = currently active
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTrailerTruckAssignmentSchema = createInsertSchema(trailerTruckAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTrailerTruckAssignment = z.infer<typeof insertTrailerTruckAssignmentSchema>;
+export type TrailerTruckAssignment = typeof trailerTruckAssignments.$inferSelect;
+
 export const drivers = pgTable("drivers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
