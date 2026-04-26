@@ -38,7 +38,8 @@ The system provides a comprehensive set of modules:
   - Tolls attachments (PDF/image uploads) for toll documentation
   - Repairs tracking with notes field
   - Pickup pictures support for documenting trailer condition at acquisition
-  - Tabbed dialog interface organizing: Basic Info, Insurance, Dates & Rent, Tolls, and Pictures
+  - **Truck Assignment History**: Full assignment tracking via `trailer_truck_assignments` table. Each trailer can be assigned to multiple trucks across different time periods. Each assignment stores truckId, startDate, endDate (null=currently active), and notes. The "Truck History" tab appears when editing a trailer — shows all historical assignments as cards with Active/Completed badges, supports adding new assignments, editing end dates to close them out, and deleting records.
+  - Tabbed dialog interface organizing: Basic Info, Insurance, Dates & Rent, Tolls, Pictures, and Truck History (edit mode only)
 - **Driver Management**: Comprehensive driver roster with full DOT compliance tracking, including CDL, medical card, SSN, employment, and contact information.
 - **GPS Driver Tracking**: Real-time location tracking with API endpoints for mobile apps, live location display with coordinates and Google Maps links.
 - **Driver Self-Registration**: Public-facing driver signup at `/driver-signup` for self-onboarding.

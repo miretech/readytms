@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { useDropzone } from "react-dropzone";
-import { insertTrailerSchema, type Trailer, type Truck } from "@shared/schema";
+import { insertTrailerSchema, type Trailer, type Truck, type TrailerTruckAssignment } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -32,10 +32,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, X, FileText, Image, Calendar, Shield, DollarSign, Wrench, Receipt, Camera } from "lucide-react";
+import { Upload, X, FileText, Image, Calendar, Shield, DollarSign, Wrench, Receipt, Camera, Plus, Trash2, History, CheckCircle2 } from "lucide-react";
 
 interface FileAttachment {
   fileName: string;
@@ -65,6 +67,17 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
   const [pickupPictures, setPickupPictures] = useState<FileAttachment[]>([]);
   const [repairsAttachments, setRepairsAttachments] = useState<FileAttachment[]>([]);
 
+  // Truck assignment form state
+  const [assignTruckId, setAssignTruckId] = useState("");
+  const [assignStartDate, setAssignStartDate] = useState("");
+  const [assignEndDate, setAssignEndDate] = useState("");
+  const [assignNotes, setAssignNotes] = useState("");
+  const [assignFormError, setAssignFormError] = useState("");
+
+  // Editing an existing assignment's end date
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+  const [editingEndDate, setEditingEndDate] = useState("");
+
   // Fetch full trailer data including attachments when editing
   const { data: fullTrailer } = useQuery<Trailer>({
     queryKey: ['/api/trailers', trailer?.id],
@@ -76,6 +89,80 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
     queryKey: ['/api/trucks'],
     enabled: open,
   });
+
+  // Fetch assignment history for this trailer
+  const { data: assignments = [] } = useQuery<TrailerTruckAssignment[]>({
+    queryKey: ['/api/trailers', trailer?.id, 'assignments'],
+    queryFn: async () => {
+      const res = await fetch(`/api/trailers/${trailer!.id}/assignments`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+    enabled: open && isEditing && !!trailer?.id,
+  });
+
+  const truckMap = new Map(trucks.map((t) => [t.id, t.truckNumber]));
+
+  const createAssignmentMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/trailers/${trailer!.id}/assignments`, {
+        truckId: assignTruckId,
+        startDate: assignStartDate,
+        endDate: assignEndDate || undefined,
+        notes: assignNotes || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trailers', trailer!.id, 'assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/trailers'] });
+      setAssignTruckId("");
+      setAssignStartDate("");
+      setAssignEndDate("");
+      setAssignNotes("");
+      setAssignFormError("");
+      toast({ title: "Assignment added", description: "Truck assignment recorded successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add assignment.", variant: "destructive" });
+    },
+  });
+
+  const updateAssignmentMutation = useMutation({
+    mutationFn: async ({ id, endDate }: { id: string; endDate: string }) => {
+      return await apiRequest("PATCH", `/api/trailer-assignments/${id}`, { endDate: endDate || null });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trailers', trailer!.id, 'assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/trailers'] });
+      setEditingAssignmentId(null);
+      setEditingEndDate("");
+      toast({ title: "Assignment updated" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update assignment.", variant: "destructive" });
+    },
+  });
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/trailer-assignments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trailers', trailer!.id, 'assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/trailers'] });
+      toast({ title: "Assignment removed" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove assignment.", variant: "destructive" });
+    },
+  });
+
+  const handleAddAssignment = () => {
+    if (!assignTruckId) { setAssignFormError("Please select a truck"); return; }
+    if (!assignStartDate) { setAssignFormError("Please set a start date"); return; }
+    setAssignFormError("");
+    createAssignmentMutation.mutate();
+  };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -271,12 +358,17 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <Tabs defaultValue="basic" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className={`grid w-full ${isEditing ? "grid-cols-6" : "grid-cols-5"}`}>
                   <TabsTrigger value="basic" data-testid="tab-basic">Basic Info</TabsTrigger>
                   <TabsTrigger value="insurance" data-testid="tab-insurance">Insurance</TabsTrigger>
                   <TabsTrigger value="dates" data-testid="tab-dates">Dates & Rent</TabsTrigger>
                   <TabsTrigger value="tolls" data-testid="tab-tolls">Tolls</TabsTrigger>
                   <TabsTrigger value="pictures" data-testid="tab-pictures">Pictures</TabsTrigger>
+                  {isEditing && (
+                    <TabsTrigger value="truck-history" data-testid="tab-truck-history">
+                      Truck History
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 {/* Basic Info Tab */}
@@ -755,6 +847,189 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
                     </div>
                   )}
                 </TabsContent>
+
+                {/* Truck History Tab — only shown when editing */}
+                {isEditing && (
+                  <TabsContent value="truck-history" className="space-y-5 mt-4">
+                    <div className="flex items-center gap-2">
+                      <History className="h-5 w-5 text-primary" />
+                      <h3 className="text-lg font-medium">Truck Assignment History</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Log every truck that has pulled this trailer. Each assignment tracks the truck, start date, and end date so history is never lost.
+                    </p>
+
+                    {/* Add new assignment form */}
+                    <Card className="p-4 space-y-4">
+                      <p className="text-sm font-medium flex items-center gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        Add New Truck Assignment
+                      </p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Truck *</label>
+                          <Select value={assignTruckId} onValueChange={setAssignTruckId}>
+                            <SelectTrigger data-testid="select-assign-truck">
+                              <SelectValue placeholder="Select truck" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {trucks.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>{t.truckNumber}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Start Date *</label>
+                          <Input
+                            type="date"
+                            value={assignStartDate}
+                            onChange={(e) => setAssignStartDate(e.target.value)}
+                            data-testid="input-assign-start-date"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">End Date (Optional)</label>
+                          <Input
+                            type="date"
+                            value={assignEndDate}
+                            onChange={(e) => setAssignEndDate(e.target.value)}
+                            data-testid="input-assign-end-date"
+                          />
+                          <p className="text-xs text-muted-foreground">Leave blank if still assigned to this truck</p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Notes (Optional)</label>
+                          <Input
+                            value={assignNotes}
+                            onChange={(e) => setAssignNotes(e.target.value)}
+                            placeholder="e.g. long haul route, seasonal"
+                            data-testid="input-assign-notes"
+                          />
+                        </div>
+                      </div>
+                      {assignFormError && (
+                        <p className="text-xs text-destructive">{assignFormError}</p>
+                      )}
+                      <Button
+                        type="button"
+                        onClick={handleAddAssignment}
+                        disabled={createAssignmentMutation.isPending}
+                        data-testid="button-add-assignment"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        {createAssignmentMutation.isPending ? "Saving..." : "Add Assignment"}
+                      </Button>
+                    </Card>
+
+                    <Separator />
+
+                    {/* Assignment history list */}
+                    {assignments.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-center">
+                        <History className="h-8 w-8 text-muted-foreground mb-3" />
+                        <p className="text-sm font-medium">No assignments yet</p>
+                        <p className="text-xs text-muted-foreground mt-1">Add the first truck assignment above</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          {assignments.length} assignment{assignments.length !== 1 ? "s" : ""} on record
+                        </p>
+                        {assignments.map((a) => {
+                          const isActive = !a.endDate;
+                          const isEditingThis = editingAssignmentId === a.id;
+                          return (
+                            <Card key={a.id} className="p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1 min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-sm">
+                                      Truck #{truckMap.get(a.truckId) || a.truckId}
+                                    </span>
+                                    {isActive ? (
+                                      <Badge variant="default" className="text-xs">
+                                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                                        Active
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs">Completed</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {a.startDate}
+                                    {" → "}
+                                    {a.endDate ? a.endDate : <span className="text-green-600 font-medium">Present</span>}
+                                  </p>
+                                  {a.notes && (
+                                    <p className="text-xs text-muted-foreground italic">{a.notes}</p>
+                                  )}
+                                </div>
+                                <div className="flex gap-1 shrink-0">
+                                  {isEditingThis ? (
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="date"
+                                        value={editingEndDate}
+                                        onChange={(e) => setEditingEndDate(e.target.value)}
+                                        className="w-36 h-8 text-xs"
+                                        data-testid={`input-edit-end-date-${a.id}`}
+                                      />
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={() => updateAssignmentMutation.mutate({ id: a.id, endDate: editingEndDate })}
+                                        disabled={updateAssignmentMutation.isPending}
+                                        data-testid={`button-save-end-date-${a.id}`}
+                                      >
+                                        Save
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => { setEditingAssignmentId(null); setEditingEndDate(""); }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => { setEditingAssignmentId(a.id); setEditingEndDate(a.endDate || ""); }}
+                                        data-testid={`button-edit-assignment-${a.id}`}
+                                      >
+                                        {isActive ? "Set End Date" : "Edit"}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-destructive"
+                                        onClick={() => {
+                                          if (confirm("Remove this assignment record?")) {
+                                            deleteAssignmentMutation.mutate(a.id);
+                                          }
+                                        }}
+                                        disabled={deleteAssignmentMutation.isPending}
+                                        data-testid={`button-delete-assignment-${a.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+                )}
 
                 {/* Pictures Tab */}
                 <TabsContent value="pictures" className="space-y-4 mt-4">

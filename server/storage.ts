@@ -58,10 +58,13 @@ import {
   type DivisionInvitation,
   type InsertDivisionInvitation,
   type PasswordResetToken,
+  type TrailerTruckAssignment,
+  type InsertTrailerTruckAssignment,
   users,
   loads,
   trucks,
   trailers,
+  trailerTruckAssignments,
   drivers,
   customers,
   documents,
@@ -129,7 +132,12 @@ export interface IStorage {
   createTrailer(trailer: InsertTrailer, companyId?: string): Promise<Trailer>;
   updateTrailer(id: string, trailer: Partial<InsertTrailer>): Promise<Trailer | undefined>;
   deleteTrailer(id: string): Promise<boolean>;
-  
+
+  getTrailerAssignments(trailerId: string): Promise<TrailerTruckAssignment[]>;
+  createTrailerAssignment(data: InsertTrailerTruckAssignment): Promise<TrailerTruckAssignment>;
+  updateTrailerAssignment(id: string, data: Partial<InsertTrailerTruckAssignment>): Promise<TrailerTruckAssignment | undefined>;
+  deleteTrailerAssignment(id: string): Promise<boolean>;
+
   getAllDrivers(companyId?: string): Promise<Driver[]>;
   getDriver(id: string): Promise<Driver | undefined>;
   getDriverByEmail(email: string): Promise<Driver | undefined>;
@@ -786,6 +794,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTrailer(id: string): Promise<boolean> {
     const result = await db.delete(trailers).where(eq(trailers.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getTrailerAssignments(trailerId: string): Promise<TrailerTruckAssignment[]> {
+    return await db
+      .select()
+      .from(trailerTruckAssignments)
+      .where(eq(trailerTruckAssignments.trailerId, trailerId))
+      .orderBy(desc(trailerTruckAssignments.startDate));
+  }
+
+  async createTrailerAssignment(data: InsertTrailerTruckAssignment): Promise<TrailerTruckAssignment> {
+    const [result] = await db.insert(trailerTruckAssignments).values(data).returning();
+    return result;
+  }
+
+  async updateTrailerAssignment(id: string, data: Partial<InsertTrailerTruckAssignment>): Promise<TrailerTruckAssignment | undefined> {
+    const [result] = await db
+      .update(trailerTruckAssignments)
+      .set(data)
+      .where(eq(trailerTruckAssignments.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteTrailerAssignment(id: string): Promise<boolean> {
+    const result = await db.delete(trailerTruckAssignments).where(eq(trailerTruckAssignments.id, id)).returning();
     return result.length > 0;
   }
 

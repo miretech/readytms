@@ -566,6 +566,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Trailer Truck Assignment History routes
+  app.get("/api/trailers/:trailerId/assignments", async (req, res) => {
+    try {
+      const assignments = await storage.getTrailerAssignments(req.params.trailerId);
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+
+  app.post("/api/trailers/:trailerId/assignments", async (req, res) => {
+    try {
+      const { insertTrailerTruckAssignmentSchema } = await import("@shared/schema");
+      const data = insertTrailerTruckAssignmentSchema.parse({
+        ...req.body,
+        trailerId: req.params.trailerId,
+      });
+      const assignment = await storage.createTrailerAssignment(data);
+      // Also update haulingTruckId on the trailer if this is an active assignment (no endDate)
+      if (!data.endDate) {
+        await storage.updateTrailer(req.params.trailerId, { haulingTruckId: data.truckId });
+      }
+      res.status(201).json(assignment);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid assignment data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.patch("/api/trailer-assignments/:id", async (req, res) => {
+    try {
+      const assignment = await storage.updateTrailerAssignment(req.params.id, req.body);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  app.delete("/api/trailer-assignments/:id", async (req, res) => {
+    const deleted = await storage.deleteTrailerAssignment(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
+    res.status(204).send();
+  });
+
   app.get("/api/drivers", async (req: any, res) => {
     const drivers = await storage.getAllDrivers(req.user?.divisionId || undefined);
     res.json(drivers);
