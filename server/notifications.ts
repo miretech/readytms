@@ -87,8 +87,8 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
       html: options.html,
     };
 
-    if (options.from && options.from !== 'noreply@readytms.com') {
-      emailPayload.reply_to = options.from;
+    if (options.from && !options.from.includes('noreply@readytms.com')) {
+      emailPayload.replyTo = options.from;
     }
 
     // Add attachments if provided — Resend only accepts filename + content
@@ -99,7 +99,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
       }));
     }
 
-    console.log('[Notifications] Sending email to:', emailPayload.to, 'reply_to:', emailPayload.reply_to || 'none');
+    console.log('[Notifications] Sending email to:', emailPayload.to, 'replyTo:', emailPayload.replyTo || 'none');
     const { data, error } = await resend.emails.send(emailPayload);
 
     if (error) {
