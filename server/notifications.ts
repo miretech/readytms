@@ -69,42 +69,51 @@ interface SMSOptions {
 /**
  * Send an email notification
  */
-export async function sendEmail(options: EmailOptions): Promise<boolean> {
+export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
   if (!resend) {
-    console.error('[Notifications] Resend not configured - email not sent');
-    return false;
+    const msg = 'Resend not configured — RESEND_API_KEY missing';
+    console.error('[Notifications]', msg);
+    return { success: false, error: msg };
   }
 
   try {
+    // Always send from the verified domain. If a custom "from" address is
+    // specified, put it in reply_to so replies go back to that address.
+    const verifiedSender = 'Ready TMS <noreply@readytms.com>';
     const emailPayload: any = {
-      from: options.from || 'Ready TMS <noreply@readytms.com>',
+      from: verifiedSender,
       to: options.to,
       subject: options.subject,
       html: options.html,
     };
 
-    // Add attachments if provided
+    if (options.from && options.from !== 'noreply@readytms.com') {
+      emailPayload.reply_to = options.from;
+    }
+
+    // Add attachments if provided — Resend only accepts filename + content
     if (options.attachments && options.attachments.length > 0) {
       emailPayload.attachments = options.attachments.map(att => ({
         filename: att.filename,
         content: att.content,
-        ...(att.type && { type: att.type }),
       }));
     }
 
-    console.log('[Notifications] Sending email from:', emailPayload.from, 'to:', emailPayload.to);
+    console.log('[Notifications] Sending email to:', emailPayload.to, 'reply_to:', emailPayload.reply_to || 'none');
     const { data, error } = await resend.emails.send(emailPayload);
 
     if (error) {
-      console.error('[Notifications] Email send error:', JSON.stringify(error));
-      return false;
+      const msg = JSON.stringify(error);
+      console.error('[Notifications] Resend error:', msg);
+      return { success: false, error: msg };
     }
 
-    console.log('[Notifications] Email sent successfully. ID:', data?.id, '| To:', emailPayload.to);
-    return true;
-  } catch (error) {
-    console.error('[Notifications] Email send exception:', error);
-    return false;
+    console.log('[Notifications] Email sent successfully. ID:', data?.id);
+    return { success: true };
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    console.error('[Notifications] Email send exception:', msg);
+    return { success: false, error: msg };
   }
 }
 
@@ -201,7 +210,7 @@ export async function sendGPSEnabledNotification(driver: Driver): Promise<void> 
     </html>
   `;
 
-  const emailSent = await sendEmail({
+  const { success: emailSent } = await sendEmail({
     to: driver.email,
     subject: 'GPS Tracking Enabled - Ready TMS',
     html: emailHtml,
@@ -276,7 +285,7 @@ export async function sendGPSReminderNotification(driver: Driver): Promise<void>
     </html>
   `;
 
-  const emailSent = await sendEmail({
+  const { success: emailSent } = await sendEmail({
     to: driver.email,
     subject: 'GPS Location Reminder - Ready TMS',
     html: emailHtml,
@@ -383,7 +392,7 @@ export async function sendMaintenanceReminderNotification(
     </html>
   `;
 
-  const emailSent = await sendEmail({
+  const { success: emailSent } = await sendEmail({
     to: driver.email,
     subject: `${isOverdue ? '⚠️ OVERDUE' : '🔧'} Maintenance ${status} - Truck ${truck.truckNumber}`,
     html: emailHtml,

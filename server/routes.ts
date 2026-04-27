@@ -1062,7 +1062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send email
-      const emailSent = await sendEmail({
+      const emailResult = await sendEmail({
         to: validatedData.to,
         from: validatedData.from,
         subject: validatedData.subject,
@@ -1070,8 +1070,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         attachments: attachments.length > 0 ? attachments : undefined,
       });
 
-      if (!emailSent) {
-        return res.status(500).json({ error: "Failed to send email" });
+      if (!emailResult.success) {
+        console.error('[Factoring Email] Send failed:', emailResult.error);
+        return res.status(500).json({ error: "Failed to send email", details: emailResult.error });
       }
 
       res.json({ success: true, message: "Email sent successfully" });
@@ -2402,7 +2403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let emailSent = false;
       try {
-        emailSent = await sendEmail({
+        const inviteEmailResult = await sendEmail({
           to: email,
           subject: `You're invited to join ${division.companyName} on Ready TMS`,
           html: `
@@ -2440,6 +2441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             </html>
           `,
         });
+        emailSent = inviteEmailResult.success;
       } catch (emailErr) {
         console.error("Email sending failed for division invite:", emailErr);
       }

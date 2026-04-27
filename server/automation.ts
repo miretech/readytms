@@ -264,7 +264,7 @@ export async function sendSingleTaskReminder(task: { title: string; dueDate: Dat
     const emails = parseEmails(task.reminderEmail);
     let anySuccess = false;
     for (const email of emails) {
-      const sent = await sendEmail({
+      const { success: sent } = await sendEmail({
         to: email,
         subject: `[Ready TMS] Task Reminder: ${task.title}`,
         html,
@@ -349,7 +349,7 @@ export async function sendDailyTaskReminders() {
           </div>
         </div>`;
 
-      const sent = await sendEmail({
+      const { success: sent } = await sendEmail({
         to: email,
         subject: `[Ready TMS] Daily Task Reminder – ${tasks.length} task${tasks.length !== 1 ? "s" : ""} (${format(today, "MMM d")})`,
         html,
