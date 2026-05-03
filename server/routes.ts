@@ -352,6 +352,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Public POD upload - no login required
+  app.post("/api/public/pod-upload", async (req, res) => {
+    try {
+      const { driverName, loadNumber, truckNumber, podAttachments } = req.body;
+
+      if (!driverName || !loadNumber || !truckNumber) {
+        return res.status(400).json({ error: "Driver name, load number, and truck number are required" });
+      }
+
+      if (!podAttachments || !Array.isArray(podAttachments) || podAttachments.length === 0) {
+        return res.status(400).json({ error: "At least one POD attachment is required" });
+      }
+
+      const podSchema = z.array(z.object({
+        filename: z.string(),
+        data: z.string(),
+        type: z.string(),
+      }));
+
+      try {
+        podSchema.parse(podAttachments);
+      } catch {
+        return res.status(400).json({ error: "Invalid attachment format" });
+      }
+
+      if (podAttachments.length > 10) {
+        return res.status(400).json({ error: "Maximum 10 POD attachments per upload" });
+      }
+
+      const maxSize = 10 * 1024 * 1024;
+      for (const att of podAttachments) {
+        if (att.data.length > maxSize) {
+          return res.status(400).json({ error: `Attachment ${att.filename} exceeds 10MB limit` });
+        }
+      }
+
+      const load = await storage.getLoadByNumber(loadNumber.trim());
+      if (!load) {
+        return res.status(404).json({ error: "Load number not found. Please check and try again." });
+      }
+
+      // Verify truck number matches assigned truck
+      if (load.assignedTruckId) {
+        const truck = await storage.getTruck(load.assignedTruckId);
+        if (truck && truck.truckNumber.toLowerCase() !== truckNumber.trim().toLowerCase()) {
+          return res.status(400).json({ error: "Truck number does not match the assigned truck for this load." });
+        }
+      }
+
+      const timestampedAttachments = podAttachments.map(att => ({
+        ...att,
+        uploadedAt: new Date().toISOString(),
+        uploadedByName: driverName.trim(),
+        uploadedByTruck: truckNumber.trim(),
+      }));
+
+      const existingPODs = (load.podAttachments as any) || [];
+      const allPODs = [...existingPODs, ...timestampedAttachments];
+
+      if (allPODs.length > 50) {
+        return res.status(400).json({ error: "Maximum 50 total POD attachments allowed per load" });
+      }
+
+      const updatedLoad = await storage.updateLoad(load.id, {
+        podAttachments: allPODs,
+        status: "delivered",
+      });
+
+      if (!updatedLoad) {
+        return res.status(500).json({ error: "Failed to update load" });
+      }
+
+      await autoGenerateInvoice(updatedLoad);
+
+      res.json({ message: "POD uploaded successfully", loadNumber: load.loadNumber });
+    } catch (error) {
+      console.error("Error uploading public POD:", error);
+      res.status(500).json({ error: "Failed to upload POD. Please try again." });
+    }
+  });
+
   // Driver POD Upload Routes - Require driver authentication
   app.get("/api/driver/loads", isAuthenticated, isDriver, async (req: any, res) => {
     try {
