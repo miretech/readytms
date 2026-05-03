@@ -39,7 +39,8 @@ The system provides a comprehensive set of modules:
   - Repairs tracking with notes field
   - Pickup pictures support for documenting trailer condition at acquisition
   - **Truck Assignment History**: Full assignment tracking via `trailer_truck_assignments` table. Each trailer can be assigned to multiple trucks across different time periods. Each assignment stores truckId, startDate, endDate (null=currently active), and notes. The "Truck History" tab appears when editing a trailer — shows all historical assignments as cards with Active/Completed badges, supports adding new assignments, editing end dates to close them out, and deleting records.
-  - Tabbed dialog interface organizing: Basic Info, Insurance, Dates & Rent, Tolls, Pictures, and Truck History (edit mode only)
+  - **DOT Inspection Records**: Full inspection history tracking via `trailer_dot_inspections` table. Each trailer can have multiple DOT inspection records. Each record stores issueDate, expirationDate, shopName, shopAddress, result (passed/failed), notes, and file attachments (PDFs/images). The "DOT Insp." tab appears when editing a trailer — shows all inspection records with pass/fail badges, expired status detection, and downloadable attachments. Supports adding and deleting inspection records.
+  - Tabbed dialog interface organizing: Basic Info, Insurance, Dates & Rent, Tolls, Pictures, DOT Insp. (edit only), and Truck History (edit mode only)
 - **Driver Management**: Comprehensive driver roster with full DOT compliance tracking, including CDL, medical card, SSN, employment, and contact information.
 - **GPS Driver Tracking**: Real-time location tracking with API endpoints for mobile apps, live location display with coordinates and Google Maps links.
 - **Driver Self-Registration**: Public-facing driver signup at `/driver-signup` for self-onboarding.

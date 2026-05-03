@@ -143,6 +143,28 @@ export const insertTrailerTruckAssignmentSchema = createInsertSchema(trailerTruc
 export type InsertTrailerTruckAssignment = z.infer<typeof insertTrailerTruckAssignmentSchema>;
 export type TrailerTruckAssignment = typeof trailerTruckAssignments.$inferSelect;
 
+// Trailer DOT Inspections - tracks DOT inspection history for each trailer
+export const trailerDotInspections = pgTable("trailer_dot_inspections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trailerId: varchar("trailer_id").notNull(),
+  issueDate: text("issue_date"),
+  expirationDate: text("expiration_date"),
+  shopName: text("shop_name"),
+  shopAddress: text("shop_address"),
+  result: text("result"), // "passed" | "failed"
+  notes: text("notes"),
+  attachments: jsonb("attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTrailerDotInspectionSchema = createInsertSchema(trailerDotInspections).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTrailerDotInspection = z.infer<typeof insertTrailerDotInspectionSchema>;
+export type TrailerDotInspection = typeof trailerDotInspections.$inferSelect;
+
 export const drivers = pgTable("drivers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),

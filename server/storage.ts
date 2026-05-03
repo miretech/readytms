@@ -60,6 +60,8 @@ import {
   type PasswordResetToken,
   type TrailerTruckAssignment,
   type InsertTrailerTruckAssignment,
+  type TrailerDotInspection,
+  type InsertTrailerDotInspection,
   type Feedback,
   type InsertFeedback,
   users,
@@ -67,6 +69,7 @@ import {
   trucks,
   trailers,
   trailerTruckAssignments,
+  trailerDotInspections,
   drivers,
   customers,
   documents,
@@ -140,6 +143,11 @@ export interface IStorage {
   createTrailerAssignment(data: InsertTrailerTruckAssignment): Promise<TrailerTruckAssignment>;
   updateTrailerAssignment(id: string, data: Partial<InsertTrailerTruckAssignment>): Promise<TrailerTruckAssignment | undefined>;
   deleteTrailerAssignment(id: string): Promise<boolean>;
+
+  getTrailerDotInspections(trailerId: string): Promise<TrailerDotInspection[]>;
+  createTrailerDotInspection(data: InsertTrailerDotInspection): Promise<TrailerDotInspection>;
+  updateTrailerDotInspection(id: string, data: Partial<InsertTrailerDotInspection>): Promise<TrailerDotInspection | undefined>;
+  deleteTrailerDotInspection(id: string): Promise<boolean>;
 
   getAllDrivers(companyId?: string): Promise<Driver[]>;
   getDriver(id: string): Promise<Driver | undefined>;
@@ -828,6 +836,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTrailerAssignment(id: string): Promise<boolean> {
     const result = await db.delete(trailerTruckAssignments).where(eq(trailerTruckAssignments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getTrailerDotInspections(trailerId: string): Promise<TrailerDotInspection[]> {
+    return await db
+      .select()
+      .from(trailerDotInspections)
+      .where(eq(trailerDotInspections.trailerId, trailerId))
+      .orderBy(desc(trailerDotInspections.createdAt));
+  }
+
+  async createTrailerDotInspection(data: InsertTrailerDotInspection): Promise<TrailerDotInspection> {
+    const [result] = await db.insert(trailerDotInspections).values(data).returning();
+    return result;
+  }
+
+  async updateTrailerDotInspection(id: string, data: Partial<InsertTrailerDotInspection>): Promise<TrailerDotInspection | undefined> {
+    const [result] = await db
+      .update(trailerDotInspections)
+      .set(data)
+      .where(eq(trailerDotInspections.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteTrailerDotInspection(id: string): Promise<boolean> {
+    const result = await db.delete(trailerDotInspections).where(eq(trailerDotInspections.id, id)).returning();
     return result.length > 0;
   }
 

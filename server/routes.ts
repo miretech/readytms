@@ -21,7 +21,8 @@ import {
   insertGpsLocationSchema,
   insertShortPaySchema,
   insertChargeBackSchema,
-  insertFeedbackSchema
+  insertFeedbackSchema,
+  insertTrailerDotInspectionSchema
 } from "@shared/schema";
 import { setupAuth, isAuthenticated, isAdmin, isDriver } from "./auth";
 import passport from "passport";
@@ -611,6 +612,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const deleted = await storage.deleteTrailerAssignment(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Assignment not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Trailer DOT Inspection routes
+  app.get("/api/trailers/:trailerId/dot-inspections", async (req, res) => {
+    try {
+      const inspections = await storage.getTrailerDotInspections(req.params.trailerId);
+      res.json(inspections);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch DOT inspections" });
+    }
+  });
+
+  app.post("/api/trailers/:trailerId/dot-inspections", async (req, res) => {
+    try {
+      const data = insertTrailerDotInspectionSchema.parse({
+        ...req.body,
+        trailerId: req.params.trailerId,
+      });
+      const inspection = await storage.createTrailerDotInspection(data);
+      res.status(201).json(inspection);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid inspection data", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.patch("/api/trailer-dot-inspections/:id", async (req, res) => {
+    try {
+      const inspection = await storage.updateTrailerDotInspection(req.params.id, req.body);
+      if (!inspection) {
+        return res.status(404).json({ error: "Inspection not found" });
+      }
+      res.json(inspection);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update inspection" });
+    }
+  });
+
+  app.delete("/api/trailer-dot-inspections/:id", async (req, res) => {
+    const deleted = await storage.deleteTrailerDotInspection(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Inspection not found" });
     }
     res.status(204).send();
   });

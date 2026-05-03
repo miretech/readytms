@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { useDropzone } from "react-dropzone";
-import { insertTrailerSchema, type Trailer, type Truck, type TrailerTruckAssignment } from "@shared/schema";
+import { insertTrailerSchema, type Trailer, type Truck, type TrailerTruckAssignment, type TrailerDotInspection } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, X, FileText, Image, Calendar, Shield, DollarSign, Wrench, Receipt, Camera, Plus, Trash2, History, CheckCircle2 } from "lucide-react";
+import { Upload, X, FileText, Image, Calendar, Shield, DollarSign, Wrench, Receipt, Camera, Plus, Trash2, History, CheckCircle2, ClipboardCheck } from "lucide-react";
 
 interface FileAttachment {
   fileName: string;
@@ -77,6 +77,16 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
   // Editing an existing assignment's end date
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
   const [editingEndDate, setEditingEndDate] = useState("");
+
+  // DOT inspection form state
+  const [dotIssueDate, setDotIssueDate] = useState("");
+  const [dotExpirationDate, setDotExpirationDate] = useState("");
+  const [dotShopName, setDotShopName] = useState("");
+  const [dotShopAddress, setDotShopAddress] = useState("");
+  const [dotResult, setDotResult] = useState("");
+  const [dotNotes, setDotNotes] = useState("");
+  const [dotAttachments, setDotAttachments] = useState<FileAttachment[]>([]);
+  const [dotFormError, setDotFormError] = useState("");
 
   // Fetch full trailer data including attachments when editing
   const { data: fullTrailer } = useQuery<Trailer>({
@@ -156,6 +166,63 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
       toast({ title: "Error", description: "Failed to remove assignment.", variant: "destructive" });
     },
   });
+
+  // Fetch DOT inspections for this trailer
+  const { data: dotInspections = [] } = useQuery<TrailerDotInspection[]>({
+    queryKey: ['/api/trailers', trailer?.id, 'dot-inspections'],
+    queryFn: async () => {
+      const res = await fetch(`/api/trailers/${trailer!.id}/dot-inspections`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+    enabled: open && isEditing && !!trailer?.id,
+  });
+
+  const createDotInspectionMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/trailers/${trailer!.id}/dot-inspections`, {
+        issueDate: dotIssueDate || undefined,
+        expirationDate: dotExpirationDate || undefined,
+        shopName: dotShopName || undefined,
+        shopAddress: dotShopAddress || undefined,
+        result: dotResult || undefined,
+        notes: dotNotes || undefined,
+        attachments: dotAttachments.length > 0 ? dotAttachments : undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trailers', trailer!.id, 'dot-inspections'] });
+      setDotIssueDate(""); setDotExpirationDate(""); setDotShopName("");
+      setDotShopAddress(""); setDotResult(""); setDotNotes("");
+      setDotAttachments([]); setDotFormError("");
+      toast({ title: "DOT inspection added", description: "Inspection record saved successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save inspection.", variant: "destructive" });
+    },
+  });
+
+  const deleteDotInspectionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/trailer-dot-inspections/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trailers', trailer!.id, 'dot-inspections'] });
+      toast({ title: "Inspection removed" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove inspection.", variant: "destructive" });
+    },
+  });
+
+  const handleAddDotInspection = () => {
+    if (!dotIssueDate && !dotExpirationDate && !dotShopName) {
+      setDotFormError("Please fill in at least one field (issue date, expiration date, or shop name)");
+      return;
+    }
+    setDotFormError("");
+    createDotInspectionMutation.mutate();
+  };
 
   const handleAddAssignment = () => {
     if (!assignTruckId) { setAssignFormError("Please select a truck"); return; }
@@ -298,6 +365,15 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
     maxSize: 10 * 1024 * 1024,
   });
 
+  const dotDropzone = useDropzone({
+    onDrop: (files) => handleFileUpload(files, setDotAttachments),
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+    },
+    maxSize: 10 * 1024 * 1024,
+  });
+
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const payload = {
@@ -358,12 +434,17 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <Tabs defaultValue="basic" className="w-full">
-                <TabsList className={`grid w-full ${isEditing ? "grid-cols-6" : "grid-cols-5"}`}>
+                <TabsList className={`grid w-full ${isEditing ? "grid-cols-7" : "grid-cols-5"}`}>
                   <TabsTrigger value="basic" data-testid="tab-basic">Basic Info</TabsTrigger>
                   <TabsTrigger value="insurance" data-testid="tab-insurance">Insurance</TabsTrigger>
                   <TabsTrigger value="dates" data-testid="tab-dates">Dates & Rent</TabsTrigger>
                   <TabsTrigger value="tolls" data-testid="tab-tolls">Tolls</TabsTrigger>
                   <TabsTrigger value="pictures" data-testid="tab-pictures">Pictures</TabsTrigger>
+                  {isEditing && (
+                    <TabsTrigger value="dot-inspection" data-testid="tab-dot-inspection">
+                      DOT Insp.
+                    </TabsTrigger>
+                  )}
                   {isEditing && (
                     <TabsTrigger value="truck-history" data-testid="tab-truck-history">
                       Truck History
@@ -847,6 +928,238 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
                     </div>
                   )}
                 </TabsContent>
+
+                {/* DOT Inspection Tab — only shown when editing */}
+                {isEditing && (
+                  <TabsContent value="dot-inspection" className="space-y-5 mt-4">
+                    <div className="flex items-center gap-2">
+                      <ClipboardCheck className="h-5 w-5 text-primary" />
+                      <h3 className="text-lg font-medium">DOT Inspection Records</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Record every DOT inspection for this trailer. Each entry tracks the shop, dates, pass/fail result, and supporting documents.
+                    </p>
+
+                    {/* Add new inspection form */}
+                    <Card className="p-4 space-y-4">
+                      <p className="text-sm font-medium flex items-center gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        Add New DOT Inspection
+                      </p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Issue Date</label>
+                          <Input
+                            type="date"
+                            value={dotIssueDate}
+                            onChange={(e) => setDotIssueDate(e.target.value)}
+                            data-testid="input-dot-issue-date"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Expiration Date</label>
+                          <Input
+                            type="date"
+                            value={dotExpirationDate}
+                            onChange={(e) => setDotExpirationDate(e.target.value)}
+                            data-testid="input-dot-expiration-date"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Shop / Station Name</label>
+                          <Input
+                            value={dotShopName}
+                            onChange={(e) => setDotShopName(e.target.value)}
+                            placeholder="e.g. ABC Inspection Station"
+                            data-testid="input-dot-shop-name"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Result</label>
+                          <Select value={dotResult} onValueChange={setDotResult}>
+                            <SelectTrigger data-testid="select-dot-result">
+                              <SelectValue placeholder="Select result" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="passed">Passed</SelectItem>
+                              <SelectItem value="failed">Failed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="text-sm font-medium">Shop Address</label>
+                          <Input
+                            value={dotShopAddress}
+                            onChange={(e) => setDotShopAddress(e.target.value)}
+                            placeholder="123 Main St, City, ST 00000"
+                            data-testid="input-dot-shop-address"
+                          />
+                        </div>
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="text-sm font-medium">Notes (Optional)</label>
+                          <Textarea
+                            value={dotNotes}
+                            onChange={(e) => setDotNotes(e.target.value)}
+                            placeholder="Any additional details about this inspection..."
+                            className="min-h-[60px]"
+                            data-testid="input-dot-notes"
+                          />
+                        </div>
+                      </div>
+
+                      {/* File attachment upload */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Attachments (PDF / Images)</label>
+                        <div
+                          {...dotDropzone.getRootProps()}
+                          className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                            dotDropzone.isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                          }`}
+                        >
+                          <input {...dotDropzone.getInputProps()} data-testid="input-dot-upload" />
+                          <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            {dotDropzone.isDragActive ? "Drop files here" : "Click or drag inspection documents to upload"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">PDF or images, max 10MB each</p>
+                        </div>
+                        {dotAttachments.length > 0 && (
+                          <div className="space-y-1 mt-2">
+                            {dotAttachments.map((file, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-2 rounded-md bg-muted/40">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {file.fileName.match(/\.(jpg|jpeg|png|gif)$/i)
+                                    ? <Image className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                    : <FileText className="h-4 w-4 text-red-500 flex-shrink-0" />}
+                                  <span className="text-sm truncate">{file.fileName}</span>
+                                </div>
+                                <Button
+                                  type="button" variant="ghost" size="icon"
+                                  className="h-7 w-7 text-destructive"
+                                  onClick={() => removeFile(idx, setDotAttachments)}
+                                  data-testid={`button-remove-dot-file-${idx}`}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {dotFormError && <p className="text-xs text-destructive">{dotFormError}</p>}
+                      <Button
+                        type="button"
+                        onClick={handleAddDotInspection}
+                        disabled={createDotInspectionMutation.isPending}
+                        data-testid="button-add-dot-inspection"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        {createDotInspectionMutation.isPending ? "Saving..." : "Save Inspection"}
+                      </Button>
+                    </Card>
+
+                    <Separator />
+
+                    {/* Inspection history list */}
+                    {dotInspections.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-center">
+                        <ClipboardCheck className="h-8 w-8 text-muted-foreground mb-3" />
+                        <p className="text-sm font-medium">No inspections recorded</p>
+                        <p className="text-xs text-muted-foreground mt-1">Add the first DOT inspection above</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          {dotInspections.length} inspection{dotInspections.length !== 1 ? "s" : ""} on record
+                        </p>
+                        {dotInspections.map((insp) => {
+                          const isPassed = insp.result === "passed";
+                          const isFailed = insp.result === "failed";
+                          const isExpired = insp.expirationDate
+                            ? new Date(insp.expirationDate) < new Date()
+                            : false;
+                          return (
+                            <Card key={insp.id} className="p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1 min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {insp.shopName && (
+                                      <span className="font-medium text-sm">{insp.shopName}</span>
+                                    )}
+                                    {insp.result && (
+                                      <Badge
+                                        variant={isPassed ? "default" : "destructive"}
+                                        className="text-xs"
+                                      >
+                                        {isPassed ? (
+                                          <><CheckCircle2 className="mr-1 h-3 w-3" />Passed</>
+                                        ) : (
+                                          <>Failed</>
+                                        )}
+                                      </Badge>
+                                    )}
+                                    {isExpired && (
+                                      <Badge variant="destructive" className="text-xs">Expired</Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground space-y-0.5">
+                                    {insp.issueDate && <p>Issued: {insp.issueDate}</p>}
+                                    {insp.expirationDate && (
+                                      <p className={isExpired ? "text-destructive font-medium" : ""}>
+                                        Expires: {insp.expirationDate}
+                                      </p>
+                                    )}
+                                    {insp.shopAddress && <p>{insp.shopAddress}</p>}
+                                  </div>
+                                  {insp.notes && (
+                                    <p className="text-xs text-muted-foreground italic">{insp.notes}</p>
+                                  )}
+                                  {insp.attachments && (insp.attachments as FileAttachment[]).length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {(insp.attachments as FileAttachment[]).map((att, ai) => (
+                                        <button
+                                          key={ai}
+                                          type="button"
+                                          className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                          onClick={() => {
+                                            const link = document.createElement("a");
+                                            link.href = att.fileData;
+                                            link.download = att.fileName;
+                                            link.click();
+                                          }}
+                                          data-testid={`button-download-dot-att-${insp.id}-${ai}`}
+                                        >
+                                          <FileText className="h-3 w-3" />
+                                          {att.fileName}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive shrink-0"
+                                  onClick={() => {
+                                    if (confirm("Remove this inspection record?")) {
+                                      deleteDotInspectionMutation.mutate(insp.id);
+                                    }
+                                  }}
+                                  disabled={deleteDotInspectionMutation.isPending}
+                                  data-testid={`button-delete-dot-${insp.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+                )}
 
                 {/* Truck History Tab — only shown when editing */}
                 {isEditing && (
