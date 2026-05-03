@@ -10,19 +10,47 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { MessageSquare, User, Upload, X, FileText, Image as ImageIcon, Download, Clock } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MessageSquare, User, Upload, X, FileText, Image as ImageIcon, Download, Clock, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function FeedbackPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [personName, setPersonName] = useState("");
   const [note, setNote] = useState("");
   const [attachment, setAttachment] = useState<{ fileName: string; fileData: string } | null>(null);
   const [nameError, setNameError] = useState("");
   const [noteError, setNoteError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
 
   const { data: feedbacks = [], isLoading } = useQuery<Feedback[]>({
     queryKey: ["/api/feedbacks"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/feedbacks/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedbacks"] });
+      setDeleteTarget(null);
+      toast({ title: "Feedback deleted", description: "The feedback entry has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete feedback. Please try again.", variant: "destructive" });
+    },
   });
 
   const submitMutation = useMutation({
@@ -249,9 +277,22 @@ export default function FeedbackPage() {
                         {fb.personName}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {format(new Date(fb.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {format(new Date(fb.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                      </div>
+                      {isAdmin && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteTarget(fb)}
+                          data-testid={`button-delete-feedback-${fb.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -301,6 +342,29 @@ export default function FeedbackPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Feedback</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the feedback from{" "}
+              <span className="font-medium">{deleteTarget?.personName}</span>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-feedback">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-feedback"
+              className="bg-destructive text-destructive-foreground"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

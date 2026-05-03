@@ -2810,6 +2810,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/feedbacks/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      if ((req.user as any).role !== 'admin') {
+        return res.status(403).json({ error: "Forbidden: only admin-role users can delete feedback" });
+      }
+      const deleted = await storage.deleteFeedback(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete feedback" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
