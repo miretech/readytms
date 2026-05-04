@@ -46,6 +46,7 @@ const companySettingsSchema = z.object({
   cityStateZip: z.string().min(1, "City, State, ZIP is required"),
   phone: z.string().min(1, "Phone number is required"),
   logoUrl: z.string().optional(),
+  dispatchNotificationEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
 });
 
 type CompanySettingsFormValues = z.infer<typeof companySettingsSchema>;
@@ -429,6 +430,7 @@ export default function CompanySettingsPage() {
           cityStateZip: settings.cityStateZip,
           phone: settings.phone,
           logoUrl: settings.logoUrl || "",
+          dispatchNotificationEmail: settings.dispatchNotificationEmail || "",
         }
       : undefined,
   });
@@ -599,6 +601,28 @@ export default function CompanySettingsPage() {
                           </div>
                         )}
                       </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="dispatchNotificationEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dispatch Notification Email</FormLabel>
+                    <FormDescription>
+                      When a driver uploads a POD via the driver portal, a notification will be sent to this address. Leave blank to disable.
+                    </FormDescription>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="email"
+                        placeholder="dispatch@yourcompany.com"
+                        data-testid="input-dispatch-notification-email"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -926,6 +926,7 @@ export const companySettings = pgTable("company_settings", {
   cityStateZip: text("city_state_zip").notNull().default("St Paul, MN 55114"),
   phone: text("phone").notNull().default("612-567-5034"),
   logoUrl: text("logo_url"), // URL or base64 data of company logo
+  dispatchNotificationEmail: text("dispatch_notification_email"), // Email to notify when a POD is uploaded
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -987,6 +988,7 @@ export const feedbacks = pgTable("feedbacks", {
   note: text("note").notNull(),
   attachmentFileName: text("attachment_file_name"),
   attachmentFileData: text("attachment_file_data"),
+  status: text("status").notNull().default("open"), // "open" or "resolved"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

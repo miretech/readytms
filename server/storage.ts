@@ -336,6 +336,7 @@ export interface IStorage {
   getAllFeedbacks(): Promise<Feedback[]>;
   createFeedback(feedback: InsertFeedback): Promise<Feedback>;
   deleteFeedback(id: string): Promise<boolean>;
+  updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2119,6 +2120,15 @@ export class DatabaseStorage implements IStorage {
   async deleteFeedback(id: string): Promise<boolean> {
     const deleted = await db.delete(feedbacks).where(eq(feedbacks.id, id)).returning();
     return deleted.length > 0;
+  }
+
+  async updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined> {
+    const [updated] = await db
+      .update(feedbacks)
+      .set({ status })
+      .where(eq(feedbacks.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 

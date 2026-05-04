@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MessageSquare, User, Upload, X, FileText, Image as ImageIcon, Download, Clock, Trash2 } from "lucide-react";
+import { MessageSquare, User, Upload, X, FileText, Image as ImageIcon, Download, Clock, Trash2, CheckCircle2, Circle } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -35,8 +35,10 @@ export default function FeedbackPage() {
   const [noteError, setNoteError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
 
+  // Only admins fetch the feedback list
   const { data: feedbacks = [], isLoading } = useQuery<Feedback[]>({
     queryKey: ["/api/feedbacks"],
+    enabled: isAdmin,
   });
 
   const deleteMutation = useMutation({
@@ -50,6 +52,18 @@ export default function FeedbackPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete feedback. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      return await apiRequest("PATCH", `/api/feedbacks/${id}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedbacks"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update status.", variant: "destructive" });
     },
   });
 
@@ -234,55 +248,106 @@ export default function FeedbackPage() {
         </CardContent>
       </Card>
 
-      {/* Submitted feedback list */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Submitted Feedback</h2>
-          {feedbacks.length > 0 && (
-            <Badge variant="outline">{feedbacks.length} total</Badge>
-          )}
-        </div>
-
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-4">
-                  <div className="h-4 bg-muted rounded w-1/4 mb-3" />
-                  <div className="h-3 bg-muted rounded w-full mb-2" />
-                  <div className="h-3 bg-muted rounded w-3/4" />
-                </CardContent>
-              </Card>
-            ))}
+      {/* Submitted feedback list — admin only */}
+      {isAdmin && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-base font-semibold">Submitted Feedback</h2>
+            <div className="flex items-center gap-2">
+              {feedbacks.length > 0 && (
+                <Badge variant="outline">{feedbacks.length} total</Badge>
+              )}
+              {feedbacks.filter(f => f.status === "open").length > 0 && (
+                <Badge variant="secondary">
+                  {feedbacks.filter(f => f.status === "open").length} open
+                </Badge>
+              )}
+            </div>
           </div>
-        ) : feedbacks.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm font-medium">No feedback yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Be the first to submit feedback above</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {feedbacks.map((fb) => (
-              <Card key={fb.id} data-testid={`card-feedback-${fb.id}`}>
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
-                        <User className="h-4 w-4 text-primary" />
+
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="p-4">
+                    <div className="h-4 bg-muted rounded w-1/4 mb-3" />
+                    <div className="h-3 bg-muted rounded w-full mb-2" />
+                    <div className="h-3 bg-muted rounded w-3/4" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : feedbacks.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium">No feedback yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Feedback submitted by staff will appear here</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {feedbacks.map((fb) => (
+                <Card key={fb.id} data-testid={`card-feedback-${fb.id}`}>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                          <User className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="font-medium text-sm" data-testid={`text-feedback-name-${fb.id}`}>
+                          {fb.personName}
+                        </span>
+                        {fb.status === "resolved" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20"
+                            data-testid={`badge-status-${fb.id}`}
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Resolved
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="text-yellow-600 border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20"
+                            data-testid={`badge-status-${fb.id}`}
+                          >
+                            <Circle className="h-3 w-3 mr-1" />
+                            Open
+                          </Badge>
+                        )}
                       </div>
-                      <span className="font-medium text-sm" data-testid={`text-feedback-name-${fb.id}`}>
-                        {fb.personName}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {format(new Date(fb.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                      </div>
-                      {isAdmin && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {format(new Date(fb.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            statusMutation.mutate({
+                              id: fb.id,
+                              status: fb.status === "resolved" ? "open" : "resolved",
+                            })
+                          }
+                          disabled={statusMutation.isPending}
+                          data-testid={`button-toggle-status-${fb.id}`}
+                        >
+                          {fb.status === "resolved" ? (
+                            <>
+                              <Circle className="h-3.5 w-3.5 mr-1.5" />
+                              Mark Open
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                              Mark Resolved
+                            </>
+                          )}
+                        </Button>
                         <Button
                           type="button"
                           variant="ghost"
@@ -292,25 +357,36 @@ export default function FeedbackPage() {
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
-                      )}
+                      </div>
                     </div>
-                  </div>
 
-                  <Separator />
+                    <Separator />
 
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed" data-testid={`text-feedback-note-${fb.id}`}>
-                    {fb.note}
-                  </p>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed" data-testid={`text-feedback-note-${fb.id}`}>
+                      {fb.note}
+                    </p>
 
-                  {fb.attachmentFileName && fb.attachmentFileData && isSafeDataUri(fb.attachmentFileData) && (
-                    <div className="flex items-center gap-2 pt-1">
-                      {isImage(fb.attachmentFileName) ? (
-                        <div className="space-y-2">
-                          <img
-                            src={fb.attachmentFileData}
-                            alt={fb.attachmentFileName}
-                            className="max-h-40 rounded-md object-contain border"
-                          />
+                    {fb.attachmentFileName && fb.attachmentFileData && isSafeDataUri(fb.attachmentFileData) && (
+                      <div className="flex items-center gap-2 pt-1">
+                        {isImage(fb.attachmentFileName) ? (
+                          <div className="space-y-2">
+                            <img
+                              src={fb.attachmentFileData}
+                              alt={fb.attachmentFileName}
+                              className="max-h-40 rounded-md object-contain border"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownload(fb.attachmentFileData!, fb.attachmentFileName!)}
+                              data-testid={`button-download-attachment-${fb.id}`}
+                            >
+                              <Download className="h-3.5 w-3.5 mr-1.5" />
+                              {fb.attachmentFileName}
+                            </Button>
+                          </div>
+                        ) : (
                           <Button
                             type="button"
                             variant="outline"
@@ -318,30 +394,19 @@ export default function FeedbackPage() {
                             onClick={() => handleDownload(fb.attachmentFileData!, fb.attachmentFileName!)}
                             data-testid={`button-download-attachment-${fb.id}`}
                           >
-                            <Download className="h-3.5 w-3.5 mr-1.5" />
+                            <FileText className="h-3.5 w-3.5 mr-1.5" />
                             {fb.attachmentFileName}
                           </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownload(fb.attachmentFileData!, fb.attachmentFileName!)}
-                          data-testid={`button-download-attachment-${fb.id}`}
-                        >
-                          <FileText className="h-3.5 w-3.5 mr-1.5" />
-                          {fb.attachmentFileName}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>

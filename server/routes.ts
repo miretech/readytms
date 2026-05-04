@@ -544,6 +544,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await autoGenerateInvoice(updatedLoad);
 
+      // Send dispatch notification email if configured
+      try {
+        const companySettingsData = await storage.getCompanySettings();
+        if (companySettingsData?.dispatchNotificationEmail) {
+          await sendEmail({
+            to: companySettingsData.dispatchNotificationEmail,
+            subject: `POD Uploaded — Load #${updatedLoad.loadNumber}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <div style="background:#2563eb;color:white;padding:16px 20px;border-radius:6px 6px 0 0;">
+                  <h2 style="margin:0;">Proof of Delivery Received</h2>
+                </div>
+                <div style="background:#f9fafb;padding:20px;border-radius:0 0 6px 6px;border:1px solid #e5e7eb;border-top:none;">
+                  <p>A driver has uploaded a POD for <strong>Load #${updatedLoad.loadNumber}</strong>.</p>
+                  <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+                    <tr><td style="padding:8px;font-weight:bold;color:#6b7280;width:40%;">Driver</td><td style="padding:8px;">${driverName}</td></tr>
+                    <tr style="background:#fff;"><td style="padding:8px;font-weight:bold;color:#6b7280;">Truck Number</td><td style="padding:8px;">${truckNumber}</td></tr>
+                    <tr><td style="padding:8px;font-weight:bold;color:#6b7280;">Load Number</td><td style="padding:8px;">#${updatedLoad.loadNumber}</td></tr>
+                    <tr style="background:#fff;"><td style="padding:8px;font-weight:bold;color:#6b7280;">Files Uploaded</td><td style="padding:8px;">${podAttachments.length}</td></tr>
+                    <tr><td style="padding:8px;font-weight:bold;color:#6b7280;">Time</td><td style="padding:8px;">${new Date().toLocaleString()}</td></tr>
+                  </table>
+                  <p style="color:#6b7280;font-size:12px;margin-top:20px;">Ready TMS — Automated Notification</p>
+                </div>
+              </div>
+            `,
+          });
+        }
+      } catch (notifError) {
+        console.error("[POD Upload] Failed to send dispatch notification:", notifError);
+      }
+
       res.json({ message: "POD uploaded successfully", loadNumber: updatedLoad.loadNumber });
     } catch (error) {
       console.error("Error in public POD upload:", error);
@@ -2860,7 +2891,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Feedback routes
-  app.get("/api/feedbacks", isAuthenticated, async (req, res) => {
+  // GET — admin only: only admins can see all submitted feedback
+  app.get("/api/feedbacks", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const allFeedbacks = await storage.getAllFeedbacks();
       res.json(allFeedbacks);
@@ -2888,11 +2920,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH status — admin only
+  app.patch("/api/feedbacks/:id/status", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { status } = req.body;
+      if (!status || !["open", "resolved"].includes(status)) {
+        return res.status(400).json({ error: "Status must be 'open' or 'resolved'" });
+      }
+      const updated = await storage.updateFeedbackStatus(req.params.id, status);
+      if (!updated) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update feedback status" });
+    }
+  });
+
   app.delete("/api/feedbacks/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      if ((req.user as any).role !== 'admin') {
-        return res.status(403).json({ error: "Forbidden: only admin-role users can delete feedback" });
-      }
       const deleted = await storage.deleteFeedback(req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Feedback not found" });
@@ -2900,6 +2946,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete feedback" });
+    }
+  });
+
+  // Public POD status lookup — no auth required
+  app.get("/api/public/pod-status/:loadNumber", async (req, res) => {
+    try {
+      const { loadNumber } = req.params;
+      const allLoads = await storage.getAllLoads();
+      const matchingLoad = allLoads.find(
+        (l) => l.loadNumber.trim().toLowerCase() === loadNumber.trim().toLowerCase()
+      );
+      if (!matchingLoad) {
+        return res.status(404).json({ error: `Load #${loadNumber} was not found.` });
+      }
+      const pods = (matchingLoad.podAttachments as any[]) || [];
+      res.json({
+        loadNumber: matchingLoad.loadNumber,
+        status: matchingLoad.status,
+        podCount: pods.length,
+        submissions: pods.map((p: any) => ({
+          filename: p.filename,
+          uploadedAt: p.uploadedAt,
+          uploadedBy: p.uploadedBy,
+          truckNumber: p.truckNumber,
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to look up POD status" });
     }
   });
 

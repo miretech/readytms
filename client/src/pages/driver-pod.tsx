@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,9 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Upload, CheckCircle2, FileText, X, Truck, User, Hash, RotateCcw } from "lucide-react";
+import {
+  Camera, Upload, CheckCircle2, FileText, X, Truck, User, Hash,
+  RotateCcw, Search, Clock, Package,
+} from "lucide-react";
+import { format } from "date-fns";
 
 const podFormSchema = z.object({
   driverName: z.string().min(1, "Driver name is required"),
@@ -19,10 +24,24 @@ const podFormSchema = z.object({
 
 type PodFormValues = z.infer<typeof podFormSchema>;
 
+interface PodStatusResult {
+  loadNumber: string;
+  status: string;
+  podCount: number;
+  submissions: Array<{
+    filename: string;
+    uploadedAt: string;
+    uploadedBy?: string;
+    truckNumber?: string;
+  }>;
+}
+
 export default function DriverPOD() {
   const { toast } = useToast();
   const [podFiles, setPodFiles] = useState<Array<{ filename: string; data: string; type: string }>>([]);
   const [uploadSuccess, setUploadSuccess] = useState<{ loadNumber: string } | null>(null);
+  const [lookupNumber, setLookupNumber] = useState("");
+  const [lookupQuery, setLookupQuery] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,6 +77,20 @@ export default function DriverPOD() {
         variant: "destructive",
       });
     },
+  });
+
+  const { data: podStatus, isLoading: isLookingUp, error: lookupError } = useQuery<PodStatusResult>({
+    queryKey: ["/api/public/pod-status", lookupQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/public/pod-status/${encodeURIComponent(lookupQuery!)}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Load not found");
+      }
+      return res.json();
+    },
+    enabled: !!lookupQuery,
+    retry: false,
   });
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,6 +151,12 @@ export default function DriverPOD() {
     form.reset();
   };
 
+  const handleLookup = () => {
+    const trimmed = lookupNumber.trim();
+    if (!trimmed) return;
+    setLookupQuery(trimmed);
+  };
+
   // Success state
   if (uploadSuccess) {
     return (
@@ -162,6 +201,7 @@ export default function DriverPOD() {
       </div>
 
       <div className="p-4 max-w-lg mx-auto space-y-4 pt-6">
+        {/* Upload form */}
         <Card>
           <CardHeader>
             <CardTitle>Upload Proof of Delivery</CardTitle>
@@ -341,6 +381,97 @@ export default function DriverPOD() {
                 </Button>
               </form>
             </Form>
+          </CardContent>
+        </Card>
+
+        {/* POD status lookup */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Check Submission Status
+            </CardTitle>
+            <CardDescription>
+              Enter a load number to see if PODs have been submitted for it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={lookupNumber}
+                  onChange={(e) => {
+                    setLookupNumber(e.target.value);
+                    if (lookupQuery) setLookupQuery(null);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+                  placeholder="e.g. 10042"
+                  className="pl-10"
+                  data-testid="input-lookup-number"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleLookup}
+                disabled={isLookingUp || !lookupNumber.trim()}
+                data-testid="button-lookup"
+              >
+                {isLookingUp ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+
+            {lookupError && (
+              <p className="text-sm text-destructive" data-testid="text-lookup-error">
+                {(lookupError as Error).message}
+              </p>
+            )}
+
+            {podStatus && (
+              <div className="space-y-2" data-testid="pod-status-result">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Load #{podStatus.loadNumber}</span>
+                  <Badge variant={podStatus.podCount > 0 ? "default" : "secondary"}>
+                    {podStatus.podCount > 0
+                      ? `${podStatus.podCount} POD${podStatus.podCount !== 1 ? "s" : ""} submitted`
+                      : "No PODs yet"}
+                  </Badge>
+                </div>
+
+                {podStatus.submissions.length > 0 && (
+                  <div className="space-y-1">
+                    {podStatus.submissions.map((sub, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-2 p-2 rounded-md bg-muted/40 text-sm"
+                        data-testid={`submission-${i}`}
+                      >
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate">{sub.filename}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <Clock className="h-3 w-3 shrink-0" />
+                            {sub.uploadedAt
+                              ? format(new Date(sub.uploadedAt), "MMM d, yyyy 'at' h:mm a")
+                              : "Unknown time"}
+                            {sub.uploadedBy && (
+                              <span>· {sub.uploadedBy}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
