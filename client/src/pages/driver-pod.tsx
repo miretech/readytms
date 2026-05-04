@@ -40,12 +40,13 @@ export default function DriverPOD() {
       if (podFiles.length === 0) {
         throw new Error("Please add at least one POD photo or file before submitting.");
       }
-      return await apiRequest("POST", "/api/public/pod-upload", {
+      const res = await apiRequest("POST", "/api/public/pod-upload", {
         ...values,
         podAttachments: podFiles,
       });
+      return res.json() as Promise<{ message: string; loadNumber: string }>;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setUploadSuccess({ loadNumber: data.loadNumber });
       setPodFiles([]);
       form.reset();
