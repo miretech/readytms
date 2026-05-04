@@ -45,7 +45,7 @@ The system provides a comprehensive set of modules:
 - **GPS Driver Tracking**: Real-time location tracking with API endpoints for mobile apps, live location display with coordinates and Google Maps links.
 - **Driver Self-Registration**: Public-facing driver signup at `/driver-signup` for self-onboarding.
 - **Driver Portal**: Mobile-friendly web portal for drivers to share GPS location, toggle duty status, view assignments, and upload PODs.
-- **Driver POD Upload Portal**: Secure, mobile-optimized web app at `/driver-pod` for drivers to upload Proof of Delivery documents with camera integration and multi-file support.
+- **Driver POD Upload Portal**: Public (no login required), mobile-optimized web app at `/driver-pod` for drivers to upload Proof of Delivery documents. Drivers enter their name, load number, and truck number, then attach photos or PDFs. Uses the public endpoint POST `/api/public/pod-upload` which looks up the load by number, appends POD files, and auto-marks the load as delivered. Camera capture and multi-file support included.
 - **GPS Notification System**: Multi-channel notification system for GPS tracking reminders:
   - Email notifications when admin enables GPS tracking for a driver
   - Daily reminder emails for drivers who haven't shared location in 24 hours
