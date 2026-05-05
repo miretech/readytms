@@ -54,16 +54,34 @@ export default function DriverPOD() {
     },
   });
 
+  const parseApiError = (error: any): string => {
+    const msg: string = error?.message || "";
+    // apiRequest throws "STATUS: {json}" — extract the human-readable error field if present
+    const jsonMatch = msg.match(/^\d+:\s*(\{.*\})$/s);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        return parsed.error || parsed.message || msg;
+      } catch {}
+    }
+    return msg || "Something went wrong. Please try again.";
+  };
+
   const uploadMutation = useMutation({
     mutationFn: async (values: PodFormValues) => {
       if (podFiles.length === 0) {
         throw new Error("Please add at least one POD photo or file before submitting.");
       }
-      const res = await apiRequest("POST", "/api/public/pod-upload", {
-        ...values,
-        podAttachments: podFiles,
+      const res = await fetch("/api/public/pod-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, podAttachments: podFiles }),
       });
-      return res.json() as Promise<{ message: string; loadNumber: string }>;
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to upload POD. Please try again.");
+      }
+      return data as { message: string; loadNumber: string };
     },
     onSuccess: (data) => {
       setUploadSuccess({ loadNumber: data.loadNumber });
@@ -73,7 +91,7 @@ export default function DriverPOD() {
     onError: (error: any) => {
       toast({
         title: "Upload Failed",
-        description: error.message || "Failed to upload POD. Please try again.",
+        description: parseApiError(error),
         variant: "destructive",
       });
     },
