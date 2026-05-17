@@ -1,4 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
+
+// Converts any stored date string (MM/DD/YYYY or ISO) to YYYY-MM-DD for <input type="date">
+function toInputDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -269,10 +281,10 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         model: trailerData.model || "",
         insuranceProvider: trailerData.insuranceProvider || "",
         insurancePolicyNumber: trailerData.insurancePolicyNumber || "",
-        insuranceExpirationDate: trailerData.insuranceExpirationDate || "",
-        pickupDate: trailerData.pickupDate || "",
-        dropOffDate: trailerData.dropOffDate || "",
-        terminatedDate: trailerData.terminatedDate || "",
+        insuranceExpirationDate: toInputDate(trailerData.insuranceExpirationDate),
+        pickupDate: toInputDate(trailerData.pickupDate),
+        dropOffDate: toInputDate(trailerData.dropOffDate),
+        terminatedDate: toInputDate(trailerData.terminatedDate),
         repairs: trailerData.repairs || "",
         rentPerMonth: trailerData.rentPerMonth || "",
         haulingTruckId: trailerData.haulingTruckId || "",
@@ -1327,7 +1339,7 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => { setEditingAssignmentId(a.id); setEditingEndDate(a.endDate || ""); }}
+                                        onClick={() => { setEditingAssignmentId(a.id); setEditingEndDate(toInputDate(a.endDate)); }}
                                         data-testid={`button-edit-assignment-${a.id}`}
                                       >
                                         {isActive ? "Set End Date" : "Edit"}
