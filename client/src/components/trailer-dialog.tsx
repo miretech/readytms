@@ -395,11 +395,26 @@ export function TrailerDialog({ open, onOpenChange, trailer }: TrailerDialogProp
         repairsAttachments: repairsAttachments.length > 0 ? repairsAttachments : undefined,
       };
       if (isEditing) {
-        return await apiRequest("PATCH", `/api/trailers/${trailer.id}`, payload);
+        const res = await apiRequest("PATCH", `/api/trailers/${trailer.id}`, payload);
+        return await res.json() as Trailer;
       }
-      return await apiRequest("POST", "/api/trailers", payload);
+      const res = await apiRequest("POST", "/api/trailers", payload);
+      return await res.json() as Trailer;
     },
-    onSuccess: () => {
+    onSuccess: (savedTrailer) => {
+      // Immediately write the fresh trailer into both caches — no refetch race condition
+      queryClient.setQueryData(["/api/trailers", savedTrailer.id], savedTrailer);
+      queryClient.setQueriesData<Trailer[]>(
+        { queryKey: ["/api/trailers"] },
+        (old) => {
+          if (!Array.isArray(old)) return old;
+          const exists = old.some((t) => t.id === savedTrailer.id);
+          return exists
+            ? old.map((t) => (t.id === savedTrailer.id ? savedTrailer : t))
+            : [...old, savedTrailer];
+        }
+      );
+      // Also mark stale so a background refetch picks up any server-side changes
       queryClient.invalidateQueries({ queryKey: ["/api/trailers"] });
       toast({
         title: isEditing ? "Trailer updated" : "Trailer added",
