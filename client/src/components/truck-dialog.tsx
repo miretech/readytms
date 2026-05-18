@@ -1,4 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
+
+// Converts any stored date string (MM/DD/YYYY or ISO) to YYYY-MM-DD for <input type="date">
+function toInputDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -104,11 +116,11 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
         year: truckData.year || undefined,
         make: truckData.make || "",
         model: truckData.model || "",
-        cabCardExpirationDate: truckData.cabCardExpirationDate || "",
-        dotInspectionDate: (truckData as any).dotInspectionDate || "",
-        dotInspectionExpirationDate: (truckData as any).dotInspectionExpirationDate || "",
-        dateAddedToCompany: (truckData as any).dateAddedToCompany || "",
-        dateTerminated: (truckData as any).dateTerminated || "",
+        cabCardExpirationDate: toInputDate(truckData.cabCardExpirationDate),
+        dotInspectionDate: toInputDate((truckData as any).dotInspectionDate),
+        dotInspectionExpirationDate: toInputDate((truckData as any).dotInspectionExpirationDate),
+        dateAddedToCompany: toInputDate((truckData as any).dateAddedToCompany),
+        dateTerminated: toInputDate((truckData as any).dateTerminated),
         ownerFullName: (truckData as any).ownerFullName || "",
         isCompanyTruck: (truckData as any).isCompanyTruck || false,
       });
@@ -218,11 +230,25 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
         isCompanyTruck: (values as any).isCompanyTruck || false,
       };
       if (isEditing) {
-        return await apiRequest("PATCH", `/api/trucks/${truck.id}`, payload);
+        const res = await apiRequest("PATCH", `/api/trucks/${truck.id}`, payload);
+        return await res.json() as Truck;
       }
-      return await apiRequest("POST", "/api/trucks", payload);
+      const res = await apiRequest("POST", "/api/trucks", payload);
+      return await res.json() as Truck;
     },
-    onSuccess: () => {
+    onSuccess: (savedTruck) => {
+      // Immediately write the fresh truck into both caches — no refetch race condition
+      queryClient.setQueryData(["/api/trucks", savedTruck.id], savedTruck);
+      queryClient.setQueriesData<Truck[]>(
+        { queryKey: ["/api/trucks"] },
+        (old) => {
+          if (!Array.isArray(old)) return old;
+          const exists = old.some((t) => t.id === savedTruck.id);
+          return exists
+            ? old.map((t) => (t.id === savedTruck.id ? savedTruck : t))
+            : [...old, savedTruck];
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/trucks"] });
       toast({
         title: isEditing ? "Truck updated" : "Truck added",
@@ -230,10 +256,18 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
       });
       onOpenChange(false);
     },
-    onError: () => {
+    onError: (error: Error) => {
+      let message = `Failed to ${isEditing ? "update" : "add"} truck. Please try again.`;
+      try {
+        const jsonStart = error.message.indexOf("{");
+        if (jsonStart !== -1) {
+          const parsed = JSON.parse(error.message.slice(jsonStart));
+          if (parsed.error) message = parsed.error;
+        }
+      } catch {}
       toast({
         title: "Error",
-        description: `Failed to ${isEditing ? "update" : "add"} truck. Please try again.`,
+        description: message,
         variant: "destructive",
       });
     },
