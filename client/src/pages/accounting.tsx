@@ -1279,6 +1279,7 @@ function EmailFactoringDialog({
   const form = useForm({
     defaultValues: {
       to: "",
+      cc: "",
       from: "",
       subject: "",
       message: "",
@@ -1332,6 +1333,7 @@ function EmailFactoringDialog({
       
       form.reset({
         to: customer?.email || "",
+        cc: "",
         from: "",
         subject: `Invoice ${invoice.invoiceNumber} - ${companySettings?.companyName || "Ready TMS"}`,
         message: emailMessage,
@@ -1511,6 +1513,7 @@ function EmailFactoringDialog({
 
       const payload = {
         to: values.to,
+        cc: values.cc || undefined,
         from: values.from || undefined,
         subject: values.subject,
         message: values.message,
@@ -1574,6 +1577,20 @@ function EmailFactoringDialog({
                   <FormLabel>To *</FormLabel>
                   <FormControl>
                     <Input {...field} type="email" placeholder="factoring@example.com" data-testid="input-to-email" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="cc"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>CC</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="email" placeholder="cc@example.com" data-testid="input-cc-email" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

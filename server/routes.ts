@@ -1153,6 +1153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const schema = z.object({
         to: z.string().email(),
+        cc: z.string().email().optional(),
         from: z.string().email().optional(),
         subject: z.string().min(1),
         message: z.string().min(1),
@@ -1227,6 +1228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send email
       const emailResult = await sendEmail({
         to: validatedData.to,
+        cc: validatedData.cc,
         from: validatedData.from,
         subject: validatedData.subject,
         html: validatedData.message.replace(/\n/g, '<br>'),

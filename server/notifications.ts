@@ -51,6 +51,7 @@ initializeRingCentral().catch(console.error);
 
 interface EmailOptions {
   to: string;
+  cc?: string;
   subject: string;
   html: string;
   attachments?: {
@@ -89,6 +90,10 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 
     if (options.from && !options.from.includes('noreply@readytms.com')) {
       emailPayload.replyTo = options.from;
+    }
+
+    if (options.cc) {
+      emailPayload.cc = options.cc;
     }
 
     // Add attachments if provided — Resend only accepts filename + content
