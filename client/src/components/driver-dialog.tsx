@@ -197,10 +197,18 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       });
       onOpenChange(false);
     },
-    onError: () => {
+    onError: (error: Error) => {
+      let message = `Failed to ${isEditing ? "update" : "add"} driver. Please try again.`;
+      try {
+        const jsonStart = error.message.indexOf("{");
+        if (jsonStart !== -1) {
+          const parsed = JSON.parse(error.message.slice(jsonStart));
+          if (parsed.error) message = parsed.error;
+        }
+      } catch {}
       toast({
         title: "Error",
-        description: `Failed to ${isEditing ? "update" : "add"} driver. Please try again.`,
+        description: message,
         variant: "destructive",
       });
     },

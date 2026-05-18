@@ -830,7 +830,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(driver);
     } catch (error: any) {
       console.error("Driver validation error:", error);
-      res.status(400).json({ error: "Invalid driver data", details: error.message });
+      if (error?.code === "23505") {
+        const detail: string = error?.detail || "";
+        if (detail.includes("license_number")) {
+          return res.status(409).json({ error: "A driver with this CDL license number already exists." });
+        }
+        if (detail.includes("email")) {
+          return res.status(409).json({ error: "A driver with this email address already exists." });
+        }
+        return res.status(409).json({ error: "A driver with this information already exists." });
+      }
+      res.status(400).json({ error: error.message || "Invalid driver data" });
     }
   });
 
