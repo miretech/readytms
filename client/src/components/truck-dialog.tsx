@@ -54,6 +54,88 @@ interface FileAttachment {
   uploadedAt: string;
 }
 
+function FileUploadSection({
+  dropzone,
+  files,
+  setFiles,
+  title,
+  testIdPrefix,
+  onDownload,
+}: {
+  dropzone: ReturnType<typeof useDropzone>;
+  files: FileAttachment[];
+  setFiles: React.Dispatch<React.SetStateAction<FileAttachment[]>>;
+  title: string;
+  testIdPrefix: string;
+  onDownload: (file: FileAttachment) => void;
+}) {
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium flex items-center gap-2">
+        <FileText className="h-4 w-4" />
+        {title}
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Upload documents (PDF or images, max 10MB each)
+      </p>
+
+      <div
+        {...dropzone.getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+          dropzone.isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary"
+        }`}
+        data-testid={`dropzone-${testIdPrefix}`}
+      >
+        <input {...dropzone.getInputProps()} />
+        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          {dropzone.isDragActive
+            ? "Drop the files here..."
+            : "Drag & drop files here, or click to select"}
+        </p>
+      </div>
+
+      {files.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-sm font-medium">Uploaded Documents ({files.length})</p>
+          {files.map((file, index) => (
+            <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm truncate">{file.fileName}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onDownload(file)}
+                  data-testid={`button-download-${testIdPrefix}-${index}`}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeFile(index)}
+                  data-testid={`button-remove-${testIdPrefix}-${index}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const formSchema = insertTruckSchema.extend({
   truckNumber: z.string().min(1, "Truck number is required"),
   type: z.string().min(1, "Type is required"),
@@ -180,10 +262,6 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
     });
   }, []);
 
-  const removeFile = (index: number, setFiles: React.Dispatch<React.SetStateAction<FileAttachment[]>>) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const cabCardDropzone = useDropzone({
     onDrop: (files) => handleFileUpload(files, setCabCardFiles),
     accept: {
@@ -285,80 +363,6 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
   };
 
   const isCompanyTruck = form.watch("isCompanyTruck");
-
-  const FileUploadSection = ({ 
-    dropzone, 
-    files, 
-    setFiles, 
-    title, 
-    testIdPrefix 
-  }: { 
-    dropzone: ReturnType<typeof useDropzone>;
-    files: FileAttachment[];
-    setFiles: React.Dispatch<React.SetStateAction<FileAttachment[]>>;
-    title: string;
-    testIdPrefix: string;
-  }) => (
-    <div className="space-y-2">
-      <label className="text-sm font-medium flex items-center gap-2">
-        <FileText className="h-4 w-4" />
-        {title}
-      </label>
-      <p className="text-xs text-muted-foreground">
-        Upload documents (PDF or images, max 10MB each)
-      </p>
-      
-      <div
-        {...dropzone.getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-          dropzone.isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary"
-        }`}
-        data-testid={`dropzone-${testIdPrefix}`}
-      >
-        <input {...dropzone.getInputProps()} />
-        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          {dropzone.isDragActive
-            ? "Drop the files here..."
-            : "Drag & drop files here, or click to select"}
-        </p>
-      </div>
-
-      {files.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <p className="text-sm font-medium">Uploaded Documents ({files.length})</p>
-          {files.map((file, index) => (
-            <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <FileText className="h-4 w-4 flex-shrink-0" />
-                <span className="text-sm truncate">{file.fileName}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => downloadFile(file)}
-                  data-testid={`button-download-${testIdPrefix}-${index}`}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeFile(index, setFiles)}
-                  data-testid={`button-remove-${testIdPrefix}-${index}`}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -573,6 +577,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                       setFiles={setCabCardFiles}
                       title="Cab Card Documents"
                       testIdPrefix="cabcard"
+                      onDownload={downloadFile}
                     />
                   </div>
                 </TabsContent>
@@ -633,6 +638,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                       setFiles={setDotInspectionFiles}
                       title="DOT Inspection Documents"
                       testIdPrefix="dotinspection"
+                      onDownload={downloadFile}
                     />
                   </div>
                 </TabsContent>
@@ -650,6 +656,7 @@ export function TruckDialog({ open, onOpenChange, truck }: TruckDialogProps) {
                       setFiles={setRepairReceiptFiles}
                       title="Repair Receipt Documents"
                       testIdPrefix="repairs"
+                      onDownload={downloadFile}
                     />
                   </div>
                 </TabsContent>
