@@ -246,6 +246,18 @@ export default function DivisionLogin() {
                       <LogIn className="mr-2 h-4 w-4" />
                       {loginMutation.isPending ? "Signing In..." : "Sign In"}
                     </Button>
+                    <div className="text-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto text-sm px-0"
+                        onClick={() => window.location.href = "/reset-password"}
+                        data-testid="button-division-forgot-password"
+                      >
+                        Forgot password?
+                      </Button>
+                    </div>
                   </form>
                 </Form>
               </TabsContent>
