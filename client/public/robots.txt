@@ -1,0 +1,28 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Allow: /reset-password
+Allow: /driver-pod
+Allow: /driver-signup
+
+Disallow: /dashboard
+Disallow: /loads
+Disallow: /trucks
+Disallow: /trailers
+Disallow: /drivers
+Disallow: /customers
+Disallow: /accounting
+Disallow: /settlements
+Disallow: /safety
+Disallow: /maintenance
+Disallow: /fuel
+Disallow: /tasks
+Disallow: /feedback
+Disallow: /recurring-expenses
+Disallow: /gps-tracking
+Disallow: /company-settings
+Disallow: /admin-approvals
+Disallow: /api/
+
+Sitemap: https://readytms.com/sitemap.xml
