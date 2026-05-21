@@ -613,7 +613,7 @@ export class DatabaseStorage implements IStorage {
       podAttachments: sql`null`.as('pod_attachments'),
     }).from(loads);
     const results = companyId
-      ? await baseQuery.where(sql`${loads}.company_id = ${companyId}`).orderBy(desc(loads.createdAt))
+      ? await baseQuery.where(sql`(${loads}.company_id = ${companyId} OR ${loads}.company_id IS NULL)`).orderBy(desc(loads.createdAt))
       : await baseQuery.orderBy(desc(loads.createdAt));
     return results as Load[];
   }
@@ -694,7 +694,7 @@ export class DatabaseStorage implements IStorage {
       repairReceiptAttachments: sql`null`.as('repair_receipt_attachments'),
     }).from(trucks);
     const results = companyId
-      ? await baseQuery.where(sql`${trucks}.company_id = ${companyId}`)
+      ? await baseQuery.where(sql`(${trucks}.company_id = ${companyId} OR ${trucks}.company_id IS NULL)`)
       : await baseQuery;
     return results as Truck[];
   }
@@ -772,7 +772,7 @@ export class DatabaseStorage implements IStorage {
       pickupPictures: sql`null`.as('pickup_pictures'),
     }).from(trailers);
     const results = companyId
-      ? await baseQuery.where(sql`${trailers}.company_id = ${companyId}`)
+      ? await baseQuery.where(sql`(${trailers}.company_id = ${companyId} OR ${trailers}.company_id IS NULL)`)
       : await baseQuery;
     return results as Trailer[];
   }
@@ -910,7 +910,7 @@ export class DatabaseStorage implements IStorage {
       socialSecurityAttachment: sql`null`.as('social_security_attachment'),
     }).from(drivers);
     const results = companyId
-      ? await baseQuery.where(sql`${drivers}.company_id = ${companyId}`)
+      ? await baseQuery.where(sql`(${drivers}.company_id = ${companyId} OR ${drivers}.company_id IS NULL)`)
       : await baseQuery;
     return results as Driver[];
   }
@@ -1033,7 +1033,7 @@ export class DatabaseStorage implements IStorage {
 
   async getAllCustomers(companyId?: string): Promise<Customer[]> {
     if (companyId) {
-      return await db.select().from(customers).where(sql`${customers}.company_id = ${companyId}`);
+      return await db.select().from(customers).where(sql`(${customers}.company_id = ${companyId} OR ${customers}.company_id IS NULL)`);
     }
     return await db.select().from(customers);
   }
@@ -1126,7 +1126,7 @@ export class DatabaseStorage implements IStorage {
   // Invoices
   async getAllInvoices(companyId?: string): Promise<Invoice[]> {
     if (companyId) {
-      return await db.select().from(invoices).where(sql`${invoices}.company_id = ${companyId}`).orderBy(desc(invoices.invoiceDate));
+      return await db.select().from(invoices).where(sql`(${invoices}.company_id = ${companyId} OR ${invoices}.company_id IS NULL)`).orderBy(desc(invoices.invoiceDate));
     }
     return await db.select().from(invoices).orderBy(desc(invoices.invoiceDate));
   }
@@ -1462,7 +1462,7 @@ export class DatabaseStorage implements IStorage {
   // Settlements
   async getAllSettlements(companyId?: string): Promise<Settlement[]> {
     if (companyId) {
-      return await db.select().from(settlements).where(sql`${settlements}.company_id = ${companyId}`).orderBy(desc(settlements.periodEnd));
+      return await db.select().from(settlements).where(sql`(${settlements}.company_id = ${companyId} OR ${settlements}.company_id IS NULL)`).orderBy(desc(settlements.periodEnd));
     }
     return await db.select().from(settlements).orderBy(desc(settlements.periodEnd));
   }

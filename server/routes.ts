@@ -244,7 +244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Division admins only see pending users from their own division
       const currentUserDivisionId = req.user?.divisionId || null;
       const filtered = currentUserDivisionId
-        ? pendingAdmins.filter((u: any) => u.divisionId === currentUserDivisionId)
+        ? pendingAdmins.filter((u: any) => u.divisionId === currentUserDivisionId || !u.divisionId)
         : pendingAdmins;
       // Remove passwords from response
       const sanitized = filtered.map(({ password, ...user }: any) => user);
