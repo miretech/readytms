@@ -999,3 +999,22 @@ export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({
 
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type Feedback = typeof feedbacks.$inferSelect;
+
+// Sent Emails log — records every factoring email sent
+export const sentEmails = pgTable("sent_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: text("invoice_id"),
+  invoiceNumber: text("invoice_number"),
+  toEmail: text("to_email").notNull(),
+  ccEmails: text("cc_emails"), // comma-separated list of CC recipients
+  subject: text("subject"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
+export const insertSentEmailSchema = createInsertSchema(sentEmails).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type InsertSentEmail = z.infer<typeof insertSentEmailSchema>;
+export type SentEmail = typeof sentEmails.$inferSelect;

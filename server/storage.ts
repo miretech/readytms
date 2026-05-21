@@ -64,6 +64,9 @@ import {
   type InsertTrailerDotInspection,
   type Feedback,
   type InsertFeedback,
+  type SentEmail,
+  type InsertSentEmail,
+  sentEmails,
   users,
   loads,
   trucks,
@@ -337,6 +340,10 @@ export interface IStorage {
   createFeedback(feedback: InsertFeedback): Promise<Feedback>;
   deleteFeedback(id: string): Promise<boolean>;
   updateFeedbackStatus(id: string, status: string): Promise<Feedback | undefined>;
+
+  // Sent Emails
+  createSentEmail(data: InsertSentEmail): Promise<SentEmail>;
+  getAllSentEmails(): Promise<SentEmail[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2129,6 +2136,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(feedbacks.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async createSentEmail(data: InsertSentEmail): Promise<SentEmail> {
+    const [created] = await db.insert(sentEmails).values(data).returning();
+    return created;
+  }
+
+  async getAllSentEmails(): Promise<SentEmail[]> {
+    return await db.select().from(sentEmails).orderBy(desc(sentEmails.sentAt));
   }
 }
 

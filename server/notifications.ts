@@ -51,7 +51,7 @@ initializeRingCentral().catch(console.error);
 
 interface EmailOptions {
   to: string;
-  cc?: string;
+  cc?: string | string[];
   subject: string;
   html: string;
   attachments?: {
@@ -93,7 +93,9 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     }
 
     if (options.cc) {
-      emailPayload.cc = options.cc;
+      const ccList = Array.isArray(options.cc) ? options.cc : [options.cc];
+      const filtered = ccList.filter(Boolean);
+      if (filtered.length > 0) emailPayload.cc = filtered;
     }
 
     // Add attachments if provided — Resend only accepts filename + content

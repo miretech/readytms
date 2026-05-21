@@ -19,6 +19,7 @@ import {
   Download,
   Mail,
   Paperclip,
+  Send,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1588,9 +1589,9 @@ function EmailFactoringDialog({
               name="cc"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>CC</FormLabel>
+                  <FormLabel>From</FormLabel>
                   <FormControl>
-                    <Input {...field} type="email" placeholder="cc@example.com" data-testid="input-cc-email" />
+                    <Input {...field} type="email" placeholder="your@email.com" data-testid="input-cc-email" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1602,9 +1603,9 @@ function EmailFactoringDialog({
               name="from"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>From</FormLabel>
+                  <FormLabel>From (2nd)</FormLabel>
                   <FormControl>
-                    <Input {...field} type="email" placeholder="your@email.com" data-testid="input-from-email" />
+                    <Input {...field} type="email" placeholder="another@email.com" data-testid="input-from-email" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1684,6 +1685,72 @@ function EmailFactoringDialog({
         </Form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SentEmailsTab() {
+  const { data: sentEmails = [], isLoading } = useQuery<{
+    id: string;
+    invoiceId: string | null;
+    invoiceNumber: string | null;
+    toEmail: string;
+    ccEmails: string | null;
+    subject: string | null;
+    sentAt: string;
+  }[]>({ queryKey: ["/api/accounting/sent-emails"] });
+
+  return (
+    <TabsContent value="sent" className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Sent Emails
+          </CardTitle>
+          <CardDescription>History of invoices emailed to factoring companies</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-sm text-muted-foreground py-4 text-center">Loading…</div>
+          ) : sentEmails.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">No emails sent yet.</div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead>From / CC</TableHead>
+                    <TableHead>Subject</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sentEmails.map((row) => (
+                    <TableRow key={row.id} data-testid={`row-sent-email-${row.id}`}>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {new Date(row.sentAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {row.invoiceNumber || row.invoiceId || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm">{row.toEmail}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.ccEmails || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[220px] truncate">
+                        {row.subject || "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </TabsContent>
   );
 }
 
@@ -2025,6 +2092,10 @@ export default function Accounting() {
           <TabsTrigger value="payments" data-testid="tab-payments">
             <CreditCard className="mr-2 h-4 w-4" />
             Payments
+          </TabsTrigger>
+          <TabsTrigger value="sent" data-testid="tab-sent">
+            <Send className="mr-2 h-4 w-4" />
+            Sent
           </TabsTrigger>
         </TabsList>
 
@@ -2497,6 +2568,10 @@ export default function Accounting() {
             )}
           </Card>
         </TabsContent>
+
+        {/* Sent Emails Tab */}
+        <SentEmailsTab />
+
       </Tabs>
 
       <InvoiceDialog

@@ -1225,10 +1225,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Build CC list — both the "cc" field and the "from" field get copies
+      const ccRecipients: string[] = [];
+      if (validatedData.cc) ccRecipients.push(validatedData.cc);
+      if (validatedData.from) ccRecipients.push(validatedData.from);
+
       // Send email
       const emailResult = await sendEmail({
         to: validatedData.to,
-        cc: validatedData.cc,
+        cc: ccRecipients.length > 0 ? ccRecipients : undefined,
         from: validatedData.from,
         subject: validatedData.subject,
         html: validatedData.message.replace(/\n/g, '<br>'),
@@ -1240,11 +1245,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Failed to send email", details: emailResult.error });
       }
 
+      // Record sent email in the log
+      try {
+        await storage.createSentEmail({
+          invoiceId: validatedData.invoiceId,
+          invoiceNumber: invoice?.invoiceNumber || undefined,
+          toEmail: validatedData.to,
+          ccEmails: ccRecipients.length > 0 ? ccRecipients.join(", ") : undefined,
+          subject: validatedData.subject,
+        });
+      } catch (logErr) {
+        console.error('[Factoring Email] Failed to log sent email:', logErr);
+      }
+
       res.json({ success: true, message: "Email sent successfully" });
     } catch (error) {
       console.error('[Factoring Email] Error:', error);
       res.status(400).json({ error: "Invalid request data" });
     }
+  });
+
+  // Sent Emails Log
+  app.get("/api/accounting/sent-emails", async (_req, res) => {
+    const records = await storage.getAllSentEmails();
+    res.json(records);
   });
 
   // Payments Routes
