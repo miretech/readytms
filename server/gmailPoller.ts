@@ -1,0 +1,260 @@
+/**
+ * Gmail Poller — checks Gmail every 5 minutes for rate confirmation emails
+ * with PDF attachments and auto-creates loads in the TMS.
+ */
+
+import { google } from "googleapis";
+import { storage } from "./storage";
+import { extractLoadFromDocument } from "./aiExtraction";
+
+// Keywords that suggest a rate confirmation email
+const RATE_CON_SUBJECTS = [
+  "rate con",
+  "rate confirmation",
+  "load tender",
+  "load confirmation",
+  "freight confirmation",
+  "rate sheet",
+  "rate agree",
+  "dispatch confirmation",
+];
+
+function buildOAuth2Client(accessToken: string, refreshToken: string) {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  return oauth2Client;
+}
+
+function isRateConSubject(subject: string): boolean {
+  const lower = subject.toLowerCase();
+  return RATE_CON_SUBJECTS.some((keyword) => lower.includes(keyword));
+}
+
+/** Decode base64url encoded Gmail attachment data */
+function decodeBase64Url(data: string): Buffer {
+  // Gmail uses base64url encoding (+ → -, / → _)
+  const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
+  return Buffer.from(base64, "base64");
+}
+
+/** Extract text from a PDF buffer using pdf-parse */
+async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: pdfBuffer });
+  const result = await parser.getText();
+  await parser.destroy();
+  return result.text || "";
+}
+
+/** Generate a unique load number */
+function generateLoadNumber(): string {
+  const now = new Date();
+  const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const randPart = String(Math.floor(Math.random() * 9000) + 1000);
+  return `AUTO-${datePart}-${randPart}`;
+}
+
+/** Process a single Gmail message: download PDF, extract load, create in TMS */
+async function processMessage(
+  gmail: ReturnType<typeof google.gmail>,
+  messageId: string
+): Promise<{ success: boolean; loadNumber?: string; error?: string }> {
+  try {
+    const msgResp = await gmail.users.messages.get({
+      userId: "me",
+      id: messageId,
+      format: "full",
+    });
+
+    const msg = msgResp.data;
+    const payload = msg.payload;
+    if (!payload) return { success: false, error: "No payload in message" };
+
+    const pdfParts: Array<{ partId: string; filename: string; attachmentId: string }> = [];
+
+    const findPdfParts = (parts: typeof payload.parts): void => {
+      if (!parts) return;
+      for (const part of parts) {
+        const mimeType = part.mimeType || "";
+        if (
+          (mimeType === "application/pdf" || part.filename?.toLowerCase().endsWith(".pdf")) &&
+          part.body?.attachmentId
+        ) {
+          pdfParts.push({
+            partId: part.partId || "",
+            filename: part.filename || "attachment.pdf",
+            attachmentId: part.body.attachmentId,
+          });
+        }
+        if (part.parts) findPdfParts(part.parts);
+      }
+    };
+
+    findPdfParts(payload.parts);
+
+    if (pdfParts.length === 0) {
+      return { success: false, error: "No PDF attachments found" };
+    }
+
+    const pdfPart = pdfParts[0];
+    console.log(`[GmailPoller] Downloading attachment: ${pdfPart.filename}`);
+
+    const attachResp = await gmail.users.messages.attachments.get({
+      userId: "me",
+      messageId,
+      id: pdfPart.attachmentId,
+    });
+
+    const attachData = attachResp.data.data;
+    if (!attachData) {
+      return { success: false, error: "Empty attachment data" };
+    }
+
+    const pdfBuffer = decodeBase64Url(attachData);
+    console.log(`[GmailPoller] PDF downloaded (${pdfBuffer.length} bytes), extracting text`);
+
+    const pdfText = await extractPdfText(pdfBuffer);
+    if (!pdfText || pdfText.trim().length < 20) {
+      return { success: false, error: "PDF text extraction yielded insufficient content" };
+    }
+
+    const dataUrl = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+    console.log("[GmailPoller] Running Claude extraction");
+    const extracted = await extractLoadFromDocument(dataUrl, "application/pdf");
+
+    const loadNumber = extracted.loadNumber || generateLoadNumber();
+    const existing = await storage.getLoadByNumber(loadNumber);
+    if (existing) {
+      console.log(`[GmailPoller] Load ${loadNumber} already exists, skipping`);
+      return { success: false, error: `Load ${loadNumber} already exists` };
+    }
+
+    const load = await storage.createLoad({
+      loadNumber,
+      status: "pending",
+      pickupLocation: extracted.pickupLocation,
+      pickupDate: extracted.pickupDate,
+      deliveryLocation: extracted.deliveryLocation,
+      deliveryDate: extracted.deliveryDate,
+      rate: extracted.rate,
+      weight: extracted.weight ?? undefined,
+      commodity: extracted.commodity ?? undefined,
+      notes: [
+        extracted.notes,
+        extracted.brokerName ? `Broker: ${extracted.brokerName}` : null,
+        extracted.brokerAddress ? `Broker Address: ${extracted.brokerAddress}` : null,
+        extracted.brokerPhone ? `Broker Phone: ${extracted.brokerPhone}` : null,
+        extracted.brokerEmail ? `Broker Email: ${extracted.brokerEmail}` : null,
+        `Auto-imported from Gmail (${pdfPart.filename})`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    });
+
+    await storage.createNotification({
+      type: "success",
+      category: "gmail_auto_import",
+      title: "Load Auto-Created from Gmail",
+      message: `Load ${load.loadNumber} was automatically created from a rate confirmation email (${pdfPart.filename}). Pickup: ${extracted.pickupLocation}, Delivery: ${extracted.deliveryLocation}, Rate: $${extracted.rate}.`,
+      relatedEntityType: "load",
+      relatedEntityId: load.id,
+      isRead: "false",
+    });
+
+    await storage.createActivityLog({
+      action: "gmail_load_import",
+      entityType: "load",
+      entityId: load.id,
+      details: `Auto-created load ${load.loadNumber} from Gmail attachment ${pdfPart.filename}`,
+      metadata: {
+        gmailMessageId: messageId,
+        filename: pdfPart.filename,
+        brokerName: extracted.brokerName,
+      },
+      status: "success",
+    });
+
+    console.log(`[GmailPoller] ✅ Created load ${load.loadNumber} from email ${messageId}`);
+    return { success: true, loadNumber: load.loadNumber };
+  } catch (err: any) {
+    console.error(`[GmailPoller] Failed to process message ${messageId}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+async function pollGmail(): Promise<void> {
+  const tokens = await storage.getGmailTokens();
+  if (!tokens) return;
+
+  console.log(`[GmailPoller] Polling Gmail for ${tokens.connectedEmail}`);
+
+  try {
+    const auth = buildOAuth2Client(tokens.accessToken, tokens.refreshToken);
+    auth.on("tokens", async (newTokens: { access_token?: string | null; refresh_token?: string | null }) => {
+      if (newTokens.access_token) {
+        await storage.saveGmailTokens({
+          accessToken: newTokens.access_token,
+          refreshToken: newTokens.refresh_token || tokens.refreshToken,
+          connectedEmail: tokens.connectedEmail,
+        });
+      }
+    });
+
+    const gmail = google.gmail({ version: "v1", auth });
+    const subjectQuery = RATE_CON_SUBJECTS.map((kw) => `subject:"${kw}"`).join(" OR ");
+    const query = `is:unread has:attachment (${subjectQuery})`;
+
+    const listResp = await gmail.users.messages.list({ userId: "me", q: query, maxResults: 20 });
+    const messages = listResp.data.messages || [];
+    if (messages.length === 0) { console.log("[GmailPoller] No matching emails found"); return; }
+
+    console.log(`[GmailPoller] Found ${messages.length} candidate email(s)`);
+
+    for (const message of messages) {
+      if (!message.id) continue;
+      const headerResp = await gmail.users.messages.get({ userId: "me", id: message.id, format: "metadata", metadataHeaders: ["Subject"] });
+      const subjectHeader = headerResp.data.payload?.headers?.find((h: any) => h.name?.toLowerCase() === "subject");
+      const subject = subjectHeader?.value || "";
+      if (!isRateConSubject(subject)) {
+        await gmail.users.messages.modify({ userId: "me", id: message.id, requestBody: { removeLabelIds: ["UNREAD"] } });
+        continue;
+      }
+      const result = await processMessage(gmail, message.id);
+      await gmail.users.messages.modify({ userId: "me", id: message.id, requestBody: { removeLabelIds: ["UNREAD"] } });
+      if (result.success) { console.log(`[GmailPoller] ✅ Load created: ${result.loadNumber}`); }
+      else { console.log(`[GmailPoller] ⚠️  Skipped: ${result.error}`); }
+    }
+  } catch (err: any) {
+    console.error("[GmailPoller] Poll error:", err.message);
+    if (err.message?.includes("invalid_grant") || err.message?.includes("Token has been expired")) {
+      await storage.deleteGmailTokens();
+    }
+  }
+}
+
+const POLL_INTERVAL_MS = 5 * 60 * 1000;
+let pollerInterval: ReturnType<typeof setInterval> | null = null;
+
+export function startGmailPoller(): void {
+  if (pollerInterval) return;
+  console.log("[GmailPoller] Starting (5-minute interval)");
+  pollGmail().catch((err) => console.error("[GmailPoller] Initial poll error:", err));
+  pollerInterval = setInterval(() => {
+    pollGmail().catch((err) => console.error("[GmailPoller] Poll error:", err));
+  }, POLL_INTERVAL_MS);
+}
+
+export function stopGmailPoller(): void {
+  if (pollerInterval) {
+    clearInterval(pollerInterval);
+    pollerInterval = null;
+    console.log("[GmailPoller] Stopped");
+  }
+}
