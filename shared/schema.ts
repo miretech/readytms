@@ -588,7 +588,7 @@ export const settlementLineItems = pgTable("settlement_line_items", {
   loadId: varchar("load_id"), // Optional - can be manual entry
   brokerName: text("broker_name"), // Broker/Customer name for this load
   description: text("description").notNull(),
-  quantity: decimal("quantity", { precision: 10, scale: 2 }), // e.g., miles, loads, hours
+  quantity: decimal("quantity", { precision: 10, scale: 2 }), // e.g., miles, loads, or hours
   rate: decimal("rate", { precision: 10, scale: 4 }), // e.g., per mile, per load, per hour
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Gross amount for this load
   itemType: text("item_type").notNull(), // "revenue", "deduction", "bonus", "adjustment"
@@ -979,6 +979,19 @@ export const insertDivisionInvitationSchema = createInsertSchema(divisionInvitat
 
 export type InsertDivisionInvitation = z.infer<typeof insertDivisionInvitationSchema>;
 export type DivisionInvitation = typeof divisionInvitations.$inferSelect;
+
+// Gmail OAuth Tokens — store per-user Gmail integration credentials
+export const gmailTokens = pgTable("gmail_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  connectedEmail: text("connected_email").notNull(),
+  connectedAt: timestamp("connected_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type GmailToken = typeof gmailTokens.$inferSelect;
+export type InsertGmailToken = typeof gmailTokens.$inferInsert;
 
 // Feedback table — anyone can submit a name, note, and optional attachment
 export const feedbacks = pgTable("feedbacks", {
