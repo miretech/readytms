@@ -31,6 +31,7 @@ import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
 import { z } from "zod";
+import { google } from "googleapis";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up email/password Auth middleware
@@ -2890,6 +2891,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to create feedback" });
     }
   });
+
+  // Gmail OAuth Routes
+  app.get('/api/gmail/oauth/start', isAuthenticated, async (req, res) => {
+    const client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+    const url = client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: ['https://www.googleapis.com/auth/gmail.readonly'],
+    });
+    res.redirect(url);
+  });
+
+  app.get('/api/gmail/oauth/callback', async (req, res) => {
+    try {
+      const code = req.query.code;
+      if (!code || typeof code !== 'string') return res.redirect('/?gmail=error');
+      const client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI
+      );
+      const { tokens } = await client.getToken(code);
+      client.setCredentials(tokens);
+      const gmail = google.gmail({ version: 'v1', auth: client });
+      const profile = await gmail.users.getProfile({ userId: 'me' });
+      await storage.saveGmailTokens({
+        accessToken: tokens.access_token!,
+        refreshToken: tokens.refresh_token!,
+        connectedEmail: profile.data.emailAddress || '',
+      });
+      res.redirect('/?gmail=connected');
+    } catch(e: any) {
+      console.error('Gmail OAuth error:', e.message);
+      res.redirect('/?gmail=error');
+    }
+  });
+
+  app.get('/api/gmail/status', isAuthenticated, async (req, res) => {
+    const tokens = await storage.getGmailTokens();
+    if (!tokens) return res.json({ connected: false });
+    res.json({ connected: true, email: tokens.connectedEmail, connectedAt: tokens.connectedAt });
+  });
+
+  app.delete('/api/gmail/disconnect', isAuthenticated, async (req, res) => {
+    await storage.deleteGmailTokens();
+    res.json({ success: true });
+  });
+
 
   const httpServer = createServer(app);
 
