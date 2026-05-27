@@ -97,6 +97,9 @@ import {
   divisionInvitations,
   passwordResetTokens,
   feedbacks,
+  gmailTokens,
+  GmailToken,
+  InsertGmailToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
@@ -336,6 +339,11 @@ export interface IStorage {
   // Feedback
   getAllFeedbacks(): Promise<Feedback[]>;
   createFeedback(feedback: InsertFeedback): Promise<Feedback>;
+
+  // Gmail OAuth Tokens
+  saveGmailTokens(tokens: { accessToken: string; refreshToken: string; connectedEmail: string }): Promise<GmailToken>;
+  getGmailTokens(): Promise<GmailToken | undefined>;
+  deleteGmailTokens(): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2119,6 +2127,26 @@ export class DatabaseStorage implements IStorage {
   async createFeedback(feedback: InsertFeedback): Promise<Feedback> {
     const [created] = await db.insert(feedbacks).values(feedback).returning();
     return created;
+  }
+
+  async saveGmailTokens(tokens: { accessToken: string; refreshToken: string; connectedEmail: string }): Promise<GmailToken> {
+    await db.delete(gmailTokens);
+    const [created] = await db.insert(gmailTokens).values({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      connectedEmail: tokens.connectedEmail,
+    }).returning();
+    return created;
+  }
+
+  async getGmailTokens(): Promise<GmailToken | undefined> {
+    const [token] = await db.select().from(gmailTokens).limit(1);
+    return token;
+  }
+
+  async deleteGmailTokens(): Promise<boolean> {
+    await db.delete(gmailTokens);
+    return true;
   }
 }
 
