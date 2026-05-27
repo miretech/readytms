@@ -588,7 +588,7 @@ export const settlementLineItems = pgTable("settlement_line_items", {
   loadId: varchar("load_id"), // Optional - can be manual entry
   brokerName: text("broker_name"), // Broker/Customer name for this load
   description: text("description").notNull(),
-  quantity: decimal("quantity", { precision: 10, scale: 2 }), // e.g., miles, loads, or hours
+  quantity: decimal("quantity", { precision: 10, scale: 2 }), // e.g., miles, loads, ours
   rate: decimal("rate", { precision: 10, scale: 4 }), // e.g., per mile, per load, per hour
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Gross amount for this load
   itemType: text("item_type").notNull(), // "revenue", "deduction", "bonus", "adjustment"
@@ -603,7 +603,7 @@ export const insertSettlementLineItemSchema = createInsertSchema(settlementLineI
   description: z.string().min(1, "Description is required"),
   quantity: z.string().optional(),
   rate: z.string().optional(),
-  amount: z.string().min(1, "Amount is required"),
+  amount: z.st4ring().min(1, "Amount is required"),
   itemType: z.string().default("revenue"),
   settlementId: z.string(),
 });
