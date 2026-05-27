@@ -75,6 +75,7 @@ export const trucks = pgTable("trucks", {
   // Owner Info
   ownerFullName: text("owner_full_name"),
   isCompanyTruck: boolean("is_company_truck").default(false),
+  companyId: varchar("company_id"),
 });
 
 export const insertTruckSchema = createInsertSchema(trucks).omit({
@@ -115,6 +116,7 @@ export const trailers = pgTable("trailers", {
   pickupPictures: jsonb("pickup_pictures").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
   // Truck currently hauling this trailer
   haulingTruckId: varchar("hauling_truck_id"),
+  companyId: varchar("company_id"),
 });
 
 export const insertTrailerSchema = createInsertSchema(trailers).omit({
@@ -192,6 +194,7 @@ export const drivers = pgTable("drivers", {
   lastGpsNotificationSent: timestamp("last_gps_notification_sent"), // Last time GPS reminder was sent
   gpsNotificationsEnabled: text("gps_notifications_enabled").notNull().default("true"), // "true" or "false"
   driverType: text("driver_type").notNull().default("company-driver"), // "owner-operator" or "company-driver"
+  companyId: varchar("company_id"),
 });
 
 export const insertDriverSchema = createInsertSchema(drivers).omit({
@@ -220,6 +223,7 @@ export const customers = pgTable("customers", {
   contactPerson: text("contact_person"),
   mcNumber: text("mc_number"),
   notes: text("notes"),
+  companyId: varchar("company_id"),
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
@@ -249,6 +253,7 @@ export const loads = pgTable("loads", {
   podAttachment: text("pod_attachment"), // Base64 encoded proof of delivery document - DEPRECATED
   podAttachments: jsonb("pod_attachments"), // Array of {filename: string, data: string (base64), type: string, uploadedAt: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertLoadSchema = createInsertSchema(loads).omit({
@@ -335,6 +340,7 @@ export const invoices = pgTable("invoices", {
   carrierName: text("carrier_name"), // Editable carrier name for invoice
   carrierAddress: text("carrier_address"), // Editable carrier address for invoice
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({
@@ -397,6 +403,7 @@ export const inspections = pgTable("inspections", {
   performedBy: text("performed_by"),
   attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertInspectionSchema = createInsertSchema(inspections).omit({
@@ -535,6 +542,7 @@ export const settlements = pgTable("settlements", {
   paymentMethod: text("payment_method"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertSettlementSchema = createInsertSchema(settlements).omit({
@@ -593,6 +601,7 @@ export const settlementLineItems = pgTable("settlement_line_items", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Gross amount for this load
   itemType: text("item_type").notNull(), // "revenue", "deduction", "bonus", "adjustment"
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertSettlementLineItemSchema = createInsertSchema(settlementLineItems).omit({
@@ -655,6 +664,7 @@ export const maintenance = pgTable("maintenance", {
   notes: text("notes"),
   attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertMaintenanceSchema = createInsertSchema(maintenance).omit({
@@ -840,6 +850,7 @@ export const shortPays = pgTable("short_pays", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at"),
+  companyId: varchar("company_id"),
 });
 
 export const insertShortPaySchema = createInsertSchema(shortPays).omit({
@@ -900,6 +911,7 @@ export const tasks = pgTable("tasks", {
   completedAt: timestamp("completed_at"),
   attachments: jsonb("attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertTaskSchema = createInsertSchema(tasks).omit({
