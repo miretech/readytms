@@ -30,6 +30,7 @@ import bcrypt from "bcrypt";
 import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
+import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail } from "./gmail";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1230,15 +1231,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.cc) ccRecipients.push(validatedData.cc);
       if (validatedData.from) ccRecipients.push(validatedData.from);
 
-      // Send email
-      const emailResult = await sendEmail({
-        to: validatedData.to,
-        cc: ccRecipients.length > 0 ? ccRecipients : undefined,
-        from: validatedData.from,
-        subject: validatedData.subject,
-        html: validatedData.message.replace(/\n/g, '<br>'),
-        attachments: attachments.length > 0 ? attachments : undefined,
-      });
+      // Try Gmail first (uses the connected account), fall back to Resend
+      const gmailStatus = await getGmailStatus();
+      let emailResult: { success: boolean; error?: string };
+      if (gmailStatus.connected) {
+        emailResult = await sendViaGmail({
+          to: validatedData.to,
+          cc: ccRecipients.length > 0 ? ccRecipients : undefined,
+          subject: validatedData.subject,
+          html: validatedData.message.replace(/\n/g, '<br>'),
+          attachments: attachments.length > 0 ? attachments : undefined,
+        });
+        if (!emailResult.success) {
+          console.warn('[Factoring Email] Gmail failed, falling back to Resend:', emailResult.error);
+          emailResult = await sendEmail({
+            to: validatedData.to,
+            cc: ccRecipients.length > 0 ? ccRecipients : undefined,
+            from: validatedData.from,
+            subject: validatedData.subject,
+            html: validatedData.message.replace(/\n/g, '<br>'),
+            attachments: attachments.length > 0 ? attachments : undefined,
+          });
+        }
+      } else {
+        emailResult = await sendEmail({
+          to: validatedData.to,
+          cc: ccRecipients.length > 0 ? ccRecipients : undefined,
+          from: validatedData.from,
+          subject: validatedData.subject,
+          html: validatedData.message.replace(/\n/g, '<br>'),
+          attachments: attachments.length > 0 ? attachments : undefined,
+        });
+      }
 
       if (!emailResult.success) {
         console.error('[Factoring Email] Send failed:', emailResult.error);
@@ -2507,7 +2531,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Divisions Routes
+  // ── Gmail OAuth Routes ──────────────────────────────────────────────────────
+
+  // Check connection status (public — used by settings page on load)
+  app.get("/api/gmail/status", async (_req, res) => {
+    try {
+      const status = await getGmailStatus();
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ connected: false, error: err.message });
+    }
+  });
+
+  // Start OAuth flow — redirect browser to Google consent screen
+  app.get("/api/gmail/oauth/connect", (req, res) => {
+    try {
+      const url = getGmailAuthUrl();
+      res.redirect(url);
+    } catch (err: any) {
+      res.status(500).send("Failed to generate Gmail authorization URL: " + err.message);
+    }
+  });
+
+  // OAuth callback — Google redirects here after user grants permission
+  app.get("/api/gmail/oauth/callback", async (req, res) => {
+    const code = req.query.code as string | undefined;
+    if (!code) {
+      return res.redirect("/company-settings?gmail=error");
+    }
+    try {
+      await exchangeCodeAndSave(code);
+      res.redirect("/company-settings?gmail=connected");
+    } catch (err: any) {
+      console.error("[Gmail OAuth] Callback error:", err.message);
+      res.redirect("/company-settings?gmail=error");
+    }
+  });
+
+  // Disconnect Gmail
+  app.post("/api/gmail/disconnect", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      await clearGmailTokens();
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Divisions Routes ─────────────────────────────────────────────────────────
   app.get("/api/divisions", async (_req, res) => {
     const allDivisions = await storage.getAllDivisions();
     res.json(allDivisions);

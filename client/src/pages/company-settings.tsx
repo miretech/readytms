@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Save, Building2, Upload, Plus, Pencil, Trash2, Star, StarOff, Send, Copy, CheckCircle, AlertCircle } from "lucide-react";
+import { Save, Building2, Upload, Plus, Pencil, Trash2, Star, StarOff, Send, Copy, CheckCircle, AlertCircle, Mail, Link, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -335,6 +335,37 @@ export default function CompanySettingsPage() {
   const { data: divisionsList = [], isLoading: divisionsLoading } = useQuery<Division[]>({
     queryKey: ["/api/divisions"],
   });
+
+  const { data: gmailStatus, refetch: refetchGmail } = useQuery<{ connected: boolean; email?: string }>({
+    queryKey: ["/api/gmail/status"],
+  });
+
+  const disconnectGmailMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/gmail/disconnect", {});
+    },
+    onSuccess: () => {
+      refetchGmail();
+      toast({ title: "Gmail Disconnected", description: "Your Gmail account has been disconnected." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Handle OAuth callback result via query param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gmailParam = params.get("gmail");
+    if (gmailParam === "connected") {
+      refetchGmail();
+      toast({ title: "Gmail Connected", description: "Your Gmail account is now linked. Invoice emails will be sent from your Gmail." });
+      window.history.replaceState({}, "", "/company-settings");
+    } else if (gmailParam === "error") {
+      toast({ title: "Gmail Connection Failed", description: "Could not connect your Gmail account. Please try again.", variant: "destructive" });
+      window.history.replaceState({}, "", "/company-settings");
+    }
+  }, []);
 
   const updateMutation = useMutation({
     mutationFn: async (data: CompanySettingsFormValues) => {
@@ -931,6 +962,66 @@ export default function CompanySettingsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Separator />
+
+      {/* Gmail Integration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Gmail Integration
+          </CardTitle>
+          <CardDescription>
+            Connect your Gmail account to send invoice emails directly from your inbox. When connected, factoring emails are sent from your Gmail address instead of the system default.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {gmailStatus?.connected ? (
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 dark:bg-green-900">
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Connected</p>
+                  <p className="text-sm text-muted-foreground">{gmailStatus.email}</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => disconnectGmailMutation.mutate()}
+                disabled={disconnectGmailMutation.isPending}
+                data-testid="button-gmail-disconnect"
+              >
+                <Unlink className="mr-2 h-4 w-4" />
+                {disconnectGmailMutation.isPending ? "Disconnecting..." : "Disconnect Gmail"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
+                  <Mail className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Not connected</p>
+                  <p className="text-sm text-muted-foreground">Invoice emails use the system default sender</p>
+                </div>
+              </div>
+              <Button
+                asChild
+                data-testid="button-gmail-connect"
+              >
+                <a href="/api/gmail/oauth/connect">
+                  <Link className="mr-2 h-4 w-4" />
+                  Connect Gmail
+                </a>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <AlertDialog
         open={!!deletingDivision}

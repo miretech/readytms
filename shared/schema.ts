@@ -925,8 +925,12 @@ export const companySettings = pgTable("company_settings", {
   address: text("address").notNull().default("2380 Wycliff Street Ste 200"),
   cityStateZip: text("city_state_zip").notNull().default("St Paul, MN 55114"),
   phone: text("phone").notNull().default("612-567-5034"),
-  logoUrl: text("logo_url"), // URL or base64 data of company logo
-  dispatchNotificationEmail: text("dispatch_notification_email"), // Email to notify when a POD is uploaded
+  logoUrl: text("logo_url"),
+  dispatchNotificationEmail: text("dispatch_notification_email"),
+  gmailAccessToken: text("gmail_access_token"),
+  gmailRefreshToken: text("gmail_refresh_token"),
+  gmailEmail: text("gmail_email"),
+  gmailTokenExpiry: text("gmail_token_expiry"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
