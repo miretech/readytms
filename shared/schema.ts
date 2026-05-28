@@ -52,7 +52,7 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 export const trucks = pgTable("trucks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  truckNumber: text("truck_number").notNull().unique(),
+  truckNumber: text("truck_number").notNull(),
   type: text("type").notNull(),
   status: text("status").notNull(),
   licensePlate: text("license_plate").notNull(),
@@ -88,7 +88,7 @@ export type Truck = typeof trucks.$inferSelect;
 
 export const trailers = pgTable("trailers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  trailerNumber: text("trailer_number").notNull().unique(),
+  trailerNumber: text("trailer_number").notNull(),
   type: text("type").notNull(),
   status: text("status").notNull(),
   licensePlate: text("license_plate").notNull(),
@@ -168,7 +168,7 @@ export type TrailerDotInspection = typeof trailerDotInspections.$inferSelect;
 export const drivers = pgTable("drivers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  email: text("email").notNull(),
   password: text("password"), // Bcrypt hashed password (optional for drivers created by admin)
   phone: text("phone").notNull(),
   address: text("address"),
@@ -231,7 +231,7 @@ export type Customer = typeof customers.$inferSelect;
 
 export const loads = pgTable("loads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  loadNumber: text("load_number").notNull().unique(),
+  loadNumber: text("load_number").notNull(),
   customerId: varchar("customer_id"), // Optional - can be added via AI extraction later
   status: text("status").notNull(),
   pickupLocation: text("pickup_location").notNull(),
@@ -319,7 +319,7 @@ export type Expense = typeof expenses.$inferSelect;
 // Invoices - Customer billing
 export const invoices = pgTable("invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  invoiceNumber: text("invoice_number").notNull().unique(),
+  invoiceNumber: text("invoice_number").notNull(),
   loadId: varchar("load_id").notNull(),
   customerId: varchar("customer_id").notNull(),
   status: text("status").notNull(),
@@ -1022,3 +1022,21 @@ export const insertSentEmailSchema = createInsertSchema(sentEmails).omit({
 
 export type InsertSentEmail = z.infer<typeof insertSentEmailSchema>;
 export type SentEmail = typeof sentEmails.$inferSelect;
+
+// Stub definitions to prevent drizzle from dropping production tables that exist
+// in the database but are managed outside of this schema file.
+export const companies = pgTable("companies", {
+  id: varchar("id").primaryKey(),
+  name: text("name"),
+  isPrimary: text("is_primary"),
+  subdomain: text("subdomain"),
+  createdAt: timestamp("created_at"),
+});
+
+export const companyUsers = pgTable("company_users", {
+  id: varchar("id").primaryKey(),
+  companyId: varchar("company_id"),
+  userId: varchar("user_id"),
+  role: text("role"),
+  createdAt: timestamp("created_at"),
+});
