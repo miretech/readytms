@@ -1,23 +1,12 @@
 /**
- * Gmail Poller — checks Gmail every 5 minutes for rate confirmation emails
+ * Gmail Poller — checks Gmail every 5 minutes for unread emails
  * with PDF attachments and auto-creates loads in the TMS.
+ * Searches ALL unread PDFs — Claude AI determines if it's a rate con.
  */
 
 import { google } from "googleapis";
 import { storage } from "./storage";
 import { extractLoadFromDocument } from "./aiExtraction";
-
-// Keywords that suggest a rate confirmation email
-const RATE_CON_SUBJECTS = [
-  "rate con",
-  "rate confirmation",
-  "load tender",
-  "load confirmation",
-  "freight confirmation",
-  "rate sheet",
-  "rate agree",
-  "dispatch confirmation",
-];
 
 function buildOAuth2Client(accessToken: string, refreshToken: string) {
   const oauth2Client = new google.auth.OAuth2(
@@ -32,25 +21,10 @@ function buildOAuth2Client(accessToken: string, refreshToken: string) {
   return oauth2Client;
 }
 
-function isRateConSubject(subject: string): boolean {
-  const lower = subject.toLowerCase();
-  return RATE_CON_SUBJECTS.some((keyword) => lower.includes(keyword));
-}
-
 /** Decode base64url encoded Gmail attachment data */
 function decodeBase64Url(data: string): Buffer {
-  // Gmail uses base64url encoding (+ → -, / → _)
   const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
   return Buffer.from(base64, "base64");
-}
-
-/** Extract text from a PDF buffer using pdf-parse */
-async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: pdfBuffer });
-  const result = await parser.getText();
-  await parser.destroy();
-  return result.text || "";
 }
 
 /** Generate a unique load number */
@@ -61,7 +35,7 @@ function generateLoadNumber(): string {
   return `AUTO-${datePart}-${randPart}`;
 }
 
-/** Process a single Gmail message: download PDF, extract load, create in TMS */
+/** Process a single Gmail message: download PDF, run Claude extraction, create load */
 async function processMessage(
   gmail: ReturnType<typeof google.gmail>,
   messageId: string
@@ -76,6 +50,12 @@ async function processMessage(
     const msg = msgResp.data;
     const payload = msg.payload;
     if (!payload) return { success: false, error: "No payload in message" };
+
+    const subjectHeader = payload.headers?.find(
+      (h: any) => h.name?.toLowerCase() === "subject"
+    );
+    const subject = subjectHeader?.value || "(no subject)";
+    console.log(`[GmailPoller] Processing email: "${subject}"`);
 
     const pdfParts: Array<{ partId: string; filename: string; attachmentId: string }> = [];
 
@@ -104,7 +84,7 @@ async function processMessage(
     }
 
     const pdfPart = pdfParts[0];
-    console.log(`[GmailPoller] Downloading attachment: ${pdfPart.filename}`);
+    console.log(`[GmailPoller] Downloading PDF: ${pdfPart.filename}`);
 
     const attachResp = await gmail.users.messages.attachments.get({
       userId: "me",
@@ -118,16 +98,15 @@ async function processMessage(
     }
 
     const pdfBuffer = decodeBase64Url(attachData);
-    console.log(`[GmailPoller] PDF downloaded (${pdfBuffer.length} bytes), extracting text`);
-
-    const pdfText = await extractPdfText(pdfBuffer);
-    if (!pdfText || pdfText.trim().length < 20) {
-      return { success: false, error: "PDF text extraction yielded insufficient content" };
-    }
+    console.log(`[GmailPoller] PDF downloaded (${pdfBuffer.length} bytes), running Claude extraction`);
 
     const dataUrl = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
-    console.log("[GmailPoller] Running Claude extraction");
     const extracted = await extractLoadFromDocument(dataUrl, "application/pdf");
+
+    if (!extracted.pickupLocation || !extracted.deliveryLocation) {
+      console.log(`[GmailPoller] Not a rate con (no pickup/delivery): "${subject}"`);
+      return { success: false, error: "Not a rate confirmation — no pickup/delivery data" };
+    }
 
     const loadNumber = extracted.loadNumber || generateLoadNumber();
     const existing = await storage.getLoadByNumber(loadNumber);
@@ -153,6 +132,7 @@ async function processMessage(
         extracted.brokerPhone ? `Broker Phone: ${extracted.brokerPhone}` : null,
         extracted.brokerEmail ? `Broker Email: ${extracted.brokerEmail}` : null,
         `Auto-imported from Gmail (${pdfPart.filename})`,
+        `Email subject: ${subject}`,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -162,7 +142,7 @@ async function processMessage(
       type: "success",
       category: "gmail_auto_import",
       title: "Load Auto-Created from Gmail",
-      message: `Load ${load.loadNumber} was automatically created from a rate confirmation email (${pdfPart.filename}). Pickup: ${extracted.pickupLocation}, Delivery: ${extracted.deliveryLocation}, Rate: $${extracted.rate}.`,
+      message: `Load ${load.loadNumber} created from rate con email (${pdfPart.filename}). Pickup: ${extracted.pickupLocation}, Delivery: ${extracted.deliveryLocation}, Rate: $${extracted.rate}.`,
       relatedEntityType: "load",
       relatedEntityId: load.id,
       isRead: "false",
@@ -176,12 +156,13 @@ async function processMessage(
       metadata: {
         gmailMessageId: messageId,
         filename: pdfPart.filename,
+        subject,
         brokerName: extracted.brokerName,
       },
       status: "success",
     });
 
-    console.log(`[GmailPoller] ✅ Created load ${load.loadNumber} from email ${messageId}`);
+    console.log(`[GmailPoller] Created load ${load.loadNumber} from "${subject}"`);
     return { success: true, loadNumber: load.loadNumber };
   } catch (err: any) {
     console.error(`[GmailPoller] Failed to process message ${messageId}:`, err.message);
@@ -208,28 +189,32 @@ async function pollGmail(): Promise<void> {
     });
 
     const gmail = google.gmail({ version: "v1", auth });
-    const subjectQuery = RATE_CON_SUBJECTS.map((kw) => `subject:"${kw}"`).join(" OR ");
-    const query = `is:unread has:attachment (${subjectQuery})`;
+
+    // Search ALL unread emails with PDF attachments — Claude decides if it is a rate con
+    const query = "is:unread has:attachment filename:pdf";
 
     const listResp = await gmail.users.messages.list({ userId: "me", q: query, maxResults: 20 });
     const messages = listResp.data.messages || [];
-    if (messages.length === 0) { console.log("[GmailPoller] No matching emails found"); return; }
+    if (messages.length === 0) {
+      console.log("[GmailPoller] No unread PDF emails found");
+      return;
+    }
 
-    console.log(`[GmailPoller] Found ${messages.length} candidate email(s)`);
+    console.log(`[GmailPoller] Found ${messages.length} unread PDF email(s) to check`);
 
     for (const message of messages) {
       if (!message.id) continue;
-      const headerResp = await gmail.users.messages.get({ userId: "me", id: message.id, format: "metadata", metadataHeaders: ["Subject"] });
-      const subjectHeader = headerResp.data.payload?.headers?.find((h: any) => h.name?.toLowerCase() === "subject");
-      const subject = subjectHeader?.value || "";
-      if (!isRateConSubject(subject)) {
-        await gmail.users.messages.modify({ userId: "me", id: message.id, requestBody: { removeLabelIds: ["UNREAD"] } });
-        continue;
-      }
       const result = await processMessage(gmail, message.id);
-      await gmail.users.messages.modify({ userId: "me", id: message.id, requestBody: { removeLabelIds: ["UNREAD"] } });
-      if (result.success) { console.log(`[GmailPoller] ✅ Load created: ${result.loadNumber}`); }
-      else { console.log(`[GmailPoller] ⚠️  Skipped: ${result.error}`); }
+      await gmail.users.messages.modify({
+        userId: "me",
+        id: message.id,
+        requestBody: { removeLabelIds: ["UNREAD"] },
+      });
+      if (result.success) {
+        console.log(`[GmailPoller] Load created: ${result.loadNumber}`);
+      } else {
+        console.log(`[GmailPoller] Skipped: ${result.error}`);
+      }
     }
   } catch (err: any) {
     console.error("[GmailPoller] Poll error:", err.message);
