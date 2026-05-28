@@ -5964,8 +5964,7 @@ async function pollGmail() {
       }
     });
     const gmail = google2.gmail({ version: "v1", auth });
-    const subjectQuery = RATE_CON_SUBJECTS.map((kw) => `subject:"${kw}"`).join(" OR ");
-    const query = `is:unread has:attachment (${subjectQuery})`;
+    const query = "is:unread has:attachment filename:pdf";
     const listResp = await gmail.users.messages.list({ userId: "me", q: query, maxResults: 20 });
     const messages = listResp.data.messages || [];
     if (messages.length === 0) {
@@ -5975,13 +5974,6 @@ async function pollGmail() {
     console.log(`[GmailPoller] Found ${messages.length} candidate email(s)`);
     for (const message of messages) {
       if (!message.id) continue;
-      const headerResp = await gmail.users.messages.get({ userId: "me", id: message.id, format: "metadata", metadataHeaders: ["Subject"] });
-      const subjectHeader = headerResp.data.payload?.headers?.find((h) => h.name?.toLowerCase() === "subject");
-      const subject = subjectHeader?.value || "";
-      if (!isRateConSubject(subject)) {
-        await gmail.users.messages.modify({ userId: "me", id: message.id, requestBody: { removeLabelIds: ["UNREAD"] } });
-        continue;
-      }
       const result = await processMessage(gmail, message.id);
       await gmail.users.messages.modify({ userId: "me", id: message.id, requestBody: { removeLabelIds: ["UNREAD"] } });
       if (result.success) {
