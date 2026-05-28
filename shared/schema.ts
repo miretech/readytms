@@ -1038,17 +1038,24 @@ export type SentEmail = typeof sentEmails.$inferSelect;
 // Stub definitions to prevent drizzle from dropping production tables that exist
 // in the database but are managed outside of this schema file.
 export const companies = pgTable("companies", {
-  id: varchar("id").primaryKey(),
-  name: text("name"),
-  isPrimary: text("is_primary"),
-  subdomain: text("subdomain"),
-  createdAt: timestamp("created_at"),
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  displayName: text("display_name").notNull(),
+  address: text("address"),
+  cityStateZip: text("city_state_zip"),
+  phone: text("phone"),
+  email: text("email"),
+  logoUrl: text("logo_url"),
+  isActive: text("is_active").notNull().default("true"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const companyUsers = pgTable("company_users", {
-  id: varchar("id").primaryKey(),
-  companyId: varchar("company_id"),
-  userId: varchar("user_id"),
-  role: text("role"),
-  createdAt: timestamp("created_at"),
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  companyId: varchar("company_id").notNull(),
+  role: text("role").notNull().default("admin"),
+  isPrimary: text("is_primary").notNull().default("false"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
