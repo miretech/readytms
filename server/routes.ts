@@ -2531,7 +2531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ── Gmail OAuth Routes ──────────────────────────────────────────────────────
+  // ── Gmail OAuth Routes (v2) ─────────────────────────────────────────────────
 
   // Check connection status (public — used by settings page on load)
   app.get("/api/gmail/status", async (_req, res) => {
