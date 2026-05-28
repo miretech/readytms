@@ -308,6 +308,7 @@ export const expenses = pgTable("expenses", {
   receiptUrl: text("receipt_url"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertExpenseSchema = createInsertSchema(expenses).omit({
@@ -377,6 +378,7 @@ export const payments = pgTable("payments", {
   referenceNumber: text("reference_number"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertPaymentSchema = createInsertSchema(payments).omit({
@@ -438,6 +440,7 @@ export const accidents = pgTable("accidents", {
   status: text("status").notNull(),
   attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertAccidentSchema = createInsertSchema(accidents).omit({
@@ -472,6 +475,7 @@ export const violations = pgTable("violations", {
   dueDate: timestamp("due_date"),
   attachments: jsonb("attachments"), // Array of {filename: string, data: string (base64), type: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertViolationSchema = createInsertSchema(violations).omit({
@@ -633,6 +637,7 @@ export const recurringExpenses = pgTable("recurring_expenses", {
   endDate: timestamp("end_date"), // null = ongoing
   isActive: text("is_active").notNull().default("true"), // "true" or "false"
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertRecurringExpenseSchema = createInsertSchema(recurringExpenses).omit({
@@ -700,6 +705,7 @@ export const fuelCards = pgTable("fuel_cards", {
   status: text("status").notNull().default("active"), // active, inactive
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertFuelCardSchema = createInsertSchema(fuelCards).omit({
@@ -729,6 +735,7 @@ export const fuelTransactions = pgTable("fuel_transactions", {
   fuelType: text("fuel_type").notNull(), // Diesel, Gas, DEF
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertFuelTransactionSchema = createInsertSchema(fuelTransactions).omit({
@@ -881,6 +888,7 @@ export const chargeBacks = pgTable("charge_backs", {
   resolution: text("resolution"), // Description of how it was resolved
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  companyId: varchar("company_id"),
 });
 
 export const insertChargeBackSchema = createInsertSchema(chargeBacks).omit({
