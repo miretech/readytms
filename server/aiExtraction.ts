@@ -77,11 +77,9 @@ export async function extractLoadFromDocument(
       const pdfBuffer = Buffer.from(base64Content, "base64");
 
       try {
-        const { PDFParse } = await import("pdf-parse");
-        const parser = new PDFParse({ data: pdfBuffer });
-        const result = await parser.getText();
+        const pdfParse = (await import("pdf-parse")).default;
+        const result = await pdfParse(pdfBuffer);
         const textContent = result.text;
-        await parser.destroy();
 
         if (!textContent || textContent.trim().length < 10) {
           throw new Error(
