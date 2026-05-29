@@ -3222,48 +3222,41 @@ async function extractLoadFromDocument(fileData, fileType) {
       throw new Error("Invalid file format. Please ensure the file is properly encoded.");
     }
     const base64Content = fileData.split(",")[1] || fileData;
-    let userContent;
+    let message;
     if (fileType === "application/pdf") {
-      console.log("[AI Extract] Processing PDF file with Claude");
-      const pdfBuffer = Buffer.from(base64Content, "base64");
-      try {
-        const pdfParse = (await import("pdf-parse")).default;
-        const result = await pdfParse(pdfBuffer);
-        const textContent = result.text;
-        if (!textContent || textContent.trim().length < 10) {
-          throw new Error(
-            "PDF appears to be empty or contains only images. Please convert the PDF to PNG/JPG for better results."
-          );
-        }
-        console.log(
-          `[AI Extract] Successfully extracted ${textContent.length} characters from PDF`
-        );
-        userContent = `Extract load information from this rate confirmation document:
-
-${textContent}`;
-      } catch (pdfError) {
-        console.error("[AI Extract] PDF parsing error:", pdfError);
-        throw new Error(
-          `Failed to extract text from PDF: ${pdfError.message}. The PDF may be image-based or corrupted. Try converting it to PNG/JPG instead.`
-        );
-      }
+      console.log("[AI Extract] Processing PDF with Claude native PDF support");
+      message = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64Content } },
+            { type: "text", text: "Extract load information from this rate confirmation document." }
+          ]
+        }]
+      });
+      console.log("[AI Extract] Claude native PDF extraction succeeded");
     } else if (isImage) {
       const textContent = `[Image file: ${fileType}. Please provide text content if available.]`;
-      userContent = `Extract load information from this document:
-
-${textContent}`;
+      const userContent = `Extract load information from this document:\n\n${textContent}`;
+      message = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userContent }]
+      });
     } else {
       const textContent = Buffer.from(base64Content, "base64").toString("utf-8");
-      userContent = `Extract load information from this document:
-
-${textContent}`;
+      const userContent = `Extract load information from this document:\n\n${textContent}`;
+      message = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userContent }]
+      });
     }
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userContent }]
-    });
     const responseContent = message.content[0];
     if (!responseContent || responseContent.type !== "text") {
       throw new Error("No text response from AI");
@@ -3278,17 +3271,12 @@ ${textContent}`;
       throw new Error("Document is too large. Please use a smaller file (under 5MB).");
     }
     if (error?.message?.includes("invalid") || error?.message?.includes("format")) {
-      throw new Error("Unable to process this document. Please ensure it's a valid PDF or image file.");
+      throw new Error("Unable to process this document. Please ensure it\'s a valid PDF or image file.");
     }
     throw new Error(error?.message || "Failed to extract load information from document");
   }
 }
 
-// server/routes.ts
-init_automation();
-init_notifications();
-import { z as z3 } from "zod";
-import { google } from "googleapis";
 async function registerRoutes(app2) {
   await setupAuth(app2);
   app2.post("/api/admin/login", (req, res, next) => {
