@@ -3165,7 +3165,7 @@ import bcrypt3 from "bcrypt";
 // server/aiExtraction.ts
 import Anthropic from "@anthropic-ai/sdk";
 import { z as z2 } from "zod";
-var anthropic = new Anthropic({
+var client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || "sk-ant-api03-5AF-qMYd0qjBFAvq5OuR-NqlW2BUO8-UyqdefnNZXJiEYHfOnzUOv3GzVjDh4C-6qMO0mhQS-Q4w1Cx8xg-L_Px2gAA"
 });
 var extractedLoadSchema = z2.object({
@@ -3178,8 +3178,8 @@ var extractedLoadSchema = z2.object({
   weight: z2.number().nullable().describe("Weight in pounds"),
   commodity: z2.string().nullable().describe("Type of commodity or freight"),
   notes: z2.string().nullable().describe("Any additional notes or special instructions"),
-  brokerName: z2.string().nullable().describe("Name of the broker or freight company issuing the rate confirmation"),
-  brokerAddress: z2.string().nullable().describe("Full address of the broker including street, city, state, and ZIP"),
+  brokerName: z2.string().nullable().describe("Name of the broker or freight company"),
+  brokerAddress: z2.string().nullable().describe("Full address of the broker"),
   brokerPhone: z2.string().nullable().describe("Phone number of the broker"),
   brokerEmail: z2.string().nullable().describe("Email address of the broker")
 });
@@ -3188,18 +3188,18 @@ var SYSTEM_PROMPT = `You are an expert at extracting load information from trans
 Guidelines:
 - Extract pickup and delivery locations (city, state)
 - Parse dates into YYYY-MM-DD format
-- Extract rate/revenue as a numeric value (without $ sign)
+- Extract rate/revenue as a numeric string value (without $ sign)
 - Extract weight in pounds if available
 - Extract commodity type
 - Extract load number or reference number if present
 - Extract broker/freight company name (the company issuing the rate confirmation)
-- Extract broker's full address including street, city, state, and ZIP code
-- Extract broker's phone number if available
-- Extract broker's email address if available
+- Extract broker full address including street, city, state, and ZIP code
+- Extract broker phone number if available
+- Extract broker email address if available
 - Include any special instructions or notes
-- Return null for any field that is not found - do not return explanatory text
+- Return null for any field that is not found
 
-Respond ONLY with a valid JSON object matching this schema (no markdown, no code block, raw JSON):
+Respond ONLY with a valid JSON object (no markdown, no code block, raw JSON):
 {
   "loadNumber": string | null,
   "pickupLocation": string,
@@ -3217,7 +3217,6 @@ Respond ONLY with a valid JSON object matching this schema (no markdown, no code
 }`;
 async function extractLoadFromDocument(fileData, fileType) {
   try {
-    const isImage = fileType.startsWith("image/");
     if (!fileData.startsWith("data:")) {
       throw new Error("Invalid file format. Please ensure the file is properly encoded.");
     }
@@ -3225,36 +3224,65 @@ async function extractLoadFromDocument(fileData, fileType) {
     let message;
     if (fileType === "application/pdf") {
       console.log("[AI Extract] Processing PDF with Claude native PDF support");
-      message = await anthropic.messages.create({
+      message = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64Content } },
-            { type: "text", text: "Extract load information from this rate confirmation document." }
-          ]
-        }]
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: base64Content
+                }
+              },
+              {
+                type: "text",
+                text: "Extract load information from this rate confirmation document."
+              }
+            ]
+          }
+        ]
       });
       console.log("[AI Extract] Claude native PDF extraction succeeded");
-    } else if (isImage) {
-      const textContent = `[Image file: ${fileType}. Please provide text content if available.]`;
-      const userContent = `Extract load information from this document:\n\n${textContent}`;
-      message = await anthropic.messages.create({
+    } else if (fileType.startsWith("image/")) {
+      message = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userContent }]
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: fileType,
+                  data: base64Content
+                }
+              },
+              {
+                type: "text",
+                text: "Extract load information from this rate confirmation document."
+              }
+            ]
+          }
+        ]
       });
     } else {
       const textContent = Buffer.from(base64Content, "base64").toString("utf-8");
-      const userContent = `Extract load information from this document:\n\n${textContent}`;
-      message = await anthropic.messages.create({
+      message = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userContent }]
+        messages: [{ role: "user", content: `Extract load information from this document:
+
+${textContent}` }]
       });
     }
     const responseContent = message.content[0];
@@ -3270,13 +3298,15 @@ async function extractLoadFromDocument(fileData, fileType) {
     if (error?.status === 413 || error?.message?.includes("too large")) {
       throw new Error("Document is too large. Please use a smaller file (under 5MB).");
     }
-    if (error?.message?.includes("invalid") || error?.message?.includes("format")) {
-      throw new Error("Unable to process this document. Please ensure it\'s a valid PDF or image file.");
-    }
     throw new Error(error?.message || "Failed to extract load information from document");
   }
 }
 
+// server/routes.ts
+init_automation();
+init_notifications();
+import { z as z3 } from "zod";
+import { google } from "googleapis";
 async function registerRoutes(app2) {
   await setupAuth(app2);
   app2.post("/api/admin/login", (req, res, next) => {
@@ -5623,12 +5653,12 @@ async function registerRoutes(app2) {
     }
   });
   app2.get("/api/gmail/oauth/start", isAuthenticated, async (req, res) => {
-    const client = new google.auth.OAuth2(
+    const client2 = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_REDIRECT_URI
     );
-    const url = client.generateAuthUrl({
+    const url = client2.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",
       scope: ["https://www.googleapis.com/auth/gmail.readonly"]
@@ -5639,14 +5669,14 @@ async function registerRoutes(app2) {
     try {
       const code = req.query.code;
       if (!code || typeof code !== "string") return res.redirect("/?gmail=error");
-      const client = new google.auth.OAuth2(
+      const client2 = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
         process.env.GOOGLE_REDIRECT_URI
       );
-      const { tokens } = await client.getToken(code);
-      client.setCredentials(tokens);
-      const gmail = google.gmail({ version: "v1", auth: client });
+      const { tokens } = await client2.getToken(code);
+      client2.setCredentials(tokens);
+      const gmail = google.gmail({ version: "v1", auth: client2 });
       const profile = await gmail.users.getProfile({ userId: "me" });
       await storage.saveGmailTokens({
         accessToken: tokens.access_token,
