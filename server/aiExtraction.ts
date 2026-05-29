@@ -6,19 +6,19 @@ const anthropic = new Anthropic({
 });
 
 const extractedLoadSchema = z.object({
-  loadNumber: z.string().nullable().describe("Load number or reference number"),
-  pickupLocation: z.string().describe("Pickup location city and state"),
-  pickupDate: z.string().describe("Pickup date in ISO format YYYY-MM-DD"),
-  deliveryLocation: z.string().describe("Delivery location city and state"),
-  deliveryDate: z.string().describe("Delivery date in ISO format YYYY-MM-DD"),
-  rate: z.string().describe("Rate or revenue amount as a number"),
-  weight: z.number().nullable().describe("Weight in pounds"),
-  commodity: z.string().nullable().describe("Type of commodity or freight"),
-  notes: z.string().nullable().describe("Any additional notes or special instructions"),
-  brokerName: z.string().nullable().describe("Name of the broker or freight company issuing the rate confirmation"),
-  brokerAddress: z.string().nullable().describe("Full address of the broker including street, city, state, and ZIP"),
-  brokerPhone: z.string().nullable().describe("Phone number of the broker"),
-  brokerEmail: z.string().nullable().describe("Email address of the broker"),
+  loadNumber: z.string().nullable(),
+  pickupLocation: z.string(),
+  pickupDate: z.string(),
+  deliveryLocation: z.string(),
+  deliveryDate: z.string(),
+  rate: z.string(),
+  weight: z.number().nullable(),
+  commodity: z.string().nullable(),
+  notes: z.string().nullable(),
+  brokerName: z.string().nullable(),
+  brokerAddress: z.string().nullable(),
+  brokerPhone: z.string().nullable(),
+  brokerEmail: z.string().nullable(),
 });
 
 export type ExtractedLoad = z.infer<typeof extractedLoadSchema>;
@@ -123,32 +123,26 @@ export async function extractLoadFromDocument(
     let userContent: Anthropic.MessageParam["content"];
 
     if (fileType === 'application/pdf') {
-      // Extract text from PDF using pdf-parse (dynamic import for CommonJS compatibility)
-      console.log("[AI Extract] Processing PDF file");
-      const pdfBuffer = Buffer.from(base64Content, "base64");
-
-      try {
-        const { PDFParse } = await import("pdf-parse");
-        const parser = new PDFParse({ data: pdfBuffer });
-        const result = await parser.getText();
-        const textContent = result.text;
-
-        await parser.destroy();
-
-        if (!textContent || textContent.trim().length < 10) {
-          throw new Error("PDF appears to be empty or contains only images. Please convert the PDF to PNG/JPG for better results.");
-        }
-
-        console.log(`[AI Extract] Successfully extracted ${textContent.length} characters from PDF`);
-
-        userContent = `Extract load information from this PDF document:\n\n${textContent}`;
-      } catch (pdfError: any) {
-        console.error("[AI Extract] PDF parsing error:", pdfError);
-        throw new Error(`Failed to extract text from PDF: ${pdfError.message}. The PDF may be image-based or corrupted. Try converting it to PNG/JPG instead.`);
-      }
+      // Use Anthropic's native PDF document support
+      console.log("[AI Extract] Processing PDF using Anthropic native PDF support");
+      userContent = [
+        {
+          type: "text",
+          text: "Extract load information from this PDF document:",
+        },
+        {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: base64Content,
+          },
+        } as any,
+      ];
     } else if (isImage) {
-      // For images, use Anthropic's vision with base64 source
-      const mediaType = (fileType as Anthropic.Base64ImageSource["media_type"]);
+      // Use Anthropic's vision with base64 image source
+      const mediaType = fileType as Anthropic.Base64ImageSource["media_type"];
+      console.log(`[AI Extract] Processing image (${fileType})`);
       userContent = [
         {
           type: "text",
@@ -164,8 +158,9 @@ export async function extractLoadFromDocument(
         },
       ];
     } else {
-      // Text files
+      // Plain text files
       const textContent = Buffer.from(base64Content, "base64").toString("utf-8");
+      console.log("[AI Extract] Processing text file");
       userContent = `Extract load information from this document:\n\n${textContent}`;
     }
 
@@ -187,22 +182,16 @@ export async function extractLoadFromDocument(
       throw new Error("No structured response from AI");
     }
 
-    const parsed = extractedLoadSchema.parse(toolUseBlock.input);
-    return parsed;
+    return extractedLoadSchema.parse(toolUseBlock.input);
   } catch (error: any) {
-    console.error("Error extracting load data:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      status: error?.status,
-      type: error?.error?.type,
-    });
+    console.error("[AI Extract] Error:", error?.message);
 
     if (error?.status === 413 || error?.message?.includes('too large')) {
       throw new Error("Document is too large. Please use a smaller file (under 5MB).");
     }
 
-    if (error?.message?.includes('invalid') || error?.message?.includes('format')) {
-      throw new Error("Unable to process this document. Please ensure it's a valid PDF or image file. For PDFs, try converting to PNG/JPG first.");
+    if (error?.status === 400 && error?.message?.includes('pdf')) {
+      throw new Error("Unable to process this PDF. Please try converting it to PNG/JPG first.");
     }
 
     const message = error?.message || "Failed to extract load information from document";
