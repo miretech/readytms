@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html><head><meta charset=UTF-8><title>ReadyTMS AI Automation</title>
+<style>
+body{background:#0B0F1A;color:#E2E8F0;font-family:sans-serif;padding:20px;margin:0}
+.card{background:#111827;border:1px solid #1F2D45;border-radius:12px;padding:20px;margin:16px 0}
+.btn{background:#F97316;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;margin:4px;font-size:13px}
+.btn-b{background:rgba(56,189,248,.15);color:#38BDF8;border:1px solid rgba(56,189,248,.3)}
+.btn-g{background:rgba(34,197,94,.15);color:#22C55E;border:1px solid rgba(34,197,94,.3)}
+.btn-p{background:rgba(167,139,250,.15);color:#A78BFA;border:1px solid rgba(167,139,250,.3)}
+input,select,textarea{background:#080C14;border:1px solid #1F2D45;border-radius:6px;padding:8px;color:#E2E8F0;width:100%;box-sizing:border-box;margin:4px 0}
+label{font-size:10px;color:#64748B;text-transform:uppercase;display:block}
+.out{display:none;margin-top:10px;background:#080C14;border:1px solid #22C55E;border-radius:8px;padding:12px;font-family:monospace;font-size:12px;color:#86EFAC;white-space:pre-wrap;max-height:280px;overflow-y:auto}
+.err{border-color:#F87171 !important;color:#F87171 !important}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+h2{color:#F97316;margin:0}h3{color:#E2E8F0}
+</style></head>
+<body>
+<div style="background:#111827;padding:16px;border-radius:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+<div><h2>ReadyTMS AI Automation</h2><p style="margin:0;font-size:11px;color:#64748B">Ready Carrier LLC - Claude AI Powered</p></div>
+<span id=st style="font-size:12px;color:#64748B">Checking...</span>
+</div>
+<div class=grid>
+<div class=card><h3>Invoice + Settlement</h3>
+<label>Load ID</label><input id=a1 value="RC-2026-001">
+<label>Driver Name</label><input id=a2 value="Marcus Johnson">
+<label>Origin</label><input id=a3 value="Chicago IL">
+<label>Destination</label><input id=a4 value="Minneapolis MN">
+<label>Miles</label><input id=a5 type=number value=410>
+<label>Rate/mile ($)</label><input id=a6 type=number value=3.20>
+<label>Driver Pay %</label><input id=a7 type=number value=75>
+<button class=btn onclick=inv()>Generate Invoice + Settlement</button>
+<div class=out id=ao></div></div>
+<div class=card><h3>Auto Quote Generator</h3>
+<label>Shipper Name</label><input id=b1 value="XYZ Logistics">
+<label>Shipper Email</label><input id=b2 value="ops@xyz.com">
+<label>Origin</label><input id=b3 value="Detroit MI">
+<label>Destination</label><input id=b4 value="St Paul MN">
+<label>Miles</label><input id=b5 type=number value=520>
+<label>Equipment</label><select id=b6><option>Dry Van</option><option>Reefer</option><option>Flatbed</option></select>
+<button class="btn btn-b" onclick=qt()>Generate Quote Email</button>
+<div class=out id=bo></div></div>
+<div class=card><h3>Driver Assignment AI</h3>
+<label>Origin</label><input id=c1 value="Chicago IL">
+<label>Destination</label><input id=c2 value="Cleveland OH">
+<label>Miles</label><input id=c3 type=number value=345>
+<label>Drivers (JSON)</label>
+<textarea id=c4 rows=4>[{"name":"Marcus J","truckUnit":"770","currentLocation":"Gary IN","hoursAvailable":9},{"name":"David T","truckUnit":"781","currentLocation":"Milwaukee WI","hoursAvailable":7}]</textarea>
+<button class="btn btn-g" onclick=asgn()>Assign Best Driver</button>
+<div class=out id=co></div></div>
+<div class=card><h3>BOL Data Extractor</h3>
+<label>Paste BOL Text</label>
+<textarea id=d1 rows=6>BILL OF LADING
+Shipper: ABC Manufacturing Corp
+Consignee: XYZ Distribution
+BOL: BOL-2026-5544
+Commodity: Auto Parts
+Weight: 42000 lbs
+Equipment: Dry Van</textarea>
+<button class="btn btn-p" onclick=bol()>Extract BOL Data</button>
+<div class=out id=do></div></div>
+</div>
+<div class=card style="margin-top:20px"><h3>Gmail Rate Con Automation</h3>
+<p style="color:#64748B;font-size:12px">Step 1: <a href=/gmail/auth style="color:#F97316">Connect Gmail (one time)</a> | Step 2: Click Fetch below</p>
+<button class=btn onclick=fc()>Fetch Rate Cons from Gmail</button>
+<div class=out id=fo></div>
+<h4>Or paste rate con email manually:</h4>
+<textarea id=e1 rows=5 placeholder="Paste rate con email body here..."></textarea>
+<button class="btn btn-b" onclick=ep()>Extract + Create Load</button>
+<div class=out id=eo></div></div>
+<script>
+const p=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json());
+const sh=(id,t,e)=>{const el=document.getElementById(id);el.style.display='block';el.className='out'+(e?' err':'');el.textContent=t};
+window.onload=async()=>{try{const r=await fetch('/webhook/health'),d=await r.json(),el=document.getElementById('st');el.textContent=d.apiKey&&d.apiKey.startsWith('set')?'Claude Connected':'API Key Missing';el.style.color=d.apiKey&&d.apiKey.startsWith('set')?'#22C55E':'#F87171'}catch{document.getElementById('st').textContent='Server Error'}};
+async function inv(){try{const r=await p('/webhook/load-delivered',{loadId:a1.value,driverName:a2.value,origin:a3.value,destination:a4.value,miles:+a5.value,ratePerMile:+a6.value,driverPayPercent:+a7.value/100,commodity:'Freight',shipperName:'Shipper',deliveredAt:new Date().toLocaleDateString(),weight:'42000'});r.success?sh('ao','GROSS: $'+r.data.gross+'
+DRIVER: $'+r.data.driverPay+'
+NET: $'+r.data.companyNet+'
+
+'+r.data.invoice):sh('ao','Error: '+r.error,1)}catch(e){sh('ao','Error: '+e.message,1)}}
+async function qt(){try{const r=await p('/webhook/quote-request',{shipperName:b1.value,shipperEmail:b2.value,origin:b3.value,destination:b4.value,estimatedMiles:+b5.value,weight:'38000',equipmentType:b6.value,pickupDate:new Date().toLocaleDateString(),commodity:'Freight'});r.success?sh('bo','QUOTE: $'+r.data.totalQuote+'
+
+'+r.data.emailDraft):sh('bo','Error: '+r.error,1)}catch(e){sh('bo','Error: '+e.message,1)}}
+async function asgn(){try{let d;try{d=JSON.parse(c4.value)}catch{sh('co','Invalid JSON',1);return}const r=await p('/webhook/assign-driver',{load:{origin:c1.value,destination:c2.value,estimatedMiles:+c3.value,pickupDate:new Date().toLocaleDateString(),pickupTime:'08:00 AM'},drivers:d});r.success?sh('co','ASSIGNED: '+r.data.assignedDriver+'
+UNIT: '+r.data.truckUnit+'
+ETA: '+r.data.etaToPickup+'
+REASON: '+r.data.reason):sh('co','Error: '+r.error,1)}catch(e){sh('co','Error: '+e.message,1)}}
+async function bol(){try{const r=await p('/webhook/bol-upload',{bolText:d1.value});r.success?sh('do',JSON.stringify(r.data,null,2)):sh('do','Error: '+r.error,1)}catch(e){sh('do','Error: '+e.message,1)}}
+async function fc(){try{const r=await fetch('/gmail/fetch-ratecons'),d=await r.json();sh('fo',d.message||JSON.stringify(d.results,null,2))}catch(e){sh('fo','Error: '+e.message,1)}}
+async function ep(){try{const r=await p('/gmail/extract-ratecon',{emailBody:e1.value,subject:'Rate Confirmation',from:'broker@example.com'});r.success?sh('eo',JSON.stringify(r.extracted,null,2)):sh('eo','Error: '+r.error,1)}catch(e){sh('eo','Error: '+e.message,1)}}
+</script></body></html>
