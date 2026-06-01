@@ -1,8 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from "zod";
 
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY ?? "";
+if (!ANTHROPIC_KEY || !/^sk-ant-[A-Za-z0-9_-]+$/.test(ANTHROPIC_KEY)) {
+  console.warn(
+    "[AI Extract] WARNING: ANTHROPIC_API_KEY is missing or invalid. " +
+    `Value starts with: "${ANTHROPIC_KEY.substring(0, 12)}..." — check for spaces, ellipsis (…), or truncation.`
+  );
+}
+
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: ANTHROPIC_KEY,
 });
 
 const extractedLoadSchema = z.object({
