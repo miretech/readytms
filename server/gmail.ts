@@ -177,7 +177,7 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
     const query = brokerKeywords.map(k => 'subject:(' + k + ')').join(' OR ') + ' OR filename:ratecon OR filename:rate_con OR filename:RateConf';
     const listRes = await gmail.users.messages.list({
       userId: 'me',
-      q: '(' + query + ') is:unread',
+      q: '(' + query + ') is:unread newer_than:60d',
       maxResults: 50,
     });
     const messages = listRes.data.messages || [];
@@ -220,6 +220,9 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
           weight: extracted.weight ? Number(extracted.weight) : null,
           notes: 'Auto-imported from Gmail rate con',
         };
+                const existingLoads = await storage.getLoads();
+                const dupLoad = existingLoads.find((l: any) => l.loadNumber === loadData.loadNumber);
+                if (dupLoad) { await gmail.users.messages.modify({ userId: 'me', id: msg.id, requestBody: { removeLabelIds: ['UNREAD'] } }); continue; }
         await storage.createLoad(loadData as any, companyId);
         await gmail.users.messages.modify({ userId: 'me', id: msg.id, requestBody: { removeLabelIds: ['UNREAD'] } });
         results.created++;
