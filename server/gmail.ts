@@ -150,3 +150,84 @@ export async function sendViaGmail(opts: GmailSendOptions): Promise<{ success: b
     return { success: false, error: err?.message ?? 'Failed to send via Gmail' };
   }
 }
+
+export async function scanRateConEmails(companyId: string): Promise<{ scanned: number; created: number; errors: string[] }> {
+  const results = { scanned: 0, created: 0, errors: [] as string[] };
+  try {
+    const settings = await storage.getCompanySettings();
+    if (!settings?.gmailRefreshToken) {
+      throw new Error('Gmail not connected');
+    }
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials({
+      refresh_token: settings.gmailRefreshToken,
+      access_token: settings.gmailAccessToken ?? undefined,
+    });
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    oauth2Client.setCredentials(credentials);
+    if (credentials.access_token) {
+      await storage.updateCompanySettings({
+        gmailAccessToken: credentials.access_token,
+        gmailTokenExpiry: credentials.expiry_date ? String(credentials.expiry_date) : undefined,
+      });
+    }
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    const brokerKeywords = ['rate confirmation', 'rate con', 'load tender', 'load confirmation', 'TQL', 'Echo Global', 'Coyote', 'CH Robinson', 'CHR', 'loadconfirmation', 'rateconfirmation'];
+    const query = brokerKeywords.map(k => 'subject:(' + k + ')').join(' OR ');
+    const listRes = await gmail.users.messages.list({
+      userId: 'me',
+      q: '(' + query + ') is:unread',
+      maxResults: 20,
+    });
+    const messages = listRes.data.messages || [];
+    results.scanned = messages.length;
+    for (const msg of messages) {
+      try {
+        const fullMsg = await gmail.users.messages.get({ userId: 'me', id: msg.id });
+        const parts = fullMsg.data.payload?.parts || [];
+        let pdfAttachmentId: string | null = null;
+        let pdfMimeType = 'application/pdf';
+        const findPdf = (partList: any[]): void => {
+          for (const part of partList) {
+            if (part.filename && part.filename.toLowerCase().endsWith('.pdf') && part.body?.attachmentId) {
+              pdfAttachmentId = part.body.attachmentId;
+              pdfMimeType = part.mimeType || 'application/pdf';
+              return;
+            }
+            if (part.parts) findPdf(part.parts);
+          }
+        };
+        findPdf(parts);
+        if (!pdfAttachmentId) {
+          await gmail.users.messages.modify({ userId: 'me', id: msg.id, requestBody: { removeLabelIds: ['UNREAD'] } });
+          continue;
+        }
+        const attachRes = await gmail.users.messages.attachments.get({ userId: 'me', messageId: msg.id, id: pdfAttachmentId });
+        const rawData = attachRes.data.data || '';
+        const base64Pdf = rawData.replace(/-/g, '+').replace(/_/g, '/');
+        const { extractLoadFromDocument } = await import('./aiExtraction');
+        const extracted = await extractLoadFromDocument(base64Pdf, pdfMimeType);
+        const loadData = {
+          loadNumber: extracted.loadNumber || ('RC-' + Date.now()),
+          status: 'pending',
+          pickupLocation: extracted.pickupLocation || '',
+          pickupDate: extracted.pickupDate ? new Date(extracted.pickupDate) : new Date(),
+          deliveryLocation: extracted.deliveryLocation || '',
+          deliveryDate: extracted.deliveryDate ? new Date(extracted.deliveryDate) : new Date(),
+          rate: extracted.rate || '0',
+          commodity: extracted.commodity || '',
+          weight: extracted.weight ? Number(extracted.weight) : null,
+          notes: 'Auto-imported from Gmail rate con',
+        };
+        await storage.createLoad(loadData as any, companyId);
+        await gmail.users.messages.modify({ userId: 'me', id: msg.id, requestBody: { removeLabelIds: ['UNREAD'] } });
+        results.created++;
+      } catch (msgErr: any) {
+        results.errors.push(msgErr?.message || 'Unknown error processing email');
+      }
+    }
+  } catch (err: any) {
+    results.errors.push(err?.message || 'Failed to scan emails');
+  }
+  return results;
+}

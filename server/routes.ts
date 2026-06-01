@@ -30,7 +30,7 @@ import bcrypt from "bcrypt";
 import { extractLoadFromDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
-import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail } from "./gmail";
+import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail, scanRateConEmails } from "./gmail";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -2575,6 +2575,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/gmail/scan-ratecons", isAuthenticated, async (req, res) => {
+    try {
+      const companyId = req.user?.companyId;
+      if (!companyId) {
+        return res.status(400).json({ error: 'No company ID found' });
+      }
+      const results = await scanRateConEmails(companyId);
+      return res.json({ success: true, ...results });
+    } catch (err: any) {
+      console.error('[Gmail Scan] Error:', err?.message);
+      return res.status(500).json({ error: err?.message || 'Failed to scan emails' });
     }
   });
 
