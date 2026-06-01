@@ -174,11 +174,11 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
     }
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
     const brokerKeywords = ['rate confirmation', 'rate con', 'load tender', 'load confirmation', 'TQL', 'Echo Global', 'Coyote', 'CH Robinson', 'CHR', 'loadconfirmation', 'rateconfirmation'];
-    const query = brokerKeywords.map(k => 'subject:(' + k + ')').join(' OR ');
+    const query = brokerKeywords.map(k => 'subject:(' + k + ')').join(' OR ') + ' OR filename:ratecon OR filename:rate_con OR filename:RateConf';
     const listRes = await gmail.users.messages.list({
       userId: 'me',
       q: '(' + query + ') is:unread',
-      maxResults: 20,
+      maxResults: 50,
     });
     const messages = listRes.data.messages || [];
     results.scanned = messages.length;
