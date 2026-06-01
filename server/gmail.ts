@@ -207,7 +207,7 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
         const rawData = attachRes.data.data || '';
         const base64Pdf = rawData.replace(/-/g, '+').replace(/_/g, '/');
         const { extractLoadFromDocument } = await import('./aiExtraction');
-        const extracted = await extractLoadFromDocument(base64Pdf, pdfMimeType);
+        const extracted = await extractLoadFromDocument(`data:${pdfMimeType};base64,${base64Pdf}`, pdfMimeType);
         const loadData = {
           loadNumber: extracted.loadNumber || ('RC-' + Date.now()),
           status: 'pending',
