@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from "zod";
 
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || Buffer.from('c2stYW50LWFwaTAzLTVBRi1xTVlkMHFqQkZBdnE1T3VSLU5xbFcyQlVPOC1VeXFkZWZuTlpYSmlFWUhmT256VU92M0d6VmpEaDRDLTZxTU8wbWhRUy1RNHcxQ3g4eGctTF9QeDJnQUE=', 'base64').toString(),
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 const extractedLoadSchema = z.object({
