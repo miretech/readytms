@@ -2580,10 +2580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/gmail/scan-ratecons", isAuthenticated, async (req, res) => {
     try {
-      const companyId = req.user?.divisionId;
-      if (!companyId) {
-        return res.status(400).json({ error: 'No company ID found' });
-      }
+      const companyId = req.user?.divisionId || undefined;
       const results = await scanRateConEmails(companyId);
       return res.json({ success: true, ...results });
     } catch (err: any) {
