@@ -254,13 +254,15 @@ export const loads = pgTable("loads", {
   podAttachments: jsonb("pod_attachments"), // Array of {filename: string, data: string (base64), type: string, uploadedAt: string}
   createdAt: timestamp("created_at").defaultNow().notNull(),
   companyId: varchar("company_id"),
+  source: text("source").default("manual"),
 });
 
 export const insertLoadSchema = createInsertSchema(loads).omit({
   id: true,
   createdAt: true,
 }).extend({
-  customerId: z.string().optional(), // Optional - can be added via AI extraction later
+  customerId: z.string().optional(),
+  source: z.enum(["manual", "ai_extract"]).optional(), // Optional - can be added via AI extraction later
   pickupDate: z.string(),
   deliveryDate: z.string(),
   rate: z.string(),

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Bot, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -189,6 +189,7 @@ export default function Loads() {
                     <SortIcon column="deliveryDate" sortColumn={sortColumn} sortDir={sortDir} />
                   </TableHead>
                   <TableHead>Rate</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead
                     className="cursor-pointer select-none whitespace-nowrap hover:text-foreground"
                     onClick={() => handleColumnSort("createdAt")}
@@ -217,6 +218,19 @@ export default function Loads() {
                     <TableCell>{formatDateLocal(load.deliveryDate)}</TableCell>
                     <TableCell className="font-semibold">
                       ${Number(load.rate).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      {(load as any).source === "ai_extract" ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                          <Bot className="h-3 w-3" />
+                          AI
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                          <PenLine className="h-3 w-3" />
+                          Manual
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {formatDateTime(load.createdAt)}

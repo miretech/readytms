@@ -243,6 +243,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
     const cleanedValues = {
       ...values,
       customerId: values.customerId || undefined,
+      source: activeTab === "ai" ? "ai_extract" : "manual",
     };
     mutation.mutate(cleanedValues);
   };
