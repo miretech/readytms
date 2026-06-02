@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, ChevronLeft, ChevronRight, Clock, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -42,6 +42,7 @@ export default function Loads() {
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [sortBy, setSortBy] = useState<"default" | "recently-added">("recently-added");
   const { toast } = useToast();
 
   const { data: loads = [], isLoading } = useQuery<Load[]>({
@@ -68,11 +69,18 @@ export default function Loads() {
     },
   });
 
-  const filteredLoads = loads.filter((load) =>
-    load.loadNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    load.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    load.deliveryLocation.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredLoads = loads
+    .filter((load) =>
+      load.loadNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      load.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      load.deliveryLocation.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortBy === "recently-added") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      return 0;
+    });
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredLoads.length / itemsPerPage);
@@ -139,8 +147,8 @@ export default function Loads() {
       </div>
 
       <Card className="p-6">
-        <div className="mb-4">
-          <div className="relative">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search loads..."
@@ -150,6 +158,17 @@ export default function Loads() {
               data-testid="input-search-loads"
             />
           </div>
+          <Button
+            variant={sortBy === "recently-added" ? "default" : "outline"}
+            onClick={() => {
+              setSortBy(sortBy === "recently-added" ? "default" : "recently-added");
+              setCurrentPage(1);
+            }}
+            data-testid="button-sort-recently-added"
+          >
+            <Clock className="mr-2 h-4 w-4" />
+            Recently Added
+          </Button>
         </div>
 
         {filteredLoads.length === 0 ? (
