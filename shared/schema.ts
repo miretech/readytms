@@ -255,6 +255,7 @@ export const loads = pgTable("loads", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   companyId: varchar("company_id"),
   source: text("source").default("manual"),
+  rateConUrl: text("rate_con_url"),
 });
 
 export const insertLoadSchema = createInsertSchema(loads).omit({

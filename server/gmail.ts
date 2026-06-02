@@ -208,6 +208,13 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
         const base64Pdf = rawData.replace(/-/g, '+').replace(/_/g, '/');
         const { extractLoadFromDocument } = await import('./aiExtraction');
         const extracted = await extractLoadFromDocument(`data:${pdfMimeType};base64,${base64Pdf}`, pdfMimeType);
+        let rateConUrl = "";
+        try {
+          const { uploadPdfToS3 } = await import("./s3");
+          rateConUrl = await uploadPdfToS3(base64Pdf, attachment.filename || "ratecon.pdf", pdfMimeType);
+        } catch (s3Err: any) {
+          console.warn("S3 upload failed:", s3Err?.message);
+        }
         const loadData = {
           loadNumber: extracted.loadNumber || ('RC-' + Date.now()),
           status: 'pending',
@@ -219,6 +226,7 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
           commodity: extracted.commodity || '',
           weight: extracted.weight ? Number(extracted.weight) : null,
           notes: 'Auto-imported from Gmail rate con',
+          rateConUrl: rateConUrl,
         };
                 const existingLoads = await storage.getLoads();
                 const dupLoad = existingLoads.find((l: any) => l.loadNumber === loadData.loadNumber);
