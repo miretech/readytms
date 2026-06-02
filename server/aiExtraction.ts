@@ -127,6 +127,7 @@ export async function extractLoadFromDocument(
     }
 
     const base64Content = fileData.split(",")[1] || fileData;
+    let message: Anthropic.Message;
 
     let userContent: Anthropic.MessageParam["content"];
 

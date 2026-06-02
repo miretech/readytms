@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -181,7 +181,6 @@ export default function DriverPOD() {
       <div className="min-h-screen bg-background">
         <div className="bg-primary text-primary-foreground p-4 sticky top-0 z-50 shadow-md">
           <h1 className="text-xl font-bold">Driver POD Upload</h1>
-          <p className="text-sm opacity-90">Proof of Delivery Portal</p>
         </div>
         <div className="p-4 flex items-center justify-center min-h-[calc(100vh-80px)]">
           <Card className="w-full max-w-md text-center">

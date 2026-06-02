@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeAutomationSettings, sendDailyTaskReminders } from "./automation";
+import { startGmailPoller } from "./gmailPoller";
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -40,6 +41,9 @@ app.use((req, res, next) => {
 (async () => {
   // Initialize automation settings
   await initializeAutomationSettings();
+
+  // Start Gmail poller (no-op if Gmail is not connected)
+  startGmailPoller();
 
   // Schedule daily task reminders — runs at 8 AM every day
   let lastReminderDate = "";

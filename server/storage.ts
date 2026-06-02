@@ -100,6 +100,9 @@ import {
   divisionInvitations,
   passwordResetTokens,
   feedbacks,
+  gmailTokens,
+  GmailToken,
+  InsertGmailToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
@@ -126,6 +129,7 @@ export interface IStorage {
   
   getAllLoads(companyId?: string): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
+  getLoadByNumber(loadNumber: string): Promise<Load | undefined>;
   createLoad(load: InsertLoad, companyId?: string): Promise<Load>;
   updateLoad(id: string, load: Partial<InsertLoad>): Promise<Load | undefined>;
   deleteLoad(id: string): Promise<boolean>;
@@ -620,6 +624,11 @@ export class DatabaseStorage implements IStorage {
 
   async getLoad(id: string): Promise<Load | undefined> {
     const [load] = await db.select().from(loads).where(eq(loads.id, id));
+    return load || undefined;
+  }
+
+  async getLoadByNumber(loadNumber: string): Promise<Load | undefined> {
+    const [load] = await db.select().from(loads).where(eq(loads.loadNumber, loadNumber));
     return load || undefined;
   }
 

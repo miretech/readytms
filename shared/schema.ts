@@ -1008,6 +1008,19 @@ export const insertDivisionInvitationSchema = createInsertSchema(divisionInvitat
 export type InsertDivisionInvitation = z.infer<typeof insertDivisionInvitationSchema>;
 export type DivisionInvitation = typeof divisionInvitations.$inferSelect;
 
+// Gmail OAuth Tokens — store per-user Gmail integration credentials
+export const gmailTokens = pgTable("gmail_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  connectedEmail: text("connected_email").notNull(),
+  connectedAt: timestamp("connected_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type GmailToken = typeof gmailTokens.$inferSelect;
+export type InsertGmailToken = typeof gmailTokens.$inferInsert;
+
 // Feedback table — anyone can submit a name, note, and optional attachment
 export const feedbacks = pgTable("feedbacks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
