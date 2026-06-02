@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, MoreVertical, Edit, Trash2, ChevronLeft, ChevronRight, Clock, ArrowUpDown } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -25,15 +25,29 @@ import type { Load } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-// Helper to format date without timezone conversion issues
 function formatDateLocal(dateString: string | Date): string {
   if (!dateString) return "";
-  const str = typeof dateString === 'string' ? dateString : dateString.toISOString();
-  // Extract just the date part (YYYY-MM-DD) and parse as local date
-  const datePart = str.split('T')[0];
-  const [year, month, day] = datePart.split('-').map(Number);
-  const localDate = new Date(year, month - 1, day);
-  return localDate.toLocaleDateString();
+  const str = typeof dateString === "string" ? dateString : dateString.toISOString();
+  const datePart = str.split("T")[0];
+  const [year, month, day] = datePart.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString();
+}
+
+function formatDateTime(dateString: string | Date): string {
+  if (!dateString) return "";
+  return new Date(dateString).toLocaleDateString(undefined, {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
+
+type SortColumn = "createdAt" | "pickupDate" | "deliveryDate";
+type SortDir = "asc" | "desc";
+
+function SortIcon({ column, sortColumn, sortDir }: { column: SortColumn; sortColumn: SortColumn; sortDir: SortDir }) {
+  if (sortColumn !== column) return <ChevronsUpDown className="ml-1 h-3 w-3 text-muted-foreground/50 inline" />;
+  return sortDir === "asc"
+    ? <ChevronUp className="ml-1 h-3 w-3 inline" />
+    : <ChevronDown className="ml-1 h-3 w-3 inline" />;
 }
 
 export default function Loads() {
@@ -41,8 +55,9 @@ export default function Loads() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [sortBy, setSortBy] = useState<"default" | "recently-added">("recently-added");
+  const [itemsPerPage] = useState(20);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const { toast } = useToast();
 
   const { data: loads = [], isLoading } = useQuery<Load[]>({
@@ -50,24 +65,25 @@ export default function Loads() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/loads/${id}`);
-    },
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/loads/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/loads"] });
-      toast({
-        title: "Load deleted",
-        description: "The load has been successfully deleted.",
-      });
+      toast({ title: "Load deleted", description: "The load has been successfully deleted." });
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete load. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete load. Please try again.", variant: "destructive" });
     },
   });
+
+  const handleColumnSort = (col: SortColumn) => {
+    if (sortColumn === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(col);
+      setSortDir("desc");
+    }
+    setCurrentPage(1);
+  };
 
   const filteredLoads = loads
     .filter((load) =>
@@ -76,49 +92,24 @@ export default function Loads() {
       load.deliveryLocation.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      if (sortBy === "recently-added") {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-      return 0;
+      const aVal = new Date(a[sortColumn] as string).getTime();
+      const bVal = new Date(b[sortColumn] as string).getTime();
+      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
     });
 
-  // Pagination calculations
   const totalPages = Math.ceil(filteredLoads.length / itemsPerPage);
-  
-  // Derive clamped page synchronously to prevent empty table on render
   const clampedPage = totalPages === 0 ? 1 : Math.min(Math.max(currentPage, 1), totalPages);
-  
-  // Update state if clamped value differs (runs after render)
-  useEffect(() => {
-    if (currentPage !== clampedPage) {
-      setCurrentPage(clampedPage);
-    }
-  }, [currentPage, clampedPage]);
-  
-  const startIndex = (clampedPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedLoads = filteredLoads.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search changes
+  useEffect(() => {
+    if (currentPage !== clampedPage) setCurrentPage(clampedPage);
+  }, [currentPage, clampedPage]);
+
+  const startIndex = (clampedPage - 1) * itemsPerPage;
+  const paginatedLoads = filteredLoads.slice(startIndex, startIndex + itemsPerPage);
+
   const handleSearch = (value: string) => {
     setSearchQuery(value);
     setCurrentPage(1);
-  };
-
-  const handleEdit = (load: Load) => {
-    setEditingLoad(load);
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this load?")) {
-      deleteMutation.mutate(id);
-    }
-  };
-
-  const handleDialogClose = () => {
-    setIsDialogOpen(false);
-    setEditingLoad(null);
   };
 
   if (isLoading) {
@@ -137,18 +128,15 @@ export default function Loads() {
           <h1 className="text-3xl font-semibold tracking-tight">Loads</h1>
           <p className="text-sm text-muted-foreground">Manage your shipments and deliveries</p>
         </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          data-testid="button-create-load"
-        >
+        <Button onClick={() => setIsDialogOpen(true)} data-testid="button-create-load">
           <Plus className="mr-2 h-4 w-4" />
           Create Load
         </Button>
       </div>
 
       <Card className="p-6">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
+        <div className="mb-4">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search loads..."
@@ -158,17 +146,6 @@ export default function Loads() {
               data-testid="input-search-loads"
             />
           </div>
-          <Button
-            variant={sortBy === "recently-added" ? "default" : "outline"}
-            onClick={() => {
-              setSortBy(sortBy === "recently-added" ? "default" : "recently-added");
-              setCurrentPage(1);
-            }}
-            data-testid="button-sort-recently-added"
-          >
-            <Clock className="mr-2 h-4 w-4" />
-            Recently Added
-          </Button>
         </div>
 
         {filteredLoads.length === 0 ? (
@@ -195,9 +172,31 @@ export default function Loads() {
                   <TableHead>Load #</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Route</TableHead>
-                  <TableHead>Pickup Date</TableHead>
-                  <TableHead>Delivery Date</TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none whitespace-nowrap hover:text-foreground"
+                    onClick={() => handleColumnSort("pickupDate")}
+                    data-testid="th-pickup-date"
+                  >
+                    Pickup Date
+                    <SortIcon column="pickupDate" sortColumn={sortColumn} sortDir={sortDir} />
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none whitespace-nowrap hover:text-foreground"
+                    onClick={() => handleColumnSort("deliveryDate")}
+                    data-testid="th-delivery-date"
+                  >
+                    Delivery Date
+                    <SortIcon column="deliveryDate" sortColumn={sortColumn} sortDir={sortDir} />
+                  </TableHead>
                   <TableHead>Rate</TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none whitespace-nowrap hover:text-foreground"
+                    onClick={() => handleColumnSort("createdAt")}
+                    data-testid="th-date-added"
+                  >
+                    Date Added
+                    <SortIcon column="createdAt" sortColumn={sortColumn} sortDir={sortDir} />
+                  </TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -219,27 +218,23 @@ export default function Loads() {
                     <TableCell className="font-semibold">
                       ${Number(load.rate).toLocaleString()}
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDateTime(load.createdAt)}
+                    </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            data-testid={`button-actions-${load.id}`}
-                          >
+                          <Button variant="ghost" size="icon" data-testid={`button-actions-${load.id}`}>
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleEdit(load)}
-                            data-testid={`button-edit-${load.id}`}
-                          >
+                          <DropdownMenuItem onClick={() => { setEditingLoad(load); setIsDialogOpen(true); }} data-testid={`button-edit-${load.id}`}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleDelete(load.id)}
+                            onClick={() => { if (confirm("Are you sure you want to delete this load?")) deleteMutation.mutate(load.id); }}
                             className="text-destructive"
                             data-testid={`button-delete-${load.id}`}
                           >
@@ -259,53 +254,28 @@ export default function Loads() {
         {filteredLoads.length > 0 && (
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredLoads.length)} of {filteredLoads.length} loads
+              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredLoads.length)} of {filteredLoads.length} loads
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(clampedPage - 1)}
-                disabled={clampedPage === 1}
-                data-testid="button-prev-page"
-              >
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(clampedPage - 1)} disabled={clampedPage === 1} data-testid="button-prev-page">
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Previous
               </Button>
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                   let pageNumber;
-                  if (totalPages <= 5) {
-                    pageNumber = i + 1;
-                  } else if (clampedPage <= 3) {
-                    pageNumber = i + 1;
-                  } else if (clampedPage >= totalPages - 2) {
-                    pageNumber = totalPages - 4 + i;
-                  } else {
-                    pageNumber = clampedPage - 2 + i;
-                  }
-                  
+                  if (totalPages <= 5) pageNumber = i + 1;
+                  else if (clampedPage <= 3) pageNumber = i + 1;
+                  else if (clampedPage >= totalPages - 2) pageNumber = totalPages - 4 + i;
+                  else pageNumber = clampedPage - 2 + i;
                   return (
-                    <Button
-                      key={pageNumber}
-                      variant={clampedPage === pageNumber ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNumber)}
-                      data-testid={`button-page-${pageNumber}`}
-                      className="min-w-[2.5rem]"
-                    >
+                    <Button key={pageNumber} variant={clampedPage === pageNumber ? "default" : "outline"} size="sm" onClick={() => setCurrentPage(pageNumber)} data-testid={`button-page-${pageNumber}`} className="min-w-[2.5rem]">
                       {pageNumber}
                     </Button>
                   );
                 })}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(clampedPage + 1)}
-                disabled={clampedPage === totalPages}
-                data-testid="button-next-page"
-              >
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(clampedPage + 1)} disabled={clampedPage === totalPages} data-testid="button-next-page">
                 Next
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
@@ -314,11 +284,7 @@ export default function Loads() {
         )}
       </Card>
 
-      <LoadDialog
-        open={isDialogOpen}
-        onOpenChange={handleDialogClose}
-        load={editingLoad}
-      />
+      <LoadDialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingLoad(null); }} load={editingLoad} />
     </div>
   );
 }
