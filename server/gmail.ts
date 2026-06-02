@@ -226,6 +226,7 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
           commodity: extracted.commodity || '',
           weight: extracted.weight ? Number(extracted.weight) : null,
           notes: 'Auto-imported from Gmail rate con',
+              source: 'ai_extract',
           rateConUrl: rateConUrl,
         };
                 const existingLoads = await storage.getLoads();
