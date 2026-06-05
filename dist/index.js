@@ -6519,6 +6519,8 @@ async function processMessage(gmail, messageId) {
       rate: extracted.rate,
       weight: extracted.weight ?? void 0,
       commodity: extracted.commodity ?? void 0,
+      source: "ai_extract",
+      invoiceAttachment: dataUrl,
       notes: [
         extracted.notes,
         extracted.brokerName ? `Broker: ${extracted.brokerName}` : null,

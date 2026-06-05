@@ -123,6 +123,8 @@ async function processMessage(
       rate: extracted.rate,
       weight: extracted.weight ?? undefined,
       commodity: extracted.commodity ?? undefined,
+      source: "ai_extract",
+      invoiceAttachment: dataUrl,
       notes: [
         extracted.notes,
         extracted.brokerName ? `Broker: ${extracted.brokerName}` : null,
@@ -134,7 +136,7 @@ async function processMessage(
       ]
         .filter(Boolean)
         .join("\n"),
-    });
+    } as any);
 
     await storage.createNotification({
       type: "success",
