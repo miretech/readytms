@@ -637,8 +637,8 @@ export class DatabaseStorage implements IStorage {
       .insert(loads)
       .values({
         ...insertLoad,
-        pickupDate: new Date(insertLoad.pickupDate),
-        deliveryDate: new Date(insertLoad.deliveryDate),
+        pickupDate: insertLoad.pickupDate ? new Date(insertLoad.pickupDate) : new Date(),
+        deliveryDate: insertLoad.deliveryDate ? new Date(insertLoad.deliveryDate) : new Date(),
       })
       .returning();
     if (companyId) {

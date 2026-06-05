@@ -15,7 +15,9 @@ __export(schema_exports, {
   activityLog: () => activityLog,
   automationSettings: () => automationSettings,
   chargeBacks: () => chargeBacks,
+  companies: () => companies,
   companySettings: () => companySettings,
+  companyUsers: () => companyUsers,
   customers: () => customers,
   divisionInvitations: () => divisionInvitations,
   divisions: () => divisions,
@@ -49,6 +51,7 @@ __export(schema_exports, {
   insertNotificationSchema: () => insertNotificationSchema,
   insertPaymentSchema: () => insertPaymentSchema,
   insertRecurringExpenseSchema: () => insertRecurringExpenseSchema,
+  insertSentEmailSchema: () => insertSentEmailSchema,
   insertSettlementLineItemSchema: () => insertSettlementLineItemSchema,
   insertSettlementSchema: () => insertSettlementSchema,
   insertShortPaySchema: () => insertShortPaySchema,
@@ -66,6 +69,7 @@ __export(schema_exports, {
   passwordResetTokens: () => passwordResetTokens,
   payments: () => payments,
   recurringExpenses: () => recurringExpenses,
+  sentEmails: () => sentEmails,
   sessions: () => sessions,
   settlementLineItems: () => settlementLineItems,
   settlements: () => settlements,
@@ -82,7 +86,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, decimal, timestamp, integer, index, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, users, passwordResetTokens, trucks, insertTruckSchema, trailers, insertTrailerSchema, trailerTruckAssignments, insertTrailerTruckAssignmentSchema, trailerDotInspections, insertTrailerDotInspectionSchema, drivers, insertDriverSchema, customers, insertCustomerSchema, loads, insertLoadSchema, documents, insertDocumentSchema, expenses, insertExpenseSchema, invoices, insertInvoiceSchema, payments, insertPaymentSchema, inspections, insertInspectionSchema, accidents, insertAccidentSchema, violations, insertViolationSchema, settlements, insertSettlementSchema, settlementLineItems, insertSettlementLineItemSchema, recurringExpenses, insertRecurringExpenseSchema, maintenance, insertMaintenanceSchema, fuelCards, insertFuelCardSchema, fuelTransactions, insertFuelTransactionSchema, gpsLocations, insertGpsLocationSchema, automationSettings, insertAutomationSettingSchema, notifications, insertNotificationSchema, activityLog, insertActivityLogSchema, shortPays, insertShortPaySchema, chargeBacks, insertChargeBackSchema, tasks, insertTaskSchema, companySettings, insertCompanySettingsSchema, divisions, insertDivisionSchema, divisionInvitations, insertDivisionInvitationSchema, gmailTokens, feedbacks, insertFeedbackSchema;
+var sessions, users, passwordResetTokens, trucks, insertTruckSchema, trailers, insertTrailerSchema, trailerTruckAssignments, insertTrailerTruckAssignmentSchema, trailerDotInspections, insertTrailerDotInspectionSchema, drivers, insertDriverSchema, customers, insertCustomerSchema, loads, insertLoadSchema, documents, insertDocumentSchema, expenses, insertExpenseSchema, invoices, insertInvoiceSchema, payments, insertPaymentSchema, inspections, insertInspectionSchema, accidents, insertAccidentSchema, violations, insertViolationSchema, settlements, insertSettlementSchema, settlementLineItems, insertSettlementLineItemSchema, recurringExpenses, insertRecurringExpenseSchema, maintenance, insertMaintenanceSchema, fuelCards, insertFuelCardSchema, fuelTransactions, insertFuelTransactionSchema, gpsLocations, insertGpsLocationSchema, automationSettings, insertAutomationSettingSchema, notifications, insertNotificationSchema, activityLog, insertActivityLogSchema, shortPays, insertShortPaySchema, chargeBacks, insertChargeBackSchema, tasks, insertTaskSchema, companySettings, insertCompanySettingsSchema, divisions, insertDivisionSchema, divisionInvitations, insertDivisionInvitationSchema, gmailTokens, feedbacks, insertFeedbackSchema, sentEmails, insertSentEmailSchema, companies, companyUsers;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -128,7 +132,7 @@ var init_schema = __esm({
     });
     trucks = pgTable("trucks", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      truckNumber: text("truck_number").notNull().unique(),
+      truckNumber: text("truck_number").notNull(),
       type: text("type").notNull(),
       status: text("status").notNull(),
       licensePlate: text("license_plate").notNull(),
@@ -150,7 +154,8 @@ var init_schema = __esm({
       dateTerminated: text("date_terminated"),
       // Owner Info
       ownerFullName: text("owner_full_name"),
-      isCompanyTruck: boolean("is_company_truck").default(false)
+      isCompanyTruck: boolean("is_company_truck").default(false),
+      companyId: varchar("company_id")
     });
     insertTruckSchema = createInsertSchema(trucks).omit({
       id: true
@@ -159,7 +164,7 @@ var init_schema = __esm({
     });
     trailers = pgTable("trailers", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      trailerNumber: text("trailer_number").notNull().unique(),
+      trailerNumber: text("trailer_number").notNull(),
       type: text("type").notNull(),
       status: text("status").notNull(),
       licensePlate: text("license_plate").notNull(),
@@ -186,7 +191,8 @@ var init_schema = __esm({
       // Pickup pictures section - stores array of image attachments as JSON
       pickupPictures: jsonb("pickup_pictures").$type(),
       // Truck currently hauling this trailer
-      haulingTruckId: varchar("hauling_truck_id")
+      haulingTruckId: varchar("hauling_truck_id"),
+      companyId: varchar("company_id")
     });
     insertTrailerSchema = createInsertSchema(trailers).omit({
       id: true
@@ -225,7 +231,7 @@ var init_schema = __esm({
     drivers = pgTable("drivers", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
       name: text("name").notNull(),
-      email: text("email").notNull().unique(),
+      email: text("email").notNull(),
       password: text("password"),
       // Bcrypt hashed password (optional for drivers created by admin)
       phone: text("phone").notNull(),
@@ -254,8 +260,9 @@ var init_schema = __esm({
       // Last time GPS reminder was sent
       gpsNotificationsEnabled: text("gps_notifications_enabled").notNull().default("true"),
       // "true" or "false"
-      driverType: text("driver_type").notNull().default("company-driver")
+      driverType: text("driver_type").notNull().default("company-driver"),
       // "owner-operator" or "company-driver"
+      companyId: varchar("company_id")
     });
     insertDriverSchema = createInsertSchema(drivers).omit({
       id: true
@@ -278,14 +285,15 @@ var init_schema = __esm({
       zip: text("zip"),
       contactPerson: text("contact_person"),
       mcNumber: text("mc_number"),
-      notes: text("notes")
+      notes: text("notes"),
+      companyId: varchar("company_id")
     });
     insertCustomerSchema = createInsertSchema(customers).omit({
       id: true
     });
     loads = pgTable("loads", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      loadNumber: text("load_number").notNull().unique(),
+      loadNumber: text("load_number").notNull(),
       customerId: varchar("customer_id"),
       // Optional - can be added via AI extraction later
       status: text("status").notNull(),
@@ -306,16 +314,20 @@ var init_schema = __esm({
       // Base64 encoded proof of delivery document - DEPRECATED
       podAttachments: jsonb("pod_attachments"),
       // Array of {filename: string, data: string (base64), type: string, uploadedAt: string}
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id"),
+      source: text("source").default("manual"),
+      rateConUrl: text("rate_con_url")
     });
     insertLoadSchema = createInsertSchema(loads).omit({
       id: true,
       createdAt: true
     }).extend({
       customerId: z.string().optional(),
+      source: z.enum(["manual", "ai_extract"]).optional(),
       // Optional - can be added via AI extraction later
-      pickupDate: z.string(),
-      deliveryDate: z.string(),
+      pickupDate: z.string().optional(),
+      deliveryDate: z.string().optional(),
       rate: z.string(),
       expenses: z.string().optional(),
       podAttachments: z.array(z.object({
@@ -350,7 +362,8 @@ var init_schema = __esm({
       paymentMethod: text("payment_method"),
       receiptUrl: text("receipt_url"),
       notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertExpenseSchema = createInsertSchema(expenses).omit({
       id: true,
@@ -361,7 +374,7 @@ var init_schema = __esm({
     });
     invoices = pgTable("invoices", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      invoiceNumber: text("invoice_number").notNull().unique(),
+      invoiceNumber: text("invoice_number").notNull(),
       loadId: varchar("load_id").notNull(),
       customerId: varchar("customer_id").notNull(),
       status: text("status").notNull(),
@@ -379,7 +392,8 @@ var init_schema = __esm({
       // Editable carrier name for invoice
       carrierAddress: text("carrier_address"),
       // Editable carrier address for invoice
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertInvoiceSchema = createInsertSchema(invoices).omit({
       id: true,
@@ -410,7 +424,8 @@ var init_schema = __esm({
       paymentMethod: text("payment_method").notNull(),
       referenceNumber: text("reference_number"),
       notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertPaymentSchema = createInsertSchema(payments).omit({
       id: true,
@@ -431,7 +446,8 @@ var init_schema = __esm({
       performedBy: text("performed_by"),
       attachments: jsonb("attachments"),
       // Array of {filename: string, data: string (base64), type: string}
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertInspectionSchema = createInsertSchema(inspections).omit({
       id: true,
@@ -460,7 +476,8 @@ var init_schema = __esm({
       status: text("status").notNull(),
       attachments: jsonb("attachments"),
       // Array of {filename: string, data: string (base64), type: string}
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertAccidentSchema = createInsertSchema(accidents).omit({
       id: true,
@@ -489,7 +506,8 @@ var init_schema = __esm({
       dueDate: timestamp("due_date"),
       attachments: jsonb("attachments"),
       // Array of {filename: string, data: string (base64), type: string}
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertViolationSchema = createInsertSchema(violations).omit({
       id: true,
@@ -553,7 +571,8 @@ var init_schema = __esm({
       paidDate: timestamp("paid_date"),
       paymentMethod: text("payment_method"),
       notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertSettlementSchema = createInsertSchema(settlements).omit({
       id: true,
@@ -611,7 +630,8 @@ var init_schema = __esm({
       // Gross amount for this load
       itemType: text("item_type").notNull(),
       // "revenue", "deduction", "bonus", "adjustment"
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertSettlementLineItemSchema = createInsertSchema(settlementLineItems).omit({
       id: true,
@@ -641,7 +661,8 @@ var init_schema = __esm({
       // null = ongoing
       isActive: text("is_active").notNull().default("true"),
       // "true" or "false"
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertRecurringExpenseSchema = createInsertSchema(recurringExpenses).omit({
       id: true,
@@ -667,7 +688,8 @@ var init_schema = __esm({
       notes: text("notes"),
       attachments: jsonb("attachments"),
       // Array of {filename: string, data: string (base64), type: string}
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertMaintenanceSchema = createInsertSchema(maintenance).omit({
       id: true,
@@ -701,7 +723,8 @@ var init_schema = __esm({
       status: text("status").notNull().default("active"),
       // active, inactive
       createdAt: timestamp("created_at").defaultNow().notNull(),
-      updatedAt: timestamp("updated_at").defaultNow().notNull()
+      updatedAt: timestamp("updated_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertFuelCardSchema = createInsertSchema(fuelCards).omit({
       id: true,
@@ -728,7 +751,8 @@ var init_schema = __esm({
       fuelType: text("fuel_type").notNull(),
       // Diesel, Gas, DEF
       notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertFuelTransactionSchema = createInsertSchema(fuelTransactions).omit({
       id: true,
@@ -835,7 +859,8 @@ var init_schema = __esm({
       // "open", "disputed", "resolved", "written_off"
       notes: text("notes"),
       createdAt: timestamp("created_at").defaultNow().notNull(),
-      resolvedAt: timestamp("resolved_at")
+      resolvedAt: timestamp("resolved_at"),
+      companyId: varchar("company_id")
     });
     insertShortPaySchema = createInsertSchema(shortPays).omit({
       id: true,
@@ -862,7 +887,8 @@ var init_schema = __esm({
       resolution: text("resolution"),
       // Description of how it was resolved
       notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertChargeBackSchema = createInsertSchema(chargeBacks).omit({
       id: true,
@@ -893,7 +919,8 @@ var init_schema = __esm({
       // "maintenance", "paperwork", "dispatch", "other"
       completedAt: timestamp("completed_at"),
       attachments: jsonb("attachments").$type(),
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      companyId: varchar("company_id")
     });
     insertTaskSchema = createInsertSchema(tasks).omit({
       id: true,
@@ -914,7 +941,11 @@ var init_schema = __esm({
       cityStateZip: text("city_state_zip").notNull().default("St Paul, MN 55114"),
       phone: text("phone").notNull().default("612-567-5034"),
       logoUrl: text("logo_url"),
-      // URL or base64 data of company logo
+      dispatchNotificationEmail: text("dispatch_notification_email"),
+      gmailAccessToken: text("gmail_access_token"),
+      gmailRefreshToken: text("gmail_refresh_token"),
+      gmailEmail: text("gmail_email"),
+      gmailTokenExpiry: text("gmail_token_expiry"),
       updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
     insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
@@ -968,16 +999,58 @@ var init_schema = __esm({
       note: text("note").notNull(),
       attachmentFileName: text("attachment_file_name"),
       attachmentFileData: text("attachment_file_data"),
+      status: text("status").notNull().default("open"),
+      // "open" or "resolved"
       createdAt: timestamp("created_at").defaultNow().notNull()
     });
     insertFeedbackSchema = createInsertSchema(feedbacks).omit({
       id: true,
       createdAt: true
     });
+    sentEmails = pgTable("sent_emails", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      invoiceId: text("invoice_id"),
+      invoiceNumber: text("invoice_number"),
+      toEmail: text("to_email").notNull(),
+      ccEmails: text("cc_emails"),
+      // comma-separated list of CC recipients
+      subject: text("subject"),
+      sentAt: timestamp("sent_at").defaultNow().notNull()
+    });
+    insertSentEmailSchema = createInsertSchema(sentEmails).omit({
+      id: true,
+      sentAt: true
+    });
+    companies = pgTable("companies", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      name: text("name").notNull(),
+      displayName: text("display_name").notNull(),
+      address: text("address"),
+      cityStateZip: text("city_state_zip"),
+      phone: text("phone"),
+      email: text("email"),
+      logoUrl: text("logo_url"),
+      isActive: text("is_active").notNull().default("true"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    companyUsers = pgTable("company_users", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      userId: varchar("user_id").notNull(),
+      companyId: varchar("company_id").notNull(),
+      role: text("role").notNull().default("admin"),
+      isPrimary: text("is_primary").notNull().default("false"),
+      createdAt: timestamp("created_at").defaultNow()
+    });
   }
 });
 
 // server/db.ts
+var db_exports = {};
+__export(db_exports, {
+  db: () => db,
+  pool: () => pool
+});
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
@@ -1041,7 +1114,9 @@ var init_storage = __esm({
         return user;
       }
       async getUserByEmail(email) {
-        const [user] = await db.select().from(users).where(eq(users.email, email));
+        const [user] = await db.select().from(users).where(
+          sql2`lower(${users.email}) = ${email.toLowerCase()}`
+        );
         return user || void 0;
       }
       async createUser(userData) {
@@ -1184,7 +1259,7 @@ var init_storage = __esm({
           podAttachment: sql2`null`.as("pod_attachment"),
           podAttachments: sql2`null`.as("pod_attachments")
         }).from(loads);
-        const results = companyId ? await baseQuery.where(sql2`${loads}.company_id = ${companyId}`).orderBy(desc(loads.createdAt)) : await baseQuery.orderBy(desc(loads.createdAt));
+        const results = companyId ? await baseQuery.where(sql2`(${loads}.company_id = ${companyId} OR ${loads}.company_id IS NULL)`).orderBy(desc(loads.createdAt)) : await baseQuery.orderBy(desc(loads.createdAt));
         return results;
       }
       async getLoad(id) {
@@ -1198,8 +1273,8 @@ var init_storage = __esm({
       async createLoad(insertLoad, companyId) {
         const [load] = await db.insert(loads).values({
           ...insertLoad,
-          pickupDate: new Date(insertLoad.pickupDate),
-          deliveryDate: new Date(insertLoad.deliveryDate)
+          pickupDate: insertLoad.pickupDate ? new Date(insertLoad.pickupDate) : /* @__PURE__ */ new Date(),
+          deliveryDate: insertLoad.deliveryDate ? new Date(insertLoad.deliveryDate) : /* @__PURE__ */ new Date()
         }).returning();
         if (companyId) {
           await db.execute(sql2`UPDATE loads SET company_id = ${companyId} WHERE id = ${load.id}`);
@@ -1250,7 +1325,7 @@ var init_storage = __esm({
           dotInspectionAttachments: sql2`null`.as("dot_inspection_attachments"),
           repairReceiptAttachments: sql2`null`.as("repair_receipt_attachments")
         }).from(trucks);
-        const results = companyId ? await baseQuery.where(sql2`${trucks}.company_id = ${companyId}`) : await baseQuery;
+        const results = companyId ? await baseQuery.where(sql2`(${trucks}.company_id = ${companyId} OR ${trucks}.company_id IS NULL)`) : await baseQuery;
         return results;
       }
       async getTruck(id) {
@@ -1310,7 +1385,7 @@ var init_storage = __esm({
           repairsAttachments: sql2`null`.as("repairs_attachments"),
           pickupPictures: sql2`null`.as("pickup_pictures")
         }).from(trailers);
-        const results = companyId ? await baseQuery.where(sql2`${trailers}.company_id = ${companyId}`) : await baseQuery;
+        const results = companyId ? await baseQuery.where(sql2`(${trailers}.company_id = ${companyId} OR ${trailers}.company_id IS NULL)`) : await baseQuery;
         return results;
       }
       async getTrailer(id) {
@@ -1405,7 +1480,7 @@ var init_storage = __esm({
           medicalCardAttachment: sql2`null`.as("medical_card_attachment"),
           socialSecurityAttachment: sql2`null`.as("social_security_attachment")
         }).from(drivers);
-        const results = companyId ? await baseQuery.where(sql2`${drivers}.company_id = ${companyId}`) : await baseQuery;
+        const results = companyId ? await baseQuery.where(sql2`(${drivers}.company_id = ${companyId} OR ${drivers}.company_id IS NULL)`) : await baseQuery;
         return results;
       }
       async getDriver(id) {
@@ -1413,7 +1488,9 @@ var init_storage = __esm({
         return driver || void 0;
       }
       async getDriverByEmail(email) {
-        const [driver] = await db.select().from(drivers).where(eq(drivers.email, email));
+        const [driver] = await db.select().from(drivers).where(
+          sql2`lower(${drivers.email}) = ${email.toLowerCase()}`
+        );
         return driver || void 0;
       }
       async getDriverByLicense(licenseNumber) {
@@ -1499,7 +1576,7 @@ var init_storage = __esm({
       }
       async getAllCustomers(companyId) {
         if (companyId) {
-          return await db.select().from(customers).where(sql2`${customers}.company_id = ${companyId}`);
+          return await db.select().from(customers).where(sql2`(${customers}.company_id = ${companyId} OR ${customers}.company_id IS NULL)`);
         }
         return await db.select().from(customers);
       }
@@ -1562,7 +1639,7 @@ var init_storage = __esm({
       // Invoices
       async getAllInvoices(companyId) {
         if (companyId) {
-          return await db.select().from(invoices).where(sql2`${invoices}.company_id = ${companyId}`).orderBy(desc(invoices.invoiceDate));
+          return await db.select().from(invoices).where(sql2`(${invoices}.company_id = ${companyId} OR ${invoices}.company_id IS NULL)`).orderBy(desc(invoices.invoiceDate));
         }
         return await db.select().from(invoices).orderBy(desc(invoices.invoiceDate));
       }
@@ -1815,7 +1892,7 @@ var init_storage = __esm({
       // Settlements
       async getAllSettlements(companyId) {
         if (companyId) {
-          return await db.select().from(settlements).where(sql2`${settlements}.company_id = ${companyId}`).orderBy(desc(settlements.periodEnd));
+          return await db.select().from(settlements).where(sql2`(${settlements}.company_id = ${companyId} OR ${settlements}.company_id IS NULL)`).orderBy(desc(settlements.periodEnd));
         }
         return await db.select().from(settlements).orderBy(desc(settlements.periodEnd));
       }
@@ -2269,25 +2346,228 @@ var init_storage = __esm({
         const [created] = await db.insert(feedbacks).values(feedback).returning();
         return created;
       }
-      async saveGmailTokens(tokens) {
-        await db.delete(gmailTokens);
-        const [created] = await db.insert(gmailTokens).values({
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          connectedEmail: tokens.connectedEmail
-        }).returning();
+      async deleteFeedback(id) {
+        const deleted = await db.delete(feedbacks).where(eq(feedbacks.id, id)).returning();
+        return deleted.length > 0;
+      }
+      async updateFeedbackStatus(id, status) {
+        const [updated] = await db.update(feedbacks).set({ status }).where(eq(feedbacks.id, id)).returning();
+        return updated || void 0;
+      }
+      async createSentEmail(data) {
+        const [created] = await db.insert(sentEmails).values(data).returning();
         return created;
       }
-      async getGmailTokens() {
-        const [token] = await db.select().from(gmailTokens).limit(1);
-        return token;
-      }
-      async deleteGmailTokens() {
-        await db.delete(gmailTokens);
-        return true;
+      async getAllSentEmails() {
+        return await db.select().from(sentEmails).orderBy(desc(sentEmails.sentAt));
       }
     };
     storage = new DatabaseStorage();
+  }
+});
+
+// server/aiExtraction.ts
+var aiExtraction_exports = {};
+__export(aiExtraction_exports, {
+  extractLoadFromDocument: () => extractLoadFromDocument
+});
+import Anthropic from "@anthropic-ai/sdk";
+import { z as z2 } from "zod";
+async function extractLoadFromDocument(fileData, fileType) {
+  try {
+    const isImage = fileType.startsWith("image/");
+    if (!fileData.startsWith("data:")) {
+      throw new Error("Invalid file format. Please ensure the file is properly encoded.");
+    }
+    const base64Content = fileData.split(",")[1] || fileData;
+    let message;
+    let userContent;
+    if (fileType === "application/pdf") {
+      console.log("[AI Extract] Processing PDF using Anthropic native PDF support");
+      userContent = [
+        {
+          type: "text",
+          text: "Extract load information from this PDF document:"
+        },
+        {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: base64Content
+          }
+        }
+      ];
+    } else if (isImage) {
+      const mediaType = fileType;
+      console.log(`[AI Extract] Processing image (${fileType})`);
+      userContent = [
+        {
+          type: "text",
+          text: "Extract load information from this document:"
+        },
+        {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data: base64Content
+          }
+        }
+      ];
+    } else {
+      const textContent = Buffer.from(base64Content, "base64").toString("utf-8");
+      console.log("[AI Extract] Processing text file");
+      userContent = `Extract load information from this document:
+
+${textContent}`;
+    }
+    const response = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userContent }],
+      tools: [EXTRACT_LOAD_TOOL],
+      tool_choice: { type: "tool", name: "extract_load" }
+    });
+    const toolUseBlock = response.content.find(
+      (block) => block.type === "tool_use"
+    );
+    if (!toolUseBlock) {
+      throw new Error("No structured response from AI");
+    }
+    return extractedLoadSchema.parse(toolUseBlock.input);
+  } catch (error) {
+    console.error("[AI Extract] Error:", error?.message);
+    if (error?.status === 413 || error?.message?.includes("too large")) {
+      throw new Error("Document is too large. Please use a smaller file (under 5MB).");
+    }
+    if (error?.status === 400 && error?.message?.includes("pdf")) {
+      throw new Error("Unable to process this PDF. Please try converting it to PNG/JPG first.");
+    }
+    const message = error?.message || "Failed to extract load information from document";
+    throw new Error(message);
+  }
+}
+var ANTHROPIC_KEY, anthropic, extractedLoadSchema, SYSTEM_PROMPT, EXTRACT_LOAD_TOOL;
+var init_aiExtraction = __esm({
+  "server/aiExtraction.ts"() {
+    "use strict";
+    ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY ?? "";
+    if (!ANTHROPIC_KEY || !/^sk-ant-[A-Za-z0-9_-]+$/.test(ANTHROPIC_KEY)) {
+      console.warn(
+        `[AI Extract] WARNING: ANTHROPIC_API_KEY is missing or invalid. Value starts with: "${ANTHROPIC_KEY.substring(0, 12)}..." \u2014 check for spaces, ellipsis (\u2026), or truncation.`
+      );
+    }
+    anthropic = new Anthropic({
+      apiKey: ANTHROPIC_KEY
+    });
+    extractedLoadSchema = z2.object({
+      loadNumber: z2.string().nullable(),
+      pickupLocation: z2.string(),
+      pickupDate: z2.string(),
+      deliveryLocation: z2.string(),
+      deliveryDate: z2.string(),
+      rate: z2.string(),
+      weight: z2.number().nullable(),
+      commodity: z2.string().nullable(),
+      notes: z2.string().nullable(),
+      brokerName: z2.string().nullable(),
+      brokerAddress: z2.string().nullable(),
+      brokerPhone: z2.string().nullable(),
+      brokerEmail: z2.string().nullable()
+    });
+    SYSTEM_PROMPT = `You are an expert at extracting load information from transportation documents like rate confirmations, BOLs (Bill of Lading), and load tenders. Extract all relevant load details from the provided document.
+
+Guidelines:
+- Extract pickup and delivery locations (city, state)
+- Parse dates into YYYY-MM-DD format
+- Extract rate/revenue as a numeric value (without $ sign)
+- Extract weight in pounds if available
+- Extract commodity type
+- Extract load number or reference number if present
+- Extract broker/freight company name (the company issuing the rate confirmation)
+- Extract broker's full address including street, city, state, and ZIP code
+- Extract broker's phone number if available
+- Extract broker's email address if available
+- Include any special instructions or notes
+- Return null for any field that is not found - do not return explanatory text`;
+    EXTRACT_LOAD_TOOL = {
+      name: "extract_load",
+      description: "Extract structured load information from a transportation document",
+      input_schema: {
+        type: "object",
+        properties: {
+          loadNumber: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Load number or reference number if present"
+          },
+          pickupLocation: {
+            type: "string",
+            description: "Pickup location city and state"
+          },
+          pickupDate: {
+            type: "string",
+            description: "Pickup date in ISO format YYYY-MM-DD"
+          },
+          deliveryLocation: {
+            type: "string",
+            description: "Delivery location city and state"
+          },
+          deliveryDate: {
+            type: "string",
+            description: "Delivery date in ISO format YYYY-MM-DD"
+          },
+          rate: {
+            type: "string",
+            description: "Rate or revenue amount as a number"
+          },
+          weight: {
+            anyOf: [{ type: "number" }, { type: "null" }],
+            description: "Weight in pounds if available"
+          },
+          commodity: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Type of commodity or freight if mentioned"
+          },
+          notes: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Any additional notes or special instructions"
+          },
+          brokerName: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Name of the broker or freight company issuing the rate confirmation"
+          },
+          brokerAddress: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Full address of the broker including street, city, state, and ZIP. Return null if not found."
+          },
+          brokerPhone: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Phone number of the broker. Return null if not found."
+          },
+          brokerEmail: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Email address of the broker. Return null if not found."
+          }
+        },
+        required: [
+          "loadNumber",
+          "pickupLocation",
+          "pickupDate",
+          "deliveryLocation",
+          "deliveryDate",
+          "rate",
+          "weight",
+          "commodity",
+          "notes",
+          "brokerName",
+          "brokerAddress",
+          "brokerPhone",
+          "brokerEmail"
+        ]
+      }
+    };
   }
 });
 
@@ -2347,6 +2627,11 @@ async function sendEmail(options) {
     };
     if (options.from && !options.from.includes("noreply@readytms.com")) {
       emailPayload.replyTo = options.from;
+    }
+    if (options.cc) {
+      const ccList = Array.isArray(options.cc) ? options.cc : [options.cc];
+      const filtered = ccList.filter(Boolean);
+      if (filtered.length > 0) emailPayload.cc = filtered;
     }
     if (options.attachments && options.attachments.length > 0) {
       emailPayload.attachments = options.attachments.map((att) => ({
@@ -3007,6 +3292,41 @@ var init_automation = __esm({
   }
 });
 
+// server/s3.ts
+var s3_exports = {};
+__export(s3_exports, {
+  uploadPdfToS3: () => uploadPdfToS3
+});
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+async function uploadPdfToS3(base64Data, fileName, mimeType = "application/pdf") {
+  const base64 = base64Data.includes(",") ? base64Data.split(",")[1] : base64Data;
+  const buffer = Buffer.from(base64, "base64");
+  const key = `ratecons/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType
+    })
+  );
+  return `https://${BUCKET}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
+}
+var s3Client, BUCKET;
+var init_s3 = __esm({
+  "server/s3.ts"() {
+    "use strict";
+    s3Client = new S3Client({
+      region: process.env.AWS_REGION || "us-east-1",
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ""
+      }
+    });
+    BUCKET = process.env.AWS_S3_BUCKET || "readytms-documents";
+  }
+});
+
 // server/index.ts
 import express2 from "express";
 
@@ -3159,154 +3479,227 @@ var isDriver = (req, res, next) => {
 };
 
 // server/routes.ts
+init_aiExtraction();
+init_automation();
+init_notifications();
 import passport2 from "passport";
 import bcrypt3 from "bcrypt";
 
-// server/aiExtraction.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { z as z2 } from "zod";
-var client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || "sk-ant-api03-5AF-qMYd0qjBFAvq5OuR-NqlW2BUO8-UyqdefnNZXJiEYHfOnzUOv3GzVjDh4C-6qMO0mhQS-Q4w1Cx8xg-L_Px2gAA"
-});
-var extractedLoadSchema = z2.object({
-  loadNumber: z2.string().nullable().describe("Load number or reference number"),
-  pickupLocation: z2.string().describe("Pickup location city and state"),
-  pickupDate: z2.string().describe("Pickup date in ISO format YYYY-MM-DD"),
-  deliveryLocation: z2.string().describe("Delivery location city and state"),
-  deliveryDate: z2.string().describe("Delivery date in ISO format YYYY-MM-DD"),
-  rate: z2.string().describe("Rate or revenue amount as a number"),
-  weight: z2.number().nullable().describe("Weight in pounds"),
-  commodity: z2.string().nullable().describe("Type of commodity or freight"),
-  notes: z2.string().nullable().describe("Any additional notes or special instructions"),
-  brokerName: z2.string().nullable().describe("Name of the broker or freight company"),
-  brokerAddress: z2.string().nullable().describe("Full address of the broker"),
-  brokerPhone: z2.string().nullable().describe("Phone number of the broker"),
-  brokerEmail: z2.string().nullable().describe("Email address of the broker")
-});
-var SYSTEM_PROMPT = `You are an expert at extracting load information from transportation documents like rate confirmations, BOLs (Bill of Lading), and load tenders. Extract all relevant load details from the provided document.
-
-Guidelines:
-- Extract pickup and delivery locations (city, state)
-- Parse dates into YYYY-MM-DD format
-- Extract rate/revenue as a numeric string value (without $ sign)
-- Extract weight in pounds if available
-- Extract commodity type
-- Extract load number or reference number if present
-- Extract broker/freight company name (the company issuing the rate confirmation)
-- Extract broker full address including street, city, state, and ZIP code
-- Extract broker phone number if available
-- Extract broker email address if available
-- Include any special instructions or notes
-- Return null for any field that is not found
-
-Respond ONLY with a valid JSON object (no markdown, no code block, raw JSON):
-{
-  "loadNumber": string | null,
-  "pickupLocation": string,
-  "pickupDate": string,
-  "deliveryLocation": string,
-  "deliveryDate": string,
-  "rate": string,
-  "weight": number | null,
-  "commodity": string | null,
-  "notes": string | null,
-  "brokerName": string | null,
-  "brokerAddress": string | null,
-  "brokerPhone": string | null,
-  "brokerEmail": string | null
-}`;
-async function extractLoadFromDocument(fileData, fileType) {
-  try {
-    if (!fileData.startsWith("data:")) {
-      throw new Error("Invalid file format. Please ensure the file is properly encoded.");
+// server/gmail.ts
+init_storage();
+import { google } from "googleapis";
+var CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+var CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+var REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "https://readytms.com/api/gmail/oauth/callback";
+function getOAuth2Client() {
+  return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+}
+function getGmailAuthUrl() {
+  const oauth2Client = getOAuth2Client();
+  return oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    scope: [
+      "https://www.googleapis.com/auth/gmail.send",
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/userinfo.email"
+    ],
+    prompt: "consent"
+  });
+}
+async function exchangeCodeAndSave(code) {
+  const oauth2Client = getOAuth2Client();
+  const { tokens } = await oauth2Client.getToken(code);
+  oauth2Client.setCredentials(tokens);
+  const oauth2Api = google.oauth2({ version: "v2", auth: oauth2Client });
+  const { data } = await oauth2Api.userinfo.get();
+  await storage.updateCompanySettings({
+    gmailAccessToken: tokens.access_token ?? void 0,
+    gmailRefreshToken: tokens.refresh_token ?? void 0,
+    gmailEmail: data.email ?? void 0,
+    gmailTokenExpiry: tokens.expiry_date ? String(tokens.expiry_date) : void 0
+  });
+}
+async function getGmailStatus() {
+  const settings = await storage.getCompanySettings();
+  if (!settings?.gmailRefreshToken) return { connected: false };
+  return { connected: true, email: settings.gmailEmail ?? void 0 };
+}
+async function clearGmailTokens() {
+  const settings = await storage.getCompanySettings();
+  if (!settings) return;
+  const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+  const { companySettings: companySettings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq2, sql: drizzleSql } = await import("drizzle-orm");
+  await db2.execute(drizzleSql`
+    UPDATE company_settings
+    SET gmail_access_token = NULL,
+        gmail_refresh_token = NULL,
+        gmail_email = NULL,
+        gmail_token_expiry = NULL
+    WHERE id = ${settings.id}
+  `);
+}
+function buildRFC2822(opts) {
+  const boundary = `----_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const lines = [];
+  lines.push(`From: ${opts.from}`);
+  lines.push(`To: ${opts.to}`);
+  if (opts.cc?.length) lines.push(`Cc: ${opts.cc.join(", ")}`);
+  lines.push(`Subject: ${opts.subject}`);
+  lines.push("MIME-Version: 1.0");
+  if (opts.attachments?.length) {
+    lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+    lines.push("");
+    lines.push(`--${boundary}`);
+    lines.push("Content-Type: text/html; charset=UTF-8");
+    lines.push("");
+    lines.push(opts.html);
+    for (const att of opts.attachments) {
+      const b64 = Buffer.isBuffer(att.content) ? att.content.toString("base64") : Buffer.from(att.content, "base64").toString("base64");
+      const chunks = b64.match(/.{1,76}/g) ?? [];
+      lines.push(`--${boundary}`);
+      lines.push(`Content-Type: ${att.type || "application/octet-stream"}; name="${att.filename}"`);
+      lines.push("Content-Transfer-Encoding: base64");
+      lines.push(`Content-Disposition: attachment; filename="${att.filename}"`);
+      lines.push("");
+      lines.push(...chunks);
     }
-    const base64Content = fileData.split(",")[1] || fileData;
-    let message;
-    if (fileType === "application/pdf") {
-      console.log("[AI Extract] Processing PDF with Claude native PDF support");
-      message = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data: base64Content
-                }
-              },
-              {
-                type: "text",
-                text: "Extract load information from this rate confirmation document."
-              }
-            ]
-          }
-        ]
-      });
-      console.log("[AI Extract] Claude native PDF extraction succeeded");
-    } else if (fileType.startsWith("image/")) {
-      message = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: fileType,
-                  data: base64Content
-                }
-              },
-              {
-                type: "text",
-                text: "Extract load information from this rate confirmation document."
-              }
-            ]
-          }
-        ]
-      });
-    } else {
-      const textContent = Buffer.from(base64Content, "base64").toString("utf-8");
-      message = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: `Extract load information from this document:
-
-${textContent}` }]
-      });
-    }
-    const responseContent = message.content[0];
-    if (!responseContent || responseContent.type !== "text") {
-      throw new Error("No text response from AI");
-    }
-    const rawText = responseContent.text.trim();
-    const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    const parsed = JSON.parse(jsonText);
-    return extractedLoadSchema.parse(parsed);
-  } catch (error) {
-    console.error("Error extracting load data:", error);
-    if (error?.status === 413 || error?.message?.includes("too large")) {
-      throw new Error("Document is too large. Please use a smaller file (under 5MB).");
-    }
-    throw new Error(error?.message || "Failed to extract load information from document");
+    lines.push(`--${boundary}--`);
+  } else {
+    lines.push("Content-Type: text/html; charset=UTF-8");
+    lines.push("");
+    lines.push(opts.html);
   }
+  return lines.join("\r\n");
+}
+async function sendViaGmail(opts) {
+  try {
+    const settings = await storage.getCompanySettings();
+    if (!settings?.gmailRefreshToken) {
+      return { success: false, error: "Gmail not connected" };
+    }
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials({
+      refresh_token: settings.gmailRefreshToken,
+      access_token: settings.gmailAccessToken ?? void 0
+    });
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    oauth2Client.setCredentials(credentials);
+    if (credentials.access_token) {
+      await storage.updateCompanySettings({
+        gmailAccessToken: credentials.access_token,
+        gmailTokenExpiry: credentials.expiry_date ? String(credentials.expiry_date) : void 0
+      });
+    }
+    const from = settings.gmailEmail ?? "me";
+    const raw = buildRFC2822({ from, ...opts });
+    const encoded = Buffer.from(raw).toString("base64url");
+    const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+    await gmail.users.messages.send({ userId: "me", requestBody: { raw: encoded } });
+    return { success: true };
+  } catch (err) {
+    console.error("[Gmail] Send error:", err?.message ?? err);
+    return { success: false, error: err?.message ?? "Failed to send via Gmail" };
+  }
+}
+async function scanRateConEmails(companyId) {
+  const results = { scanned: 0, created: 0, errors: [] };
+  try {
+    const settings = await storage.getCompanySettings();
+    if (!settings?.gmailRefreshToken) {
+      throw new Error("Gmail not connected");
+    }
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials({
+      refresh_token: settings.gmailRefreshToken,
+      access_token: settings.gmailAccessToken ?? void 0
+    });
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    oauth2Client.setCredentials(credentials);
+    if (credentials.access_token) {
+      await storage.updateCompanySettings({
+        gmailAccessToken: credentials.access_token,
+        gmailTokenExpiry: credentials.expiry_date ? String(credentials.expiry_date) : void 0
+      });
+    }
+    const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+    const brokerKeywords = ["rate confirmation", "rate con", "load tender", "load confirmation", "TQL", "Echo Global", "Coyote", "CH Robinson", "CHR", "loadconfirmation", "rateconfirmation"];
+    const query = brokerKeywords.map((k) => "subject:(" + k + ")").join(" OR ") + " OR filename:ratecon OR filename:rate_con OR filename:RateConf";
+    const listRes = await gmail.users.messages.list({
+      userId: "me",
+      q: "(" + query + ") is:unread newer_than:60d",
+      maxResults: 50
+    });
+    const messages = listRes.data.messages || [];
+    results.scanned = messages.length;
+    for (const msg of messages) {
+      try {
+        const fullMsg = await gmail.users.messages.get({ userId: "me", id: msg.id });
+        const parts = fullMsg.data.payload?.parts || [];
+        let pdfAttachmentId = null;
+        let pdfMimeType = "application/pdf";
+        const findPdf = (partList) => {
+          for (const part of partList) {
+            if (part.filename && part.filename.toLowerCase().endsWith(".pdf") && part.body?.attachmentId) {
+              pdfAttachmentId = part.body.attachmentId;
+              pdfMimeType = part.mimeType || "application/pdf";
+              return;
+            }
+            if (part.parts) findPdf(part.parts);
+          }
+        };
+        findPdf(parts);
+        if (!pdfAttachmentId) {
+          await gmail.users.messages.modify({ userId: "me", id: msg.id, requestBody: { removeLabelIds: ["UNREAD"] } });
+          continue;
+        }
+        const attachRes = await gmail.users.messages.attachments.get({ userId: "me", messageId: msg.id, id: pdfAttachmentId });
+        const rawData = attachRes.data.data || "";
+        const base64Pdf = rawData.replace(/-/g, "+").replace(/_/g, "/");
+        const { extractLoadFromDocument: extractLoadFromDocument2 } = await Promise.resolve().then(() => (init_aiExtraction(), aiExtraction_exports));
+        const extracted = await extractLoadFromDocument2(`data:${pdfMimeType};base64,${base64Pdf}`, pdfMimeType);
+        let rateConUrl = "";
+        try {
+          const { uploadPdfToS3: uploadPdfToS32 } = await Promise.resolve().then(() => (init_s3(), s3_exports));
+          rateConUrl = await uploadPdfToS32(base64Pdf, attachment.filename || "ratecon.pdf", pdfMimeType);
+        } catch (s3Err) {
+          console.warn("S3 upload failed:", s3Err?.message);
+        }
+        const loadData = {
+          loadNumber: extracted.loadNumber || "RC-" + Date.now(),
+          status: "pending",
+          pickupLocation: extracted.pickupLocation || "",
+          pickupDate: extracted.pickupDate ? new Date(extracted.pickupDate) : /* @__PURE__ */ new Date(),
+          deliveryLocation: extracted.deliveryLocation || "",
+          deliveryDate: extracted.deliveryDate ? new Date(extracted.deliveryDate) : /* @__PURE__ */ new Date(),
+          rate: extracted.rate || "0",
+          commodity: extracted.commodity || "",
+          weight: extracted.weight ? Number(extracted.weight) : null,
+          notes: "Auto-imported from Gmail rate con",
+          source: "ai_extract",
+          rateConUrl
+        };
+        const existingLoads = await storage.getLoads();
+        const dupLoad = existingLoads.find((l) => l.loadNumber === loadData.loadNumber);
+        if (dupLoad) {
+          await gmail.users.messages.modify({ userId: "me", id: msg.id, requestBody: { removeLabelIds: ["UNREAD"] } });
+          continue;
+        }
+        await storage.createLoad(loadData, companyId);
+        await gmail.users.messages.modify({ userId: "me", id: msg.id, requestBody: { removeLabelIds: ["UNREAD"] } });
+        results.created++;
+      } catch (msgErr) {
+        results.errors.push(msgErr?.message || "Unknown error processing email");
+      }
+    }
+  } catch (err) {
+    results.errors.push(err?.message || "Failed to scan emails");
+  }
+  return results;
 }
 
 // server/routes.ts
-init_automation();
-init_notifications();
 import { z as z3 } from "zod";
-import { google } from "googleapis";
 async function registerRoutes(app2) {
   await setupAuth(app2);
   app2.post("/api/admin/login", (req, res, next) => {
@@ -3473,7 +3866,7 @@ async function registerRoutes(app2) {
     try {
       const pendingAdmins = await storage.getPendingAdmins();
       const currentUserDivisionId = req.user?.divisionId || null;
-      const filtered = currentUserDivisionId ? pendingAdmins.filter((u) => u.divisionId === currentUserDivisionId) : pendingAdmins;
+      const filtered = currentUserDivisionId ? pendingAdmins.filter((u) => u.divisionId === currentUserDivisionId || !u.divisionId) : pendingAdmins;
       const sanitized = filtered.map(({ password, ...user }) => user);
       res.json(sanitized);
     } catch (error) {
@@ -3708,6 +4101,95 @@ async function registerRoutes(app2) {
       });
     }
   });
+  app2.post("/api/public/pod-upload", async (req, res) => {
+    try {
+      const { driverName, loadNumber, truckNumber, podAttachments } = req.body;
+      if (!driverName || !loadNumber || !truckNumber) {
+        return res.status(400).json({ error: "Driver name, load number, and truck number are required" });
+      }
+      if (!podAttachments || !Array.isArray(podAttachments) || podAttachments.length === 0) {
+        return res.status(400).json({ error: "At least one POD file is required" });
+      }
+      const podSchema = z3.array(z3.object({
+        filename: z3.string(),
+        data: z3.string(),
+        type: z3.string()
+      }));
+      try {
+        podSchema.parse(podAttachments);
+      } catch {
+        return res.status(400).json({ error: "Invalid attachment format" });
+      }
+      if (podAttachments.length > 10) {
+        return res.status(400).json({ error: "Maximum 10 POD attachments allowed per upload" });
+      }
+      const maxSize = 10 * 1024 * 1024;
+      for (const att of podAttachments) {
+        if (att.data.length > maxSize) {
+          return res.status(400).json({ error: `Attachment ${att.filename} exceeds 10MB limit` });
+        }
+      }
+      const allLoads = await storage.getAllLoads();
+      const matchingLoad = allLoads.find(
+        (l) => l.loadNumber.trim().toLowerCase() === String(loadNumber).trim().toLowerCase()
+      );
+      if (!matchingLoad) {
+        return res.status(404).json({ error: `Load #${loadNumber} was not found. Please check the load number and try again.` });
+      }
+      const timestampedAttachments = podAttachments.map((att) => ({
+        ...att,
+        uploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        uploadedBy: driverName,
+        truckNumber
+      }));
+      const existingPODs = matchingLoad.podAttachments || [];
+      const allPODs = [...existingPODs, ...timestampedAttachments];
+      if (allPODs.length > 50) {
+        return res.status(400).json({ error: "Maximum 50 total POD attachments allowed per load" });
+      }
+      const updatedLoad = await storage.updateLoad(matchingLoad.id, {
+        podAttachments: allPODs,
+        status: "delivered"
+      });
+      if (!updatedLoad) {
+        return res.status(500).json({ error: "Failed to update load" });
+      }
+      await autoGenerateInvoice(updatedLoad);
+      try {
+        const companySettingsData = await storage.getCompanySettings();
+        if (companySettingsData?.dispatchNotificationEmail) {
+          await sendEmail({
+            to: companySettingsData.dispatchNotificationEmail,
+            subject: `POD Uploaded \u2014 Load #${updatedLoad.loadNumber}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <div style="background:#2563eb;color:white;padding:16px 20px;border-radius:6px 6px 0 0;">
+                  <h2 style="margin:0;">Proof of Delivery Received</h2>
+                </div>
+                <div style="background:#f9fafb;padding:20px;border-radius:0 0 6px 6px;border:1px solid #e5e7eb;border-top:none;">
+                  <p>A driver has uploaded a POD for <strong>Load #${updatedLoad.loadNumber}</strong>.</p>
+                  <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+                    <tr><td style="padding:8px;font-weight:bold;color:#6b7280;width:40%;">Driver</td><td style="padding:8px;">${driverName}</td></tr>
+                    <tr style="background:#fff;"><td style="padding:8px;font-weight:bold;color:#6b7280;">Truck Number</td><td style="padding:8px;">${truckNumber}</td></tr>
+                    <tr><td style="padding:8px;font-weight:bold;color:#6b7280;">Load Number</td><td style="padding:8px;">#${updatedLoad.loadNumber}</td></tr>
+                    <tr style="background:#fff;"><td style="padding:8px;font-weight:bold;color:#6b7280;">Files Uploaded</td><td style="padding:8px;">${podAttachments.length}</td></tr>
+                    <tr><td style="padding:8px;font-weight:bold;color:#6b7280;">Time</td><td style="padding:8px;">${(/* @__PURE__ */ new Date()).toLocaleString()}</td></tr>
+                  </table>
+                  <p style="color:#6b7280;font-size:12px;margin-top:20px;">Ready TMS \u2014 Automated Notification</p>
+                </div>
+              </div>
+            `
+          });
+        }
+      } catch (notifError) {
+        console.error("[POD Upload] Failed to send dispatch notification:", notifError);
+      }
+      res.json({ message: "POD uploaded successfully", loadNumber: updatedLoad.loadNumber });
+    } catch (error) {
+      console.error("Error in public POD upload:", error);
+      res.status(500).json({ error: "Failed to upload POD. Please try again." });
+    }
+  });
   app2.get("/api/trucks", async (req, res) => {
     const trucks2 = await storage.getAllTrucks(req.user?.divisionId || void 0);
     res.json(trucks2);
@@ -3922,7 +4404,17 @@ async function registerRoutes(app2) {
       res.status(201).json(driver);
     } catch (error) {
       console.error("Driver validation error:", error);
-      res.status(400).json({ error: "Invalid driver data", details: error.message });
+      if (error?.code === "23505") {
+        const detail = error?.detail || "";
+        if (detail.includes("license_number")) {
+          return res.status(409).json({ error: "A driver with this CDL license number already exists." });
+        }
+        if (detail.includes("email")) {
+          return res.status(409).json({ error: "A driver with this email address already exists." });
+        }
+        return res.status(409).json({ error: "A driver with this information already exists." });
+      }
+      res.status(400).json({ error: error.message || "Invalid driver data" });
     }
   });
   app2.patch("/api/drivers/:id", async (req, res) => {
@@ -4171,6 +4663,7 @@ async function registerRoutes(app2) {
       });
       const schema = z3.object({
         to: z3.string().email(),
+        cc: z3.string().email().optional(),
         from: z3.string().email().optional(),
         subject: z3.string().min(1),
         message: z3.string().min(1),
@@ -4197,14 +4690,14 @@ async function registerRoutes(app2) {
         });
       }
       if (validatedData.invoiceAttachments && Array.isArray(validatedData.invoiceAttachments)) {
-        validatedData.invoiceAttachments.forEach((attachment, index2) => {
-          if (attachment.data) {
-            const base64Data = attachment.data.includes(",") ? attachment.data.split(",")[1] : attachment.data;
+        validatedData.invoiceAttachments.forEach((attachment2, index2) => {
+          if (attachment2.data) {
+            const base64Data = attachment2.data.includes(",") ? attachment2.data.split(",")[1] : attachment2.data;
             const attachmentBuffer = Buffer.from(base64Data, "base64");
             attachments.push({
-              filename: attachment.filename || `Attachment-${index2 + 1}.${attachment.type?.split("/")[1] || "pdf"}`,
+              filename: attachment2.filename || `Attachment-${index2 + 1}.${attachment2.type?.split("/")[1] || "pdf"}`,
               content: attachmentBuffer,
-              type: attachment.type || "application/pdf"
+              type: attachment2.type || "application/pdf"
             });
           }
         });
@@ -4226,22 +4719,64 @@ async function registerRoutes(app2) {
           });
         }
       }
-      const emailResult = await sendEmail({
-        to: validatedData.to,
-        from: validatedData.from,
-        subject: validatedData.subject,
-        html: validatedData.message.replace(/\n/g, "<br>"),
-        attachments: attachments.length > 0 ? attachments : void 0
-      });
+      const ccRecipients = [];
+      if (validatedData.cc) ccRecipients.push(validatedData.cc);
+      if (validatedData.from) ccRecipients.push(validatedData.from);
+      const gmailStatus = await getGmailStatus();
+      let emailResult;
+      if (gmailStatus.connected) {
+        emailResult = await sendViaGmail({
+          to: validatedData.to,
+          cc: ccRecipients.length > 0 ? ccRecipients : void 0,
+          subject: validatedData.subject,
+          html: validatedData.message.replace(/\n/g, "<br>"),
+          attachments: attachments.length > 0 ? attachments : void 0
+        });
+        if (!emailResult.success) {
+          console.warn("[Factoring Email] Gmail failed, falling back to Resend:", emailResult.error);
+          emailResult = await sendEmail({
+            to: validatedData.to,
+            cc: ccRecipients.length > 0 ? ccRecipients : void 0,
+            from: validatedData.from,
+            subject: validatedData.subject,
+            html: validatedData.message.replace(/\n/g, "<br>"),
+            attachments: attachments.length > 0 ? attachments : void 0
+          });
+        }
+      } else {
+        emailResult = await sendEmail({
+          to: validatedData.to,
+          cc: ccRecipients.length > 0 ? ccRecipients : void 0,
+          from: validatedData.from,
+          subject: validatedData.subject,
+          html: validatedData.message.replace(/\n/g, "<br>"),
+          attachments: attachments.length > 0 ? attachments : void 0
+        });
+      }
       if (!emailResult.success) {
         console.error("[Factoring Email] Send failed:", emailResult.error);
         return res.status(500).json({ error: "Failed to send email", details: emailResult.error });
+      }
+      try {
+        await storage.createSentEmail({
+          invoiceId: validatedData.invoiceId,
+          invoiceNumber: invoice?.invoiceNumber || void 0,
+          toEmail: validatedData.to,
+          ccEmails: ccRecipients.length > 0 ? ccRecipients.join(", ") : void 0,
+          subject: validatedData.subject
+        });
+      } catch (logErr) {
+        console.error("[Factoring Email] Failed to log sent email:", logErr);
       }
       res.json({ success: true, message: "Email sent successfully" });
     } catch (error) {
       console.error("[Factoring Email] Error:", error);
       res.status(400).json({ error: "Invalid request data" });
     }
+  });
+  app2.get("/api/accounting/sent-emails", async (_req, res) => {
+    const records = await storage.getAllSentEmails();
+    res.json(records);
   });
   app2.get("/api/payments", async (_req, res) => {
     const payments2 = await storage.getAllPayments();
@@ -5267,6 +5802,53 @@ async function registerRoutes(app2) {
       res.status(400).json({ error: "Invalid settings data", details: error.message });
     }
   });
+  app2.get("/api/gmail/status", async (_req, res) => {
+    try {
+      const status = await getGmailStatus();
+      res.json(status);
+    } catch (err) {
+      res.status(500).json({ connected: false, error: err.message });
+    }
+  });
+  app2.get("/api/gmail/oauth/connect", (req, res) => {
+    try {
+      const url = getGmailAuthUrl();
+      res.redirect(url);
+    } catch (err) {
+      res.status(500).send("Failed to generate Gmail authorization URL: " + err.message);
+    }
+  });
+  app2.get("/api/gmail/oauth/callback", async (req, res) => {
+    const code = req.query.code;
+    if (!code) {
+      return res.redirect("/company-settings?gmail=error");
+    }
+    try {
+      await exchangeCodeAndSave(code);
+      res.redirect("/company-settings?gmail=connected");
+    } catch (err) {
+      console.error("[Gmail OAuth] Callback error:", err.message);
+      res.redirect("/company-settings?gmail=error");
+    }
+  });
+  app2.post("/api/gmail/disconnect", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      await clearGmailTokens();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.post("/api/gmail/scan-ratecons", isAuthenticated, async (req, res) => {
+    try {
+      const companyId = req.user?.divisionId || void 0;
+      const results = await scanRateConEmails(companyId);
+      return res.json({ success: true, ...results });
+    } catch (err) {
+      console.error("[Gmail Scan] Error:", err?.message);
+      return res.status(500).json({ error: err?.message || "Failed to scan emails" });
+    }
+  });
   app2.get("/api/divisions", async (_req, res) => {
     const allDivisions = await storage.getAllDivisions();
     res.json(allDivisions);
@@ -5626,7 +6208,7 @@ async function registerRoutes(app2) {
     },
     { message: "Attachment filename and file data must both be provided or both be absent" }
   );
-  app2.get("/api/feedbacks", isAuthenticated, async (req, res) => {
+  app2.get("/api/feedbacks", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const allFeedbacks = await storage.getAllFeedbacks();
       res.json(allFeedbacks);
@@ -5652,51 +6234,57 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Failed to create feedback" });
     }
   });
-  app2.get("/api/gmail/oauth/start", isAuthenticated, async (req, res) => {
-    const client2 = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    );
-    const url = client2.generateAuthUrl({
-      access_type: "offline",
-      prompt: "consent",
-      scope: ["https://www.googleapis.com/auth/gmail.readonly"]
-    });
-    res.redirect(url);
-  });
-  app2.get("/api/gmail/oauth/callback", async (req, res) => {
+  app2.patch("/api/feedbacks/:id/status", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const code = req.query.code;
-      if (!code || typeof code !== "string") return res.redirect("/?gmail=error");
-      const client2 = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URI
-      );
-      const { tokens } = await client2.getToken(code);
-      client2.setCredentials(tokens);
-      const gmail = google.gmail({ version: "v1", auth: client2 });
-      const profile = await gmail.users.getProfile({ userId: "me" });
-      await storage.saveGmailTokens({
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        connectedEmail: profile.data.emailAddress || ""
-      });
-      res.redirect("/?gmail=connected");
-    } catch (e) {
-      console.error("Gmail OAuth error:", e.message);
-      res.redirect("/?gmail=error");
+      const { status } = req.body;
+      if (!status || !["open", "resolved"].includes(status)) {
+        return res.status(400).json({ error: "Status must be 'open' or 'resolved'" });
+      }
+      const updated = await storage.updateFeedbackStatus(req.params.id, status);
+      if (!updated) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update feedback status" });
     }
   });
-  app2.get("/api/gmail/status", isAuthenticated, async (req, res) => {
-    const tokens = await storage.getGmailTokens();
-    if (!tokens) return res.json({ connected: false });
-    res.json({ connected: true, email: tokens.connectedEmail, connectedAt: tokens.connectedAt });
+  app2.delete("/api/feedbacks/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const deleted = await storage.deleteFeedback(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete feedback" });
+    }
   });
-  app2.delete("/api/gmail/disconnect", isAuthenticated, async (req, res) => {
-    await storage.deleteGmailTokens();
-    res.json({ success: true });
+  app2.get("/api/public/pod-status/:loadNumber", async (req, res) => {
+    try {
+      const { loadNumber } = req.params;
+      const allLoads = await storage.getAllLoads();
+      const matchingLoad = allLoads.find(
+        (l) => l.loadNumber.trim().toLowerCase() === loadNumber.trim().toLowerCase()
+      );
+      if (!matchingLoad) {
+        return res.status(404).json({ error: `Load #${loadNumber} was not found.` });
+      }
+      const pods = matchingLoad.podAttachments || [];
+      res.json({
+        loadNumber: matchingLoad.loadNumber,
+        status: matchingLoad.status,
+        podCount: pods.length,
+        submissions: pods.map((p) => ({
+          filename: p.filename,
+          uploadedAt: p.uploadedAt,
+          uploadedBy: p.uploadedBy,
+          truckNumber: p.truckNumber
+        }))
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to look up POD status" });
+    }
   });
   const httpServer = createServer(app2);
   return httpServer;
@@ -5818,6 +6406,7 @@ init_automation();
 
 // server/gmailPoller.ts
 init_storage();
+init_aiExtraction();
 import { google as google2 } from "googleapis";
 function buildOAuth2Client(accessToken, refreshToken) {
   const oauth2Client = new google2.auth.OAuth2(

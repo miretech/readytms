@@ -264,8 +264,8 @@ export const insertLoadSchema = createInsertSchema(loads).omit({
 }).extend({
   customerId: z.string().optional(),
   source: z.enum(["manual", "ai_extract"]).optional(), // Optional - can be added via AI extraction later
-  pickupDate: z.string(),
-  deliveryDate: z.string(),
+  pickupDate: z.string().optional(),
+  deliveryDate: z.string().optional(),
   rate: z.string(),
   expenses: z.string().optional(),
   podAttachments: z.array(z.object({
