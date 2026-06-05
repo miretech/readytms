@@ -5844,6 +5844,14 @@ async function registerRoutes(app2) {
       res.redirect("/company-settings?gmail=connected");
     } catch (err) {
       console.error("[Gmail OAuth] Callback error:", err.message);
+      console.error("[Gmail OAuth] Full error details:", JSON.stringify({
+        message: err.message,
+        code: err.code,
+        status: err.status,
+        response: err.response?.data,
+        clientId: process.env.GOOGLE_CLIENT_ID?.substring(0, 20) + "...",
+        redirectUri: process.env.GOOGLE_REDIRECT_URI || "https://readytms.com/api/gmail/oauth/callback (fallback)"
+      }, null, 2));
       res.redirect("/company-settings?gmail=error");
     }
   });
