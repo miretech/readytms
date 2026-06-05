@@ -2361,6 +2361,22 @@ var init_storage = __esm({
       async getAllSentEmails() {
         return await db.select().from(sentEmails).orderBy(desc(sentEmails.sentAt));
       }
+      async getGmailTokens() {
+        const [token] = await db.select().from(gmailTokens).limit(1);
+        return token || void 0;
+      }
+      async saveGmailTokens(tokens) {
+        await db.delete(gmailTokens);
+        const [created] = await db.insert(gmailTokens).values({
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          connectedEmail: tokens.connectedEmail
+        }).returning();
+        return created;
+      }
+      async deleteGmailTokens() {
+        await db.delete(gmailTokens);
+      }
     };
     storage = new DatabaseStorage();
   }

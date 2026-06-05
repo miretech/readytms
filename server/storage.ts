@@ -348,6 +348,11 @@ export interface IStorage {
   // Sent Emails
   createSentEmail(data: InsertSentEmail): Promise<SentEmail>;
   getAllSentEmails(): Promise<SentEmail[]>;
+
+  // Gmail Tokens
+  getGmailTokens(): Promise<GmailToken | undefined>;
+  saveGmailTokens(tokens: { accessToken: string; refreshToken: string; connectedEmail: string }): Promise<GmailToken>;
+  deleteGmailTokens(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2158,6 +2163,25 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSentEmails(): Promise<SentEmail[]> {
     return await db.select().from(sentEmails).orderBy(desc(sentEmails.sentAt));
+  }
+
+  async getGmailTokens(): Promise<GmailToken | undefined> {
+    const [token] = await db.select().from(gmailTokens).limit(1);
+    return token || undefined;
+  }
+
+  async saveGmailTokens(tokens: { accessToken: string; refreshToken: string; connectedEmail: string }): Promise<GmailToken> {
+    await db.delete(gmailTokens);
+    const [created] = await db.insert(gmailTokens).values({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      connectedEmail: tokens.connectedEmail,
+    }).returning();
+    return created;
+  }
+
+  async deleteGmailTokens(): Promise<void> {
+    await db.delete(gmailTokens);
   }
 }
 
