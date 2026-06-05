@@ -6424,17 +6424,13 @@ init_automation();
 init_storage();
 init_aiExtraction();
 import { google as google2 } from "googleapis";
-function buildOAuth2Client(accessToken, refreshToken) {
-  const oauth2Client = new google2.auth.OAuth2(
+var REDIRECT_URI2 = process.env.GOOGLE_REDIRECT_URI || "https://readytms.com/api/gmail/oauth/callback";
+function buildOAuth2Client() {
+  return new google2.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    REDIRECT_URI2
   );
-  oauth2Client.setCredentials({
-    access_token: accessToken,
-    refresh_token: refreshToken
-  });
-  return oauth2Client;
 }
 function decodeBase64Url(data) {
   const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
@@ -6563,19 +6559,19 @@ async function pollGmail() {
   const connectedEmail = settings.gmailEmail ?? "unknown";
   console.log(`[GmailPoller] Polling Gmail for ${connectedEmail}`);
   try {
-    const auth = buildOAuth2Client(
-      settings.gmailAccessToken ?? "",
-      settings.gmailRefreshToken
-    );
-    auth.on("tokens", async (newTokens) => {
-      if (newTokens.access_token) {
-        await storage.updateCompanySettings({
-          gmailAccessToken: newTokens.access_token,
-          gmailRefreshToken: newTokens.refresh_token ?? settings.gmailRefreshToken ?? void 0,
-          gmailTokenExpiry: newTokens.expiry_date ? String(newTokens.expiry_date) : void 0
-        });
-      }
+    const auth = buildOAuth2Client();
+    auth.setCredentials({
+      refresh_token: settings.gmailRefreshToken,
+      access_token: settings.gmailAccessToken ?? void 0
     });
+    const { credentials } = await auth.refreshAccessToken();
+    auth.setCredentials(credentials);
+    if (credentials.access_token) {
+      await storage.updateCompanySettings({
+        gmailAccessToken: credentials.access_token,
+        gmailTokenExpiry: credentials.expiry_date ? String(credentials.expiry_date) : void 0
+      });
+    }
     const gmail = google2.gmail({ version: "v1", auth });
     const query = "is:unread has:attachment filename:pdf";
     const listResp = await gmail.users.messages.list({ userId: "me", q: query, maxResults: 20 });

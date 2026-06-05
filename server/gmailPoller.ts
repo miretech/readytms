@@ -8,17 +8,15 @@ import { google } from "googleapis";
 import { storage } from "./storage";
 import { extractLoadFromDocument } from "./aiExtraction";
 
-function buildOAuth2Client(accessToken: string, refreshToken: string) {
-  const oauth2Client = new google.auth.OAuth2(
+// Use the same redirect URI fallback as gmail.ts so the OAuth client is identical
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "https://readytms.com/api/gmail/oauth/callback";
+
+function buildOAuth2Client() {
+  return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    REDIRECT_URI
   );
-  oauth2Client.setCredentials({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
-  return oauth2Client;
 }
 
 /** Decode base64url encoded Gmail attachment data */
@@ -181,19 +179,24 @@ async function pollGmail(): Promise<void> {
   console.log(`[GmailPoller] Polling Gmail for ${connectedEmail}`);
 
   try {
-    const auth = buildOAuth2Client(
-      settings.gmailAccessToken ?? "",
-      settings.gmailRefreshToken
-    );
-    auth.on("tokens", async (newTokens: { access_token?: string | null; refresh_token?: string | null }) => {
-      if (newTokens.access_token) {
-        await storage.updateCompanySettings({
-          gmailAccessToken: newTokens.access_token,
-          gmailRefreshToken: newTokens.refresh_token ?? settings.gmailRefreshToken ?? undefined,
-          gmailTokenExpiry: newTokens.expiry_date ? String(newTokens.expiry_date) : undefined,
-        });
-      }
+    // Build OAuth client and set credentials — same pattern as gmail.ts sendViaGmail
+    const auth = buildOAuth2Client();
+    auth.setCredentials({
+      refresh_token: settings.gmailRefreshToken,
+      access_token: settings.gmailAccessToken ?? undefined,
     });
+
+    // Explicitly refresh the access token (same as gmail.ts)
+    const { credentials } = await auth.refreshAccessToken();
+    auth.setCredentials(credentials);
+
+    // Persist the refreshed access token
+    if (credentials.access_token) {
+      await storage.updateCompanySettings({
+        gmailAccessToken: credentials.access_token,
+        gmailTokenExpiry: credentials.expiry_date ? String(credentials.expiry_date) : undefined,
+      });
+    }
 
     const gmail = google.gmail({ version: "v1", auth });
 
