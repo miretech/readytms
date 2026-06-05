@@ -6555,17 +6555,24 @@ async function processMessage(gmail, messageId) {
   }
 }
 async function pollGmail() {
-  const tokens = await storage.getGmailTokens();
-  if (!tokens) return;
-  console.log(`[GmailPoller] Polling Gmail for ${tokens.connectedEmail}`);
+  const settings = await storage.getCompanySettings();
+  if (!settings?.gmailRefreshToken) {
+    console.log("[GmailPoller] No Gmail tokens found \u2014 skipping poll");
+    return;
+  }
+  const connectedEmail = settings.gmailEmail ?? "unknown";
+  console.log(`[GmailPoller] Polling Gmail for ${connectedEmail}`);
   try {
-    const auth = buildOAuth2Client(tokens.accessToken, tokens.refreshToken);
+    const auth = buildOAuth2Client(
+      settings.gmailAccessToken ?? "",
+      settings.gmailRefreshToken
+    );
     auth.on("tokens", async (newTokens) => {
       if (newTokens.access_token) {
-        await storage.saveGmailTokens({
-          accessToken: newTokens.access_token,
-          refreshToken: newTokens.refresh_token || tokens.refreshToken,
-          connectedEmail: tokens.connectedEmail
+        await storage.updateCompanySettings({
+          gmailAccessToken: newTokens.access_token,
+          gmailRefreshToken: newTokens.refresh_token ?? settings.gmailRefreshToken ?? void 0,
+          gmailTokenExpiry: newTokens.expiry_date ? String(newTokens.expiry_date) : void 0
         });
       }
     });
@@ -6595,7 +6602,13 @@ async function pollGmail() {
   } catch (err) {
     console.error("[GmailPoller] Poll error:", err.message);
     if (err.message?.includes("invalid_grant") || err.message?.includes("Token has been expired")) {
-      await storage.deleteGmailTokens();
+      console.error("[GmailPoller] Token expired/revoked \u2014 clearing Gmail credentials");
+      await storage.updateCompanySettings({
+        gmailAccessToken: void 0,
+        gmailRefreshToken: void 0,
+        gmailEmail: void 0,
+        gmailTokenExpiry: void 0
+      });
     }
   }
 }

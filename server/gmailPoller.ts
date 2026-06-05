@@ -171,19 +171,26 @@ async function processMessage(
 }
 
 async function pollGmail(): Promise<void> {
-  const tokens = await storage.getGmailTokens();
-  if (!tokens) return;
+  const settings = await storage.getCompanySettings();
+  if (!settings?.gmailRefreshToken) {
+    console.log("[GmailPoller] No Gmail tokens found — skipping poll");
+    return;
+  }
 
-  console.log(`[GmailPoller] Polling Gmail for ${tokens.connectedEmail}`);
+  const connectedEmail = settings.gmailEmail ?? "unknown";
+  console.log(`[GmailPoller] Polling Gmail for ${connectedEmail}`);
 
   try {
-    const auth = buildOAuth2Client(tokens.accessToken, tokens.refreshToken);
+    const auth = buildOAuth2Client(
+      settings.gmailAccessToken ?? "",
+      settings.gmailRefreshToken
+    );
     auth.on("tokens", async (newTokens: { access_token?: string | null; refresh_token?: string | null }) => {
       if (newTokens.access_token) {
-        await storage.saveGmailTokens({
-          accessToken: newTokens.access_token,
-          refreshToken: newTokens.refresh_token || tokens.refreshToken,
-          connectedEmail: tokens.connectedEmail,
+        await storage.updateCompanySettings({
+          gmailAccessToken: newTokens.access_token,
+          gmailRefreshToken: newTokens.refresh_token ?? settings.gmailRefreshToken ?? undefined,
+          gmailTokenExpiry: newTokens.expiry_date ? String(newTokens.expiry_date) : undefined,
         });
       }
     });
@@ -219,7 +226,13 @@ async function pollGmail(): Promise<void> {
   } catch (err: any) {
     console.error("[GmailPoller] Poll error:", err.message);
     if (err.message?.includes("invalid_grant") || err.message?.includes("Token has been expired")) {
-      await storage.deleteGmailTokens();
+      console.error("[GmailPoller] Token expired/revoked — clearing Gmail credentials");
+      await storage.updateCompanySettings({
+        gmailAccessToken: undefined,
+        gmailRefreshToken: undefined,
+        gmailEmail: undefined,
+        gmailTokenExpiry: undefined,
+      });
     }
   }
 }
