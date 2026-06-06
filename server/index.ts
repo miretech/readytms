@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeAutomationSettings, sendDailyTaskReminders } from "./automation";
 import { startGmailPoller } from "./gmailPoller";
+import { startPaperworkPoller } from "./paperworkPoller";
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -44,6 +45,9 @@ app.use((req, res, next) => {
 
   // Start Gmail poller (no-op if Gmail is not connected)
   startGmailPoller();
+
+  // Start paperwork poller (checks Gmail for POD/BOL every 5 min)
+  startPaperworkPoller();
 
   // Schedule daily task reminders — runs at 8 AM every day
   let lastReminderDate = "";

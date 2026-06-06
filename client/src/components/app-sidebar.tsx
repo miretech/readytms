@@ -17,7 +17,8 @@ import {
   CheckSquare,
   Settings,
   UserCheck,
-  MessageSquare
+  MessageSquare,
+  FileText
 } from "lucide-react";
 import {
   Sidebar,
@@ -72,6 +73,12 @@ const menuItems = [
     title: "Customers",
     url: "/customers",
     icon: UserCog,
+    access: "all",
+  },
+  {
+    title: "Paperwork",
+    url: "/paperwork",
+    icon: FileText,
     access: "all",
   },
   {

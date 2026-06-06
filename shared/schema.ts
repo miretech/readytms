@@ -256,6 +256,10 @@ export const loads = pgTable("loads", {
   companyId: varchar("company_id"),
   source: text("source").default("manual"),
   rateConUrl: text("rate_con_url"),
+  paperworkStatus: text("paperwork_status").default("missing"),
+  paperworkReceivedAt: timestamp("paperwork_received_at"),
+  paperworkApprovedAt: timestamp("paperwork_approved_at"),
+  paperworkNotes: text("paperwork_notes"),
 });
 
 export const insertLoadSchema = createInsertSchema(loads).omit({
@@ -1058,6 +1062,42 @@ export const insertSentEmailSchema = createInsertSchema(sentEmails).omit({
 
 export type InsertSentEmail = z.infer<typeof insertSentEmailSchema>;
 export type SentEmail = typeof sentEmails.$inferSelect;
+
+// Load Documents — driver paperwork (POD, BOL, etc.) received via Gmail or manual upload
+export const loadDocuments = pgTable("load_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  loadId: varchar("load_id"),
+  emailMessageId: text("email_message_id"),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(),
+  fileData: text("file_data"),
+  documentType: text("document_type").notNull().default("other"),
+  extractedLoadNumber: text("extracted_load_number"),
+  extractedDriverName: text("extracted_driver_name"),
+  extractedTruckNumber: text("extracted_truck_number"),
+  extractedPickupDate: text("extracted_pickup_date"),
+  extractedDeliveryDate: text("extracted_delivery_date"),
+  extractedPickupLocation: text("extracted_pickup_location"),
+  extractedDeliveryLocation: text("extracted_delivery_location"),
+  extractedShipper: text("extracted_shipper"),
+  extractedReceiver: text("extracted_receiver"),
+  isSigned: boolean("is_signed"),
+  pageCount: integer("page_count"),
+  confidenceScore: decimal("confidence_score", { precision: 4, scale: 3 }),
+  status: text("status").notNull().default("received"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLoadDocumentSchema = createInsertSchema(loadDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLoadDocument = z.infer<typeof insertLoadDocumentSchema>;
+export type LoadDocument = typeof loadDocuments.$inferSelect;
 
 // Stub definitions to prevent drizzle from dropping production tables that exist
 // in the database but are managed outside of this schema file.

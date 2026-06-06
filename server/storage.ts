@@ -103,6 +103,9 @@ import {
   gmailTokens,
   GmailToken,
   InsertGmailToken,
+  loadDocuments,
+  LoadDocument,
+  InsertLoadDocument,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
@@ -353,6 +356,14 @@ export interface IStorage {
   getGmailTokens(): Promise<GmailToken | undefined>;
   saveGmailTokens(tokens: { accessToken: string; refreshToken: string; connectedEmail: string }): Promise<GmailToken>;
   deleteGmailTokens(): Promise<void>;
+
+  // Load Documents (paperwork)
+  createLoadDocument(doc: InsertLoadDocument): Promise<LoadDocument>;
+  getLoadDocuments(filters?: { loadId?: string; status?: string }): Promise<LoadDocument[]>;
+  getLoadDocument(id: string): Promise<LoadDocument | undefined>;
+  getLoadDocumentByEmailAndFile(emailMessageId: string, fileName: string): Promise<LoadDocument | undefined>;
+  updateLoadDocument(id: string, data: Partial<InsertLoadDocument>): Promise<LoadDocument | undefined>;
+  deleteLoadDocument(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2182,6 +2193,47 @@ export class DatabaseStorage implements IStorage {
 
   async deleteGmailTokens(): Promise<void> {
     await db.delete(gmailTokens);
+  }
+
+  async createLoadDocument(doc: InsertLoadDocument): Promise<LoadDocument> {
+    const [created] = await db.insert(loadDocuments).values(doc).returning();
+    return created;
+  }
+
+  async getLoadDocuments(filters?: { loadId?: string; status?: string }): Promise<LoadDocument[]> {
+    const conditions = [];
+    if (filters?.loadId) conditions.push(eq(loadDocuments.loadId, filters.loadId));
+    if (filters?.status) conditions.push(eq(loadDocuments.status, filters.status));
+    const query = db.select().from(loadDocuments);
+    if (conditions.length > 0) {
+      return await (query as any).where(and(...conditions)).orderBy(desc(loadDocuments.createdAt));
+    }
+    return await (query as any).orderBy(desc(loadDocuments.createdAt));
+  }
+
+  async getLoadDocument(id: string): Promise<LoadDocument | undefined> {
+    const [doc] = await db.select().from(loadDocuments).where(eq(loadDocuments.id, id));
+    return doc || undefined;
+  }
+
+  async getLoadDocumentByEmailAndFile(emailMessageId: string, fileName: string): Promise<LoadDocument | undefined> {
+    const [doc] = await db.select().from(loadDocuments).where(
+      and(eq(loadDocuments.emailMessageId, emailMessageId), eq(loadDocuments.fileName, fileName))
+    );
+    return doc || undefined;
+  }
+
+  async updateLoadDocument(id: string, data: Partial<InsertLoadDocument>): Promise<LoadDocument | undefined> {
+    const [updated] = await db.update(loadDocuments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(loadDocuments.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteLoadDocument(id: string): Promise<boolean> {
+    const result = await db.delete(loadDocuments).where(eq(loadDocuments.id, id));
+    return true;
   }
 }
 

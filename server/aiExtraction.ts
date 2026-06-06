@@ -114,6 +114,131 @@ const EXTRACT_LOAD_TOOL: Anthropic.Tool = {
   },
 };
 
+// ── Paperwork Extraction ─────────────────────────────────────────────────────
+
+const extractedPaperworkSchema = z.object({
+  documentType: z.enum(["pod", "bol", "rate_confirmation", "lumper", "other"]),
+  extractedLoadNumber: z.string().nullable(),
+  extractedDriverName: z.string().nullable(),
+  extractedTruckNumber: z.string().nullable(),
+  extractedPickupDate: z.string().nullable(),
+  extractedDeliveryDate: z.string().nullable(),
+  extractedPickupLocation: z.string().nullable(),
+  extractedDeliveryLocation: z.string().nullable(),
+  extractedShipper: z.string().nullable(),
+  extractedReceiver: z.string().nullable(),
+  isSigned: z.boolean().nullable(),
+  pageCount: z.number().nullable(),
+  confidenceScore: z.number(),
+});
+
+export type ExtractedPaperwork = z.infer<typeof extractedPaperworkSchema>;
+
+const EXTRACT_PAPERWORK_TOOL: Anthropic.Tool = {
+  name: "extract_paperwork",
+  description: "Extract structured information from driver paperwork documents like POD, BOL, delivery receipts",
+  input_schema: {
+    type: "object",
+    properties: {
+      documentType: {
+        type: "string",
+        enum: ["pod", "bol", "rate_confirmation", "lumper", "other"],
+        description: "Type of document: pod=Proof of Delivery, bol=Bill of Lading, rate_confirmation, lumper receipt, or other",
+      },
+      extractedLoadNumber: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Load number, reference number, or shipment ID visible on the document",
+      },
+      extractedDriverName: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Driver name if visible",
+      },
+      extractedTruckNumber: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Truck number or unit number if visible",
+      },
+      extractedPickupDate: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Pickup date in YYYY-MM-DD format",
+      },
+      extractedDeliveryDate: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Delivery date in YYYY-MM-DD format",
+      },
+      extractedPickupLocation: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Pickup city and state",
+      },
+      extractedDeliveryLocation: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Delivery city and state",
+      },
+      extractedShipper: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Shipper company name",
+      },
+      extractedReceiver: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description: "Receiver/consignee company name",
+      },
+      isSigned: {
+        anyOf: [{ type: "boolean" }, { type: "null" }],
+        description: "Whether the document appears to have a signature",
+      },
+      pageCount: {
+        anyOf: [{ type: "number" }, { type: "null" }],
+        description: "Number of pages in the document if determinable",
+      },
+      confidenceScore: {
+        type: "number",
+        description: "Confidence score 0.0 to 1.0 that this is a valid transportation paperwork document",
+      },
+    },
+    required: [
+      "documentType", "extractedLoadNumber", "extractedDriverName", "extractedTruckNumber",
+      "extractedPickupDate", "extractedDeliveryDate", "extractedPickupLocation",
+      "extractedDeliveryLocation", "extractedShipper", "extractedReceiver",
+      "isSigned", "pageCount", "confidenceScore",
+    ],
+  },
+};
+
+export async function extractPaperworkDocument(
+  fileData: string,
+  fileType: string
+): Promise<ExtractedPaperwork> {
+  const base64Content = fileData.split(",")[1] || fileData;
+
+  let userContent: Anthropic.MessageParam["content"];
+  if (fileType === "application/pdf") {
+    userContent = [
+      { type: "text", text: "Extract driver paperwork details from this transportation document:" },
+      { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64Content } } as any,
+    ];
+  } else {
+    const mediaType = fileType as Anthropic.Base64ImageSource["media_type"];
+    userContent = [
+      { type: "text", text: "Extract driver paperwork details from this transportation document:" },
+      { type: "image", source: { type: "base64", media_type: mediaType, data: base64Content } },
+    ];
+  }
+
+  const response = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1024,
+    system: "You are an expert at reading transportation paperwork including PODs (Proof of Delivery), BOLs (Bill of Lading), and delivery receipts. Extract all relevant fields accurately. Return null for missing fields.",
+    messages: [{ role: "user", content: userContent }],
+    tools: [EXTRACT_PAPERWORK_TOOL],
+    tool_choice: { type: "tool", name: "extract_paperwork" },
+  });
+
+  const toolUseBlock = response.content.find(
+    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+  );
+  if (!toolUseBlock) throw new Error("No structured response from AI");
+  return extractedPaperworkSchema.parse(toolUseBlock.input);
+}
+
 export async function extractLoadFromDocument(
   fileData: string,
   fileType: string

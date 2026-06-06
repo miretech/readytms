@@ -3,8 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { insertLoadSchema, type Load, type Customer, type Driver, type Truck } from "@shared/schema";
-import { Sparkles, FileText, Download, Eye, X, Calendar } from "lucide-react";
+import { insertLoadSchema, type Load, type Customer, type Driver, type Truck, type LoadDocument } from "@shared/schema";
+import { Sparkles, FileText, Download, Eye, X, Calendar, CheckCircle2, AlertTriangle, XCircle, Clock, Bot, Pen } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,32 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
 
   const { data: trucks = [] } = useQuery<Truck[]>({
     queryKey: ["/api/trucks"],
+  });
+
+  // Fetch paperwork documents for this load when editing
+  const { data: loadDocuments = [] } = useQuery<LoadDocument[]>({
+    queryKey: ["/api/load-documents", load?.id],
+    queryFn: () => fetch(`/api/load-documents?loadId=${load?.id}`).then(r => r.json()),
+    enabled: open && isEditing && !!load?.id,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (docId: string) => apiRequest("PATCH", `/api/load-documents/${docId}`, { status: "approved" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/load-documents", load?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/loads"] });
+      toast({ title: "Document approved" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ docId, reason }: { docId: string; reason: string }) =>
+      apiRequest("PATCH", `/api/load-documents/${docId}`, { status: "rejected", rejectionReason: reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/load-documents", load?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/loads"] });
+      toast({ title: "Document rejected" });
+    },
   });
 
   const form = useForm<FormValues>({
@@ -1064,6 +1090,115 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                         );
                       })}
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Paperwork Section — only shown in edit mode */}
+              {isEditing && (
+                <Card className="border-border">
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        Paperwork
+                      </CardTitle>
+                      {(() => {
+                        const status = (fullLoad as any)?.paperworkStatus || "missing";
+                        switch (status) {
+                          case "received": return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"><Clock className="w-3 h-3 mr-1" />Received</Badge>;
+                          case "needs_review": return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"><AlertTriangle className="w-3 h-3 mr-1" />Needs Review</Badge>;
+                          case "approved": return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Approved</Badge>;
+                          case "rejected": return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><XCircle className="w-3 h-3 mr-1" />Rejected</Badge>;
+                          default: return <Badge variant="outline" className="text-muted-foreground">Missing</Badge>;
+                        }
+                      })()}
+                    </div>
+                    {(fullLoad as any)?.paperworkNotes && (
+                      <CardDescription className="text-xs italic">"{(fullLoad as any).paperworkNotes}"</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    {loadDocuments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No documents received yet. Documents attached via Gmail or manual upload will appear here.</p>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {loadDocuments.map(doc => {
+                          const confidence = doc.confidenceScore ? parseFloat(doc.confidenceScore) : null;
+                          const docTypeLabels: Record<string, string> = { pod: "POD", bol: "BOL", rate_confirmation: "Rate Con", lumper: "Lumper", other: "Other" };
+                          return (
+                            <div key={doc.id} className="flex flex-col gap-2 rounded-md border p-3 bg-muted/30" data-testid={`paperwork-doc-${doc.id}`}>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  <span className="text-sm font-medium truncate max-w-[180px]" title={doc.fileName}>{doc.fileName}</span>
+                                  <Badge variant="outline" className="text-xs shrink-0">{docTypeLabels[doc.documentType] || doc.documentType}</Badge>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {doc.fileData && (
+                                    <a href={doc.fileData} download={doc.fileName}>
+                                      <Button size="icon" variant="ghost" type="button"><Download className="w-3.5 h-3.5" /></Button>
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                {doc.extractedLoadNumber && <span><span className="text-foreground font-medium">Load#:</span> {doc.extractedLoadNumber}</span>}
+                                {doc.extractedDriverName && <span><span className="text-foreground font-medium">Driver:</span> {doc.extractedDriverName}</span>}
+                                {doc.isSigned !== null && (
+                                  <span className={doc.isSigned ? "text-green-600 dark:text-green-400 flex items-center gap-1" : "text-red-500 flex items-center gap-1"}>
+                                    <Pen className="w-3 h-3" />{doc.isSigned ? "Signed" : "Unsigned"}
+                                  </span>
+                                )}
+                                {confidence !== null && (
+                                  <span className={`flex items-center gap-1 ${confidence >= 0.85 ? "text-green-600 dark:text-green-400" : confidence >= 0.65 ? "text-yellow-600" : "text-red-500"}`}>
+                                    <Bot className="w-3 h-3" />AI {Math.round(confidence * 100)}%
+                                  </span>
+                                )}
+                                {doc.emailMessageId && <span className="text-blue-500">via Gmail</span>}
+                                {doc.rejectionReason && <span className="text-red-500 italic">"{doc.rejectionReason}"</span>}
+                              </div>
+                              {doc.status !== "approved" && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-green-500 text-green-600 hover:text-green-700 dark:border-green-600 dark:text-green-400"
+                                    onClick={() => approveMutation.mutate(doc.id)}
+                                    disabled={approveMutation.isPending}
+                                    data-testid={`button-approve-doc-${doc.id}`}
+                                  >
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />Approve
+                                  </Button>
+                                  {doc.status !== "rejected" && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-500 text-red-600 hover:text-red-700 dark:border-red-600 dark:text-red-400"
+                                      onClick={() => {
+                                        const reason = window.prompt("Rejection reason (optional):") || "";
+                                        rejectMutation.mutate({ docId: doc.id, reason });
+                                      }}
+                                      disabled={rejectMutation.isPending}
+                                      data-testid={`button-reject-doc-${doc.id}`}
+                                    >
+                                      <XCircle className="w-3 h-3 mr-1" />Reject
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                              {doc.status === "approved" && (
+                                <Badge className="self-start bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />Approved
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

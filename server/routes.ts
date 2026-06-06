@@ -27,7 +27,7 @@ import {
 import { setupAuth, isAuthenticated, isAdmin, isDriver } from "./auth";
 import passport from "passport";
 import bcrypt from "bcrypt";
-import { extractLoadFromDocument } from "./aiExtraction";
+import { extractLoadFromDocument, extractPaperworkDocument } from "./aiExtraction";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
 import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail, scanRateConEmails } from "./gmail";
@@ -3182,6 +3182,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to look up POD status" });
+    }
+  });
+
+  // ── Load Documents (Paperwork) ───────────────────────────────────────────────
+
+  // GET /api/load-documents — all documents, optional ?status= or ?loadId= filter
+  app.get("/api/load-documents", isAuthenticated, async (req, res) => {
+    try {
+      const { loadId, status } = req.query as { loadId?: string; status?: string };
+      const docs = await storage.getLoadDocuments({ loadId, status });
+      res.json(docs);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/load-documents/:id — single document
+  app.get("/api/load-documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      const doc = await storage.getLoadDocument(req.params.id);
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      res.json(doc);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/load-documents — manual upload with AI extraction
+  app.post("/api/load-documents", isAuthenticated, async (req, res) => {
+    try {
+      const { loadId, fileData, fileName, fileType } = req.body;
+      if (!fileData || !fileName || !fileType) {
+        return res.status(400).json({ error: "fileData, fileName, and fileType are required" });
+      }
+
+      // Run AI extraction
+      let extracted: any = {};
+      try {
+        extracted = await extractPaperworkDocument(fileData, fileType);
+      } catch (err: any) {
+        console.error("[Paperwork] AI extraction error:", err.message);
+        extracted = { documentType: "other", confidenceScore: 0 };
+      }
+
+      // If no loadId given, try to match by extracted data
+      let resolvedLoadId = loadId || null;
+      let confidence = extracted.confidenceScore || 0;
+
+      if (!resolvedLoadId && extracted.extractedLoadNumber) {
+        const byNumber = await storage.getLoadByNumber(extracted.extractedLoadNumber);
+        if (byNumber) { resolvedLoadId = byNumber.id; confidence = 0.9; }
+      }
+
+      // Determine status
+      let docStatus: "received" | "needs_review" = "received";
+      if (!resolvedLoadId) docStatus = "needs_review";
+      else if (!extracted.extractedLoadNumber) docStatus = "needs_review";
+      else if (extracted.isSigned === false) docStatus = "needs_review";
+      else if ((extracted.confidenceScore || 0) < 0.75) docStatus = "needs_review";
+
+      const doc = await storage.createLoadDocument({
+        loadId: resolvedLoadId,
+        fileName,
+        fileType,
+        fileData,
+        documentType: extracted.documentType || "other",
+        extractedLoadNumber: extracted.extractedLoadNumber || null,
+        extractedDriverName: extracted.extractedDriverName || null,
+        extractedTruckNumber: extracted.extractedTruckNumber || null,
+        extractedPickupDate: extracted.extractedPickupDate || null,
+        extractedDeliveryDate: extracted.extractedDeliveryDate || null,
+        extractedPickupLocation: extracted.extractedPickupLocation || null,
+        extractedDeliveryLocation: extracted.extractedDeliveryLocation || null,
+        extractedShipper: extracted.extractedShipper || null,
+        extractedReceiver: extracted.extractedReceiver || null,
+        isSigned: extracted.isSigned ?? null,
+        pageCount: extracted.pageCount ?? null,
+        confidenceScore: String(confidence),
+        status: docStatus,
+      });
+
+      if (resolvedLoadId && docStatus === "received") {
+        await storage.updateLoad(resolvedLoadId, {
+          paperworkStatus: "received",
+          paperworkReceivedAt: new Date().toISOString(),
+        } as any);
+        await storage.createActivityLog({
+          action: "paperwork_uploaded",
+          entityType: "load",
+          entityId: resolvedLoadId,
+          details: `Manual paperwork upload: ${fileName}`,
+          metadata: { documentId: doc.id },
+        });
+      } else if (docStatus === "needs_review" && resolvedLoadId) {
+        await storage.createActivityLog({
+          action: "paperwork_needs_review",
+          entityType: "load",
+          entityId: resolvedLoadId,
+          details: `Paperwork needs review after upload: ${fileName}`,
+          metadata: { documentId: doc.id },
+        });
+      }
+
+      res.status(201).json(doc);
+    } catch (err: any) {
+      console.error("[Paperwork] Upload error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/load-documents/:id — approve, reject, or update a document
+  app.patch("/api/load-documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { status, rejectionReason, loadId } = req.body;
+      const doc = await storage.getLoadDocument(req.params.id);
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+      if (loadId !== undefined) updateData.loadId = loadId;
+
+      const updated = await storage.updateLoadDocument(req.params.id, updateData);
+
+      // Sync paperwork status on load
+      const targetLoadId = loadId ?? doc.loadId;
+      if (targetLoadId) {
+        if (status === "approved") {
+          await storage.updateLoad(targetLoadId, {
+            paperworkStatus: "approved",
+            paperworkApprovedAt: new Date().toISOString(),
+          } as any);
+          await storage.createActivityLog({
+            action: "paperwork_approved",
+            entityType: "load",
+            entityId: targetLoadId,
+            details: `Paperwork approved: ${doc.fileName}`,
+            metadata: { documentId: doc.id },
+          });
+        } else if (status === "rejected") {
+          await storage.updateLoad(targetLoadId, {
+            paperworkStatus: "rejected",
+            paperworkNotes: rejectionReason || null,
+          } as any);
+          await storage.createActivityLog({
+            action: "paperwork_rejected",
+            entityType: "load",
+            entityId: targetLoadId,
+            details: `Paperwork rejected: ${doc.fileName}. Reason: ${rejectionReason || "none"}`,
+            metadata: { documentId: doc.id },
+          });
+        } else if (status === "needs_review") {
+          await storage.updateLoad(targetLoadId, { paperworkStatus: "needs_review" } as any);
+          await storage.createActivityLog({
+            action: "paperwork_needs_review",
+            entityType: "load",
+            entityId: targetLoadId,
+            details: `Paperwork flagged for review: ${doc.fileName}`,
+            metadata: { documentId: doc.id },
+          });
+        }
+      }
+
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/load-documents/:id
+  app.delete("/api/load-documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteLoadDocument(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 

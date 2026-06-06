@@ -1,0 +1,150 @@
+We are building the next automation module for ReadyTMS.
+
+Project name: ReadyTMS Driver Paperwork Automation
+
+Goal:
+Drivers email POD/BOL paperwork to our Gmail inbox. ReadyTMS should automatically read the emails, download attachments, extract document details using AI, match the paperwork to an existing load, and update the load paperwork status.
+
+Build this module inside the existing ReadyTMS app.
+
+Requirements:
+
+1. Database changes
+Add paperwork tracking to loads:
+- paperworkStatus: "missing" | "received" | "needs_review" | "approved" | "rejected"
+- paperworkReceivedAt
+- paperworkApprovedAt
+- paperworkNotes
+
+Create a new table called load_documents:
+- id
+- loadId
+- emailMessageId
+- fileName
+- fileType
+- fileUrl or filePath
+- documentType: "pod" | "bol" | "rate_confirmation" | "lumper" | "other"
+- extractedLoadNumber
+- extractedDriverName
+- extractedTruckNumber
+- extractedPickupDate
+- extractedDeliveryDate
+- extractedPickupLocation
+- extractedDeliveryLocation
+- extractedShipper
+- extractedReceiver
+- isSigned
+- pageCount
+- confidenceScore
+- status: "received" | "needs_review" | "approved" | "rejected"
+- rejectionReason
+- createdAt
+- updatedAt
+
+2. Gmail watcher
+Use the existing Gmail integration if available.
+Create a background job that checks Gmail every 5 minutes for new emails with attachments.
+Search for emails sent to the paperwork inbox or emails with subject/body containing:
+- POD
+- BOL
+- paperwork
+- delivery receipt
+- signed
+- load
+
+For each matching email:
+- download PDF/image attachments
+- save attachment file
+- create load_documents record
+- prevent duplicates using Gmail message ID + filename
+
+3. AI extraction
+For each attachment, use the existing AI provider already configured in ReadyTMS.
+Extract:
+- load number
+- document type
+- driver name
+- truck number
+- pickup date
+- delivery date
+- pickup location
+- delivery location
+- shipper
+- receiver
+- whether POD appears signed
+- number of pages
+- confidence score
+
+Return clean JSON only.
+
+4. Load matching
+Try to match document to an existing load using:
+- load number first
+- then truck number + delivery date
+- then driver name + delivery location
+- then broker reference if available
+
+If confidence is high:
+- attach document to that load
+- update load.paperworkStatus = "received"
+
+If not matched:
+- status = "needs_review"
+- show in a review queue
+
+5. Validation rules
+Mark document as needs_review if:
+- no load number found
+- no matching load found
+- POD is not signed
+- document has only 1 page but AI thinks more pages may be missing
+- delivery date does not match load delivery date
+- truck number does not match assigned truck
+- duplicate document is detected
+- confidence score is below 0.75
+
+6. UI changes
+Add a "Paperwork" tab/page in ReadyTMS.
+
+Show:
+- Missing paperwork loads
+- Received paperwork
+- Needs review
+- Approved
+- Rejected
+
+On each load detail page, add:
+- paperwork status badge
+- list of uploaded/received documents
+- extracted fields
+- AI confidence
+- approve button
+- reject button
+- rejection reason box
+- view/download attachment button
+
+7. Manual upload fallback
+Allow office staff to manually upload POD/BOL to a load.
+Manual uploads should use the same AI extraction and validation process.
+
+8. Notifications
+When paperwork is rejected or needs review, create a note in the load activity log.
+Do not email the driver yet. We will add driver SMS/WhatsApp later.
+
+9. Safety
+Do not auto-submit to factoring yet.
+Do not delete emails.
+Do not permanently delete files.
+Keep human approval required before "approved".
+
+10. Acceptance test
+Create a test flow:
+- Add a test load
+- Upload or receive a sample POD/BOL
+- AI extracts data
+- Document matches the load
+- Load status changes to "received"
+- User can approve or reject
+- Approved document shows under the load paperwork tab
+
+Please implement this cleanly using the existing ReadyTMS coding style, database schema, storage system, routes, and frontend components.
