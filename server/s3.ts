@@ -9,21 +9,13 @@ const s3Client = new S3Client({
 });
 
 const BUCKET = process.env.AWS_S3_BUCKET || "readytms-documents";
+const REGION = process.env.AWS_REGION || "us-east-1";
 
-export async function uploadPdfToS3(
-  base64Data: string,
-  fileName: string,
-  mimeType: string = "application/pdf"
+async function uploadBufferToS3(
+  buffer: Buffer,
+  key: string,
+  mimeType: string
 ): Promise<string> {
-  // Strip data URL prefix if present
-  const base64 = base64Data.includes(",")
-    ? base64Data.split(",")[1]
-    : base64Data;
-
-  const buffer = Buffer.from(base64, "base64");
-
-  const key = `ratecons/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-
   await s3Client.send(
     new PutObjectCommand({
       Bucket: BUCKET,
@@ -32,6 +24,41 @@ export async function uploadPdfToS3(
       ContentType: mimeType,
     })
   );
+  return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+}
 
-  return `https://${BUCKET}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
+/** Upload a rate confirmation PDF (existing usage) */
+export async function uploadPdfToS3(
+  base64Data: string,
+  fileName: string,
+  mimeType: string = "application/pdf"
+): Promise<string> {
+  const base64 = base64Data.includes(",") ? base64Data.split(",")[1] : base64Data;
+  const buffer = Buffer.from(base64, "base64");
+  const key = `ratecons/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  return uploadBufferToS3(buffer, key, mimeType);
+}
+
+/** Upload driver paperwork (POD, BOL, etc.) — stores under paperwork/ folder */
+export async function uploadPaperworkToS3(
+  base64Data: string,
+  fileName: string,
+  mimeType: string
+): Promise<string> {
+  const base64 = base64Data.includes(",") ? base64Data.split(",")[1] : base64Data;
+  const buffer = Buffer.from(base64, "base64");
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const key = `paperwork/${Date.now()}-${safe}`;
+  return uploadBufferToS3(buffer, key, mimeType);
+}
+
+/** Upload a raw Buffer directly (e.g. from Gmail attachment) */
+export async function uploadBufferPaperworkToS3(
+  buffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<string> {
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const key = `paperwork/${Date.now()}-${safe}`;
+  return uploadBufferToS3(buffer, key, mimeType);
 }

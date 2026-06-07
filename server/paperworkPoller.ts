@@ -6,6 +6,7 @@
 import { google } from "googleapis";
 import { storage } from "./storage";
 import { extractPaperworkDocument } from "./aiExtraction";
+import { uploadBufferPaperworkToS3 } from "./s3";
 
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "https://readytms.com/api/gmail/oauth/callback";
 const PAPERWORK_KEYWORDS = ["pod", "bol", "paperwork", "delivery receipt", "signed", "proof of delivery", "bill of lading"];
@@ -176,16 +177,28 @@ async function processPaperworkMessage(
     if (!rawData) continue;
 
     const fileBuffer = decodeBase64Url(rawData);
-    const fileData = `data:${att.mimeType};base64,${fileBuffer.toString("base64")}`;
+    // Build a temporary base64 data URL only for AI extraction — we don't store it in the DB
+    const tempBase64DataUrl = `data:${att.mimeType};base64,${fileBuffer.toString("base64")}`;
 
     console.log(`[PaperworkPoller] Extracting data from ${att.filename} (${fileBuffer.length} bytes)`);
 
     let extracted: any = {};
     try {
-      extracted = await extractPaperworkDocument(fileData, att.mimeType);
+      extracted = await extractPaperworkDocument(tempBase64DataUrl, att.mimeType);
     } catch (err: any) {
       console.error(`[PaperworkPoller] AI extraction failed for ${att.filename}:`, err.message);
       extracted = { confidenceScore: 0 };
+    }
+
+    // Upload to S3 and store the URL (not the raw base64)
+    let fileUrl: string | undefined;
+    try {
+      fileUrl = await uploadBufferPaperworkToS3(fileBuffer, att.filename, att.mimeType);
+      console.log(`[PaperworkPoller] Uploaded to S3: ${fileUrl}`);
+    } catch (err: any) {
+      console.error(`[PaperworkPoller] S3 upload failed for ${att.filename}:`, err.message);
+      // Fall back to base64 storage if S3 fails
+      fileUrl = tempBase64DataUrl;
     }
 
     const { loadId, confidence } = await matchLoadForDocument(extracted);
@@ -198,7 +211,7 @@ async function processPaperworkMessage(
       emailMessageId: messageId,
       fileName: att.filename,
       fileType: att.mimeType,
-      fileData,
+      fileData: fileUrl,
       documentType: extracted.documentType || "other",
       extractedLoadNumber: extracted.extractedLoadNumber || null,
       extractedDriverName: extracted.extractedDriverName || null,

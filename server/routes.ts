@@ -28,6 +28,7 @@ import { setupAuth, isAuthenticated, isAdmin, isDriver } from "./auth";
 import passport from "passport";
 import bcrypt from "bcrypt";
 import { extractLoadFromDocument, extractPaperworkDocument } from "./aiExtraction";
+import { uploadPaperworkToS3 } from "./s3";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
 import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail, scanRateConEmails } from "./gmail";
@@ -3217,13 +3218,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "fileData, fileName, and fileType are required" });
       }
 
-      // Run AI extraction
+      // Run AI extraction first (needs the base64 data URL)
       let extracted: any = {};
       try {
         extracted = await extractPaperworkDocument(fileData, fileType);
       } catch (err: any) {
         console.error("[Paperwork] AI extraction error:", err.message);
         extracted = { documentType: "other", confidenceScore: 0 };
+      }
+
+      // Upload file to S3 — store the URL, not the raw base64
+      let storedFileData = fileData; // fallback to base64 if S3 fails
+      try {
+        storedFileData = await uploadPaperworkToS3(fileData, fileName, fileType);
+        console.log(`[Paperwork] Uploaded to S3: ${storedFileData}`);
+      } catch (err: any) {
+        console.error("[Paperwork] S3 upload failed, storing base64 fallback:", err.message);
       }
 
       // If no loadId given, try to match by extracted data
@@ -3246,7 +3256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         loadId: resolvedLoadId,
         fileName,
         fileType,
-        fileData,
+        fileData: storedFileData,
         documentType: extracted.documentType || "other",
         extractedLoadNumber: extracted.extractedLoadNumber || null,
         extractedDriverName: extracted.extractedDriverName || null,
