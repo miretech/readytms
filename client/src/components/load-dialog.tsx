@@ -276,7 +276,14 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   };
 
   const handleAIExtraction = (extractedData: any) => {
-    // Find the customer if one was created/linked
+    // If a new customer was created/found during extraction, refresh the customers list
+    // so the Select dropdown can show the new customer by name
+    if (extractedData.customerId) {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+    }
+
+    // Find the customer if already in cache (may be null for newly created ones — that's fine,
+    // the form values below still populate correctly from extractedData directly)
     const customer = extractedData.customerId ? customers.find(c => c.id === extractedData.customerId) : null;
     
     form.reset({
@@ -294,7 +301,6 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
       weight: extractedData.weight || 0,
       commodity: extractedData.commodity || "",
       notes: extractedData.notes || "",
-      // Prefer extracted values, fall back to customer data only if not extracted
       brokerName: extractedData.brokerName || customer?.name || "",
       brokerAddress: extractedData.brokerAddress || customer?.address || "",
       brokerPhone: extractedData.brokerPhone || customer?.phone || "",
@@ -302,11 +308,10 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
     });
     setActiveTab("manual");
     
-    // Show appropriate toast message based on whether broker was found/created
     if (extractedData.brokerName && extractedData.customerId) {
       toast({
         title: "Load data extracted with broker!",
-        description: `Broker "${extractedData.brokerName}" was automatically added. Please review the fields.`,
+        description: `Broker "${extractedData.brokerName}" was automatically linked as the customer.`,
       });
     } else {
       toast({
