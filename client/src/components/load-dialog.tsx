@@ -75,6 +75,7 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
   const [activeTab, setActiveTab] = useState<string>("manual");
   const [viewingPod, setViewingPod] = useState<{ filename: string; data: string; type: string } | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showBrokerExtract, setShowBrokerExtract] = useState(false);
 
   // Fetch full load data including attachments when editing
   const { data: fullLoad } = useQuery<Load>({
@@ -315,6 +316,27 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
     }
   };
 
+  // Broker-only extraction: fills just the customer/broker fields without touching the rest of the form
+  const handleBrokerExtraction = (extractedData: any) => {
+    if (extractedData.customerId) {
+      form.setValue("customerId", extractedData.customerId);
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+    }
+    if (extractedData.brokerName)    form.setValue("brokerName",    extractedData.brokerName);
+    if (extractedData.brokerAddress) form.setValue("brokerAddress", extractedData.brokerAddress);
+    if (extractedData.brokerPhone)   form.setValue("brokerPhone",   extractedData.brokerPhone);
+    if (extractedData.brokerEmail)   form.setValue("brokerEmail",   extractedData.brokerEmail);
+    setShowBrokerExtract(false);
+    toast({
+      title: extractedData.brokerName
+        ? `Broker found: ${extractedData.brokerName}`
+        : "Extraction complete",
+      description: extractedData.customerId
+        ? "Customer linked successfully."
+        : "Broker name filled in — please verify.",
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -365,11 +387,31 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
                 name="customerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Customer <span className="text-muted-foreground">(Optional)</span></FormLabel>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <FormLabel>Customer <span className="text-muted-foreground">(Optional)</span></FormLabel>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowBrokerExtract(v => !v)}
+                        data-testid="button-extract-broker-pdf"
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        {showBrokerExtract ? "Cancel" : "Extract from PDF"}
+                      </Button>
+                    </div>
+                    {showBrokerExtract && (
+                      <div className="mb-2">
+                        <AILoadUpload
+                          onExtracted={handleBrokerExtraction}
+                          onClose={() => setShowBrokerExtract(false)}
+                        />
+                      </div>
+                    )}
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-customer">
-                          <SelectValue placeholder="Select customer (optional - can add via AI later)" />
+                          <SelectValue placeholder="Select customer (optional)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
