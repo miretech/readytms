@@ -1,7 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { initializeAutomationSettings, sendDailyTaskReminders } from "./automation";
+import { initializeAutomationSettings, sendDailyTaskReminders, checkExpiringDocuments, checkAndSendMissingPODReminders } from "./automation";
+import { checkAndSendMaintenanceReminders } from "./notifications";
+import { storage } from "./storage";
 import { startGmailPoller } from "./gmailPoller";
 import { startPaperworkPoller } from "./paperworkPoller";
 
@@ -49,15 +51,26 @@ app.use((req, res, next) => {
   // Start paperwork poller (checks Gmail for POD/BOL every 5 min)
   startPaperworkPoller();
 
-  // Schedule daily task reminders — runs at 8 AM every day
-  let lastReminderDate = "";
+  // Schedule daily checks — runs at 8 AM every day
+  let lastDailyCheckDate = "";
   setInterval(async () => {
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0];
     const hour = now.getHours();
-    if (hour >= 8 && lastReminderDate !== dateStr) {
-      lastReminderDate = dateStr;
+    if (hour >= 8 && lastDailyCheckDate !== dateStr) {
+      lastDailyCheckDate = dateStr;
+      // Task reminders
       await sendDailyTaskReminders();
+      // CDL & medical card expiry — SMS + in-app notification
+      await checkExpiringDocuments();
+      // Maintenance due/overdue — SMS + email
+      await checkAndSendMaintenanceReminders(
+        () => storage.getAllMaintenance(),
+        () => storage.getAllTrucks(),
+        () => storage.getAllDrivers()
+      );
+      // Missing POD — SMS to assigned driver
+      await checkAndSendMissingPODReminders();
     }
   }, 60 * 60 * 1000); // check every hour
   

@@ -1,7 +1,7 @@
 import { storage } from "./storage";
 import type { Load, Driver } from "@shared/schema";
 import { differenceInDays, format } from "date-fns";
-import { sendEmail } from "./notifications";
+import { sendEmail, sendSMS } from "./notifications";
 
 /**
  * Automation Engine for Ready TMS
@@ -126,6 +126,13 @@ export async function checkExpiringDocuments() {
             details: `CDL license expired for driver ${driver.name}`,
             status: "success",
           });
+
+          if (driver.phone) {
+            await sendSMS({
+              to: driver.phone,
+              message: `Ready TMS ALERT: Your CDL license has EXPIRED. Please renew immediately and contact dispatch. - Ready TMS`,
+            });
+          }
         } else if (daysUntilExpiration > 0 && daysUntilExpiration <= warningDays) {
           // Expiring soon
           await storage.createNotification({
@@ -138,6 +145,13 @@ export async function checkExpiringDocuments() {
             recipientEmail: driver.email,
             isRead: "false",
           });
+
+          if (driver.phone) {
+            await sendSMS({
+              to: driver.phone,
+              message: `Ready TMS Reminder: Your CDL license expires in ${daysUntilExpiration} day${daysUntilExpiration === 1 ? "" : "s"}. Please renew soon and contact dispatch. - Ready TMS`,
+            });
+          }
         }
       }
 
@@ -165,6 +179,13 @@ export async function checkExpiringDocuments() {
             details: `Medical card expired for driver ${driver.name}`,
             status: "success",
           });
+
+          if (driver.phone) {
+            await sendSMS({
+              to: driver.phone,
+              message: `Ready TMS ALERT: Your medical card has EXPIRED. You cannot legally drive until it is renewed. Contact dispatch immediately. - Ready TMS`,
+            });
+          }
         } else if (daysUntilExpiration > 0 && daysUntilExpiration <= warningDays) {
           // Expiring soon
           await storage.createNotification({
@@ -177,6 +198,13 @@ export async function checkExpiringDocuments() {
             recipientEmail: driver.email,
             isRead: "false",
           });
+
+          if (driver.phone) {
+            await sendSMS({
+              to: driver.phone,
+              message: `Ready TMS Reminder: Your medical card expires in ${daysUntilExpiration} day${daysUntilExpiration === 1 ? "" : "s"}. Please schedule your DOT physical soon. - Ready TMS`,
+            });
+          }
         }
       }
     }
@@ -363,6 +391,43 @@ export async function sendDailyTaskReminders() {
     }
   } catch (error) {
     console.error("[Automation] Error sending daily task reminders:", error);
+  }
+}
+
+/**
+ * Check for loads missing POD and text the assigned driver
+ * Checks loads that are in_transit or delivered but have no POD attached
+ */
+export async function checkAndSendMissingPODReminders(): Promise<void> {
+  try {
+    const loads = await storage.getAllLoads();
+    const drivers = await storage.getAllDrivers();
+
+    // Find loads that are active (in_transit) or delivered but missing POD
+    const missingPODLoads = loads.filter((load) => {
+      const isMissingPOD = !load.podAttachment || load.podAttachment === "";
+      const isActiveOrDelivered = load.status === "in_transit" || load.status === "delivered";
+      const notCancelled = load.status !== "cancelled";
+      return isMissingPOD && isActiveOrDelivered && notCancelled;
+    });
+
+    let sent = 0;
+    for (const load of missingPODLoads) {
+      if (!load.assignedDriverId) continue;
+      const driver = drivers.find((d) => d.id === load.assignedDriverId);
+      if (!driver || !driver.phone) continue;
+
+      const statusLabel = load.status === "delivered" ? "delivered" : "in transit";
+      await sendSMS({
+        to: driver.phone,
+        message: `Ready TMS: Load ${load.loadNumber} is ${statusLabel} but no POD has been submitted. Please upload your Proof of Delivery at readytms.com/driver-pod. - Ready TMS`,
+      });
+      sent++;
+    }
+
+    console.log(`[Automation] Missing POD reminders sent: ${sent}`);
+  } catch (error) {
+    console.error("[Automation] Error sending missing POD reminders:", error);
   }
 }
 
