@@ -89,7 +89,8 @@ export default function Loads() {
     .filter((load) =>
       load.loadNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       load.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      load.deliveryLocation.toLowerCase().includes(searchQuery.toLowerCase())
+      load.deliveryLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (load.brokerName && load.brokerName.toLowerCase().includes(searchQuery.toLowerCase()))
     )
     .sort((a, b) => {
       const aVal = new Date(a[sortColumn] as string).getTime();
@@ -170,6 +171,7 @@ export default function Loads() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Load #</TableHead>
+                  <TableHead>Broker</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Route</TableHead>
                   <TableHead
@@ -205,6 +207,13 @@ export default function Loads() {
                 {paginatedLoads.map((load) => (
                   <TableRow key={load.id} data-testid={`row-load-${load.id}`}>
                     <TableCell className="font-medium">{load.loadNumber}</TableCell>
+                    <TableCell>
+                      {load.brokerName ? (
+                        <span className="text-sm font-medium" data-testid={`text-broker-${load.id}`}>{load.brokerName}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <StatusBadge status={load.status as any} type="load" />
                     </TableCell>

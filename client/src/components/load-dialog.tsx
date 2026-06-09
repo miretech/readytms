@@ -188,10 +188,10 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
         notes: loadData.notes || "",
         invoiceAttachment: loadData.invoiceAttachment || "",
         podAttachment: loadData.podAttachment || "",
-        brokerName: customer?.name || "",
-        brokerAddress: customer?.address || "",
-        brokerPhone: customer?.phone || "",
-        brokerEmail: customer?.email || "",
+        brokerName: loadData.brokerName || customer?.name || "",
+        brokerAddress: (loadData as any).brokerAddress || customer?.address || "",
+        brokerPhone: (loadData as any).brokerPhone || customer?.phone || "",
+        brokerEmail: (loadData as any).brokerEmail || customer?.email || "",
       });
     } else {
       form.reset({
@@ -239,8 +239,8 @@ export function LoadDialog({ open, onOpenChange, load }: LoadDialogProps) {
         }
       }
       
-      // Remove broker fields before sending to load endpoint
-      const { brokerName, brokerAddress, brokerPhone, brokerEmail, ...loadData } = values;
+      // Keep brokerName on the load record; strip address/phone/email (stored on customer)
+      const { brokerAddress, brokerPhone, brokerEmail, ...loadData } = values;
       
       if (isEditing) {
         return await apiRequest("PATCH", `/api/loads/${load.id}`, loadData);
