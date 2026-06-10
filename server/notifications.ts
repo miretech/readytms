@@ -143,10 +143,21 @@ export async function sendSMS(options: SMSOptions): Promise<boolean> {
     return false;
   }
 
+  // Normalize to E.164 format (+1XXXXXXXXXX)
+  const normalizePhone = (num: string) => {
+    const digits = num.replace(/\D/g, '');
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+    return `+${digits}`;
+  };
+
+  const fromNumber = normalizePhone(RC_PHONE_NUMBER);
+  const toNumber = normalizePhone(options.to);
+
   try {
     const response = await rcPlatform.post('/restapi/v1.0/account/~/extension/~/sms', {
-      from: { phoneNumber: RC_PHONE_NUMBER },
-      to: [{ phoneNumber: options.to }],
+      from: { phoneNumber: fromNumber },
+      to: [{ phoneNumber: toNumber }],
       text: options.message,
     });
 

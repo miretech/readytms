@@ -294,6 +294,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/test-sms", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { to, message } = req.body;
+      if (!to || !message) return res.status(400).json({ message: "to and message are required" });
+      const { sendSMS } = await import("./notifications");
+      const success = await sendSMS({ to, message });
+      res.json({ success, to, message });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/loads", async (req: any, res) => {
     const loads = await storage.getAllLoads(req.user?.divisionId || undefined);
     res.json(loads);
