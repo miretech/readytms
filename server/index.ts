@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { initializeAutomationSettings, sendDailyTaskReminders, checkExpiringDocuments, checkAndSendMissingPODReminders } from "./automation";
+import { initializeAutomationSettings, sendDailyTaskReminders, checkExpiringDocuments, checkAndSendMissingPODReminders, sendInvoiceDunningReminders } from "./automation";
 import { checkAndSendMaintenanceReminders } from "./notifications";
 import { storage } from "./storage";
 import { startGmailPoller } from "./gmailPoller";
@@ -71,6 +71,15 @@ app.use((req, res, next) => {
       );
       // Missing POD — SMS to assigned driver
       await checkAndSendMissingPODReminders();
+      // Invoice dunning — email brokers about unpaid invoices at 15/30/45 days
+      try {
+        const dunningResult = await sendInvoiceDunningReminders();
+        if (dunningResult.reminded > 0) {
+          log(`[Dunning] sent ${dunningResult.reminded} invoice reminder(s)`);
+        }
+      } catch (err) {
+        console.error("[Dunning] error:", err);
+      }
     }
   }, 60 * 60 * 1000); // check every hour
   

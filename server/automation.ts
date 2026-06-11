@@ -1,12 +1,85 @@
 import { storage } from "./storage";
-import type { Load, Driver } from "@shared/schema";
+import type { Load, Driver, Invoice, Customer } from "@shared/schema";
 import { differenceInDays, format } from "date-fns";
 import { sendEmail, sendSMS } from "./notifications";
+import { generateInvoicePdfBuffer } from "./invoicePdf";
 
 /**
  * Automation Engine for Ready TMS
  * Handles automated workflows like auto-invoicing, notifications, and alerts
  */
+
+// Pick the best email address to send an invoice to. Prefers the customer
+// record's email (curated by dispatch), falls back to the broker email
+// captured on the load itself by the AI extraction.
+function pickInvoiceRecipientEmail(load: Load, customer?: Customer | null): string | null {
+  const customerEmail = customer?.email?.trim();
+  if (customerEmail) return customerEmail;
+  const brokerEmail = (load as any).brokerEmail?.trim();
+  if (brokerEmail) return brokerEmail;
+  return null;
+}
+
+// Build & send the invoice email with PDF attachment. Returns success flag.
+export async function sendInvoiceEmail(
+  invoice: Invoice,
+  load: Load,
+  customer: Customer | null,
+): Promise<{ sent: boolean; reason?: string; to?: string }> {
+  const to = pickInvoiceRecipientEmail(load, customer);
+  if (!to) {
+    return { sent: false, reason: "no broker/customer email on file" };
+  }
+
+  let pdfBuffer: Buffer;
+  try {
+    const companySettings = await storage.getCompanySettings();
+    pdfBuffer = generateInvoicePdfBuffer({
+      invoice,
+      load,
+      customer,
+      companySettings: companySettings || null,
+    });
+  } catch (err: any) {
+    return { sent: false, reason: `PDF generation failed: ${err?.message || String(err)}` };
+  }
+
+  const total = Number(invoice.total);
+  const dueDate = format(new Date(invoice.dueDate), "MMM d, yyyy");
+  const carrierName = invoice.carrierName || "Ready Carrier LLC";
+  const subject = `Invoice ${invoice.invoiceNumber} — Load ${load.loadNumber}`;
+  const html = `
+    <div style="font-family: Helvetica, Arial, sans-serif; color: #222; max-width: 600px;">
+      <p>Hello${customer?.contactPerson ? ` ${customer.contactPerson}` : ""},</p>
+      <p>Please find attached our invoice for load <strong>${load.loadNumber}</strong>
+      (${load.pickupLocation} → ${load.deliveryLocation}).</p>
+      <table style="border-collapse: collapse; margin: 16px 0;">
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;">Invoice #</td><td><strong>${invoice.invoiceNumber}</strong></td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;">Amount due</td><td><strong>$${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;">Due date</td><td>${dueDate}</td></tr>
+      </table>
+      <p>Please remit payment within the terms shown on the invoice. Reply to this email if you have any questions.</p>
+      <p>Thank you,<br/>${carrierName}</p>
+    </div>
+  `;
+
+  const result = await sendEmail({
+    to,
+    subject,
+    html,
+    attachments: [
+      {
+        filename: `Invoice-${invoice.invoiceNumber}.pdf`,
+        content: pdfBuffer,
+      },
+    ],
+  });
+
+  if (!result.success) {
+    return { sent: false, reason: result.error || "sendEmail failed", to };
+  }
+  return { sent: true, to };
+}
 
 // Auto-generate invoice when load is delivered
 export async function autoGenerateInvoice(load: Load) {
@@ -72,6 +145,44 @@ export async function autoGenerateInvoice(load: Load) {
     });
 
     console.log(`Auto-generated invoice ${invoiceNumber} for load ${load.loadNumber}`);
+
+    // Auto-email the invoice to the broker/customer if enabled. Failure here
+    // does NOT roll back the invoice — dispatch can always resend manually.
+    try {
+      const emailSetting = await storage.getAutomationSetting("auto_email_invoice_on_delivery");
+      const emailEnabled = !emailSetting || emailSetting.enabled !== "false";
+      if (emailEnabled) {
+        const customer = load.customerId
+          ? (await storage.getAllCustomers()).find((c) => c.id === load.customerId) || null
+          : null;
+        const emailResult = await sendInvoiceEmail(invoice, load, customer);
+        if (emailResult.sent) {
+          await storage.createActivityLog({
+            action: "invoice_emailed",
+            entityType: "invoice",
+            entityId: invoice.id,
+            details: `Auto-emailed invoice ${invoiceNumber} to ${emailResult.to}`,
+            metadata: { invoiceId: invoice.id, loadId: load.id, to: emailResult.to },
+            status: "success",
+          });
+          console.log(`Auto-emailed invoice ${invoiceNumber} to ${emailResult.to}`);
+        } else {
+          await storage.createActivityLog({
+            action: "invoice_email_skipped",
+            entityType: "invoice",
+            entityId: invoice.id,
+            details: `Skipped auto-email of invoice ${invoiceNumber}: ${emailResult.reason}`,
+            metadata: { invoiceId: invoice.id, loadId: load.id, reason: emailResult.reason },
+            status: "warning",
+          });
+          console.log(`Skipped auto-email of invoice ${invoiceNumber}: ${emailResult.reason}`);
+        }
+      }
+    } catch (emailErr: any) {
+      console.error(`Auto-email of invoice ${invoiceNumber} failed:`, emailErr);
+      // swallow — invoice creation itself succeeded; we don't want to fail the load update.
+    }
+
     return invoice;
   } catch (error) {
     console.error("Error auto-generating invoice:", error);
@@ -431,6 +542,131 @@ export async function checkAndSendMissingPODReminders(): Promise<void> {
   }
 }
 
+// Send dunning reminders for unpaid invoices. Runs daily and emails the
+// broker/customer once per stage at 15, 30, and 45 days past invoice date.
+// Tracked via activity log to avoid duplicate emails.
+const DUNNING_STAGES_DAYS = [15, 30, 45];
+
+export async function sendInvoiceDunningReminders(): Promise<{
+  scanned: number;
+  reminded: number;
+  skipped: number;
+}> {
+  const result = { scanned: 0, reminded: 0, skipped: 0 };
+  try {
+    const setting = await storage.getAutomationSetting("auto_invoice_dunning");
+    if (setting && setting.enabled === "false") return result;
+
+    const invoices = await storage.getAllInvoices();
+    const customers = await storage.getAllCustomers();
+    const customerById = new Map(customers.map((c) => [c.id, c]));
+    const now = Date.now();
+
+    for (const invoice of invoices) {
+      // Only chase unpaid invoices.
+      const status = (invoice.status || "").toLowerCase();
+      if (status === "paid" || status === "cancelled" || status === "void") continue;
+
+      const paid = Number(invoice.paidAmount || 0);
+      const total = Number(invoice.total || 0);
+      if (paid >= total && total > 0) continue;
+
+      const invoiceMs = new Date(invoice.invoiceDate).getTime();
+      if (isNaN(invoiceMs)) continue;
+      const ageDays = Math.floor((now - invoiceMs) / (24 * 60 * 60 * 1000));
+
+      // Find the highest stage this invoice has crossed.
+      const reachedStages = DUNNING_STAGES_DAYS.filter((d) => ageDays >= d);
+      if (reachedStages.length === 0) continue;
+      const stage = Math.max(...reachedStages);
+
+      result.scanned++;
+
+      // De-dupe: have we already sent THIS stage's reminder for this invoice?
+      const priorLogs = await storage.getActivityLogsByEntity("invoice", invoice.id).catch(() => []);
+      const alreadySent = priorLogs.some(
+        (l) =>
+          l.action === "invoice_dunning_sent" &&
+          (l.metadata as any)?.stage === stage,
+      );
+      if (alreadySent) {
+        result.skipped++;
+        continue;
+      }
+
+      const load = invoice.loadId ? await storage.getLoad(invoice.loadId) : null;
+      if (!load) {
+        result.skipped++;
+        continue;
+      }
+      const customer = invoice.customerId ? customerById.get(invoice.customerId) ?? null : null;
+      const to = pickInvoiceRecipientEmail(load, customer);
+      if (!to) {
+        result.skipped++;
+        continue;
+      }
+
+      const total$ = Number(invoice.total).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      const subject = `Reminder: Invoice ${invoice.invoiceNumber} — ${stage} days past due`;
+      const html = `
+        <div style="font-family: Helvetica, Arial, sans-serif; color: #222; max-width: 600px;">
+          <p>Hello${customer?.contactPerson ? ` ${customer.contactPerson}` : ""},</p>
+          <p>This is a friendly reminder that invoice <strong>${invoice.invoiceNumber}</strong>
+          for load <strong>${load.loadNumber}</strong>
+          (${load.pickupLocation} → ${load.deliveryLocation})
+          is now <strong>${stage} days</strong> past its invoice date.</p>
+          <p>Outstanding balance: <strong>$${total$}</strong></p>
+          <p>If payment has already been sent, please disregard. Otherwise, please remit at your earliest convenience.</p>
+          <p>Thank you,<br/>${invoice.carrierName || "Ready Carrier LLC"}</p>
+        </div>
+      `;
+
+      // Re-attach the same invoice PDF so the broker has it on hand.
+      let attachments: { filename: string; content: Buffer }[] = [];
+      try {
+        const companySettings = await storage.getCompanySettings();
+        const pdfBuffer = generateInvoicePdfBuffer({
+          invoice,
+          load,
+          customer,
+          companySettings: companySettings || null,
+        });
+        attachments = [{ filename: `Invoice-${invoice.invoiceNumber}.pdf`, content: pdfBuffer }];
+      } catch {
+        // No attachment — still send the reminder text.
+      }
+
+      const sent = await sendEmail({ to, subject, html, attachments });
+      if (sent.success) {
+        await storage.createActivityLog({
+          action: "invoice_dunning_sent",
+          entityType: "invoice",
+          entityId: invoice.id,
+          details: `Sent ${stage}-day dunning reminder for invoice ${invoice.invoiceNumber} to ${to}`,
+          metadata: { invoiceId: invoice.id, stage, to, ageDays },
+          status: "success",
+        });
+        result.reminded++;
+      } else {
+        await storage.createActivityLog({
+          action: "invoice_dunning_failed",
+          entityType: "invoice",
+          entityId: invoice.id,
+          details: `Failed to send ${stage}-day dunning for invoice ${invoice.invoiceNumber}: ${sent.error}`,
+          metadata: { invoiceId: invoice.id, stage, to, error: sent.error },
+          status: "failed",
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[Automation] dunning reminders failed:", err);
+  }
+  return result;
+}
+
 // Initialize default automation settings
 export async function initializeAutomationSettings() {
   try {
@@ -439,6 +675,16 @@ export async function initializeAutomationSettings() {
         name: "auto_invoice_on_delivery",
         enabled: "true",
         config: { enabled: true, description: "Automatically generate invoices when loads are delivered" },
+      },
+      {
+        name: "auto_email_invoice_on_delivery",
+        enabled: "true",
+        config: { enabled: true, description: "Auto-email new invoices to broker on creation" },
+      },
+      {
+        name: "auto_invoice_dunning",
+        enabled: "true",
+        config: { enabled: true, stagesDays: DUNNING_STAGES_DAYS, description: "Email unpaid invoice reminders at 15/30/45 days" },
       },
       {
         name: "alert_expiring_documents",

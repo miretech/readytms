@@ -29,7 +29,7 @@ import passport from "passport";
 import bcrypt from "bcrypt";
 import { extractLoadFromDocument, extractPaperworkDocument } from "./aiExtraction";
 import { uploadPaperworkToS3 } from "./s3";
-import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
+import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments, sendInvoiceEmail } from "./automation";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
 import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail, scanRateConEmails } from "./gmail";
 import { z } from "zod";
@@ -1232,6 +1232,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Invoice not found" });
     }
     res.status(204).send();
+  });
+
+  // Manually (re)send an invoice email to the broker/customer. Useful when the
+  // initial auto-send was skipped (e.g. no email on file at delivery time) and
+  // a dispatcher wants to fire it now after adding the broker email.
+  app.post("/api/invoices/:id/resend-email", async (req: any, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      const load = invoice.loadId ? await storage.getLoad(invoice.loadId) : null;
+      if (!load) return res.status(400).json({ error: "Invoice has no linked load" });
+      const customer = invoice.customerId
+        ? (await storage.getAllCustomers()).find((c) => c.id === invoice.customerId) || null
+        : null;
+      const result = await sendInvoiceEmail(invoice, load, customer);
+      if (!result.sent) {
+        return res.status(400).json({ error: result.reason || "send failed" });
+      }
+      await storage.createActivityLog({
+        action: "invoice_emailed_manual",
+        entityType: "invoice",
+        entityId: invoice.id,
+        details: `Manually emailed invoice ${invoice.invoiceNumber} to ${result.to}`,
+        metadata: { invoiceId: invoice.id, loadId: load.id, to: result.to },
+        status: "success",
+      });
+      res.json({ sent: true, to: result.to });
+    } catch (err: any) {
+      console.error("[Invoice resend] error:", err);
+      res.status(500).json({ error: err?.message || "internal error" });
+    }
   });
 
   // Factoring Email Route
