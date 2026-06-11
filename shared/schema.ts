@@ -260,6 +260,10 @@ export const loads = pgTable("loads", {
   paperworkReceivedAt: timestamp("paperwork_received_at"),
   paperworkApprovedAt: timestamp("paperwork_approved_at"),
   paperworkNotes: text("paperwork_notes"),
+  brokerName: text("broker_name"), // Broker/Shipper name shown on loads table
+  brokerAddress: text("broker_address"),
+  brokerPhone: text("broker_phone"),
+  brokerEmail: text("broker_email"),
 });
 
 export const insertLoadSchema = createInsertSchema(loads).omit({
@@ -272,6 +276,10 @@ export const insertLoadSchema = createInsertSchema(loads).omit({
   deliveryDate: z.string().optional(),
   rate: z.string(),
   expenses: z.string().optional(),
+  brokerName: z.string().nullable().optional(),
+  brokerAddress: z.string().nullable().optional(),
+  brokerPhone: z.string().nullable().optional(),
+  brokerEmail: z.string().nullable().optional(),
   podAttachments: z.array(z.object({
     filename: z.string(),
     data: z.string(),
