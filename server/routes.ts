@@ -29,7 +29,7 @@ import passport from "passport";
 import bcrypt from "bcrypt";
 import { extractLoadFromDocument, extractPaperworkDocument } from "./aiExtraction";
 import { uploadPaperworkToS3 } from "./s3";
-import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments, sendInvoiceEmail } from "./automation";
+import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments, sendInvoiceEmail, runWeeklyDriverSettlements } from "./automation";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
 import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail, scanRateConEmails } from "./gmail";
 import { z } from "zod";
@@ -1812,6 +1812,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error auto-generating settlement:", error);
       res.status(500).json({ error: "Failed to auto-generate settlement" });
+    }
+  });
+
+  // Manually trigger the weekly auto-settlement run for ALL active drivers.
+  // The scheduled cron fires every Friday at 4 PM; this lets dispatch fire
+  // it now if drivers need a mid-week run. Idempotent per calendar day.
+  app.post("/api/settlements/run-weekly", async (_req, res) => {
+    try {
+      const result = await runWeeklyDriverSettlements();
+      res.json(result);
+    } catch (err: any) {
+      console.error("[Settlement] manual weekly run error:", err);
+      res.status(500).json({ error: err?.message || "internal error" });
     }
   });
 

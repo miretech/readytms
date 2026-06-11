@@ -1,8 +1,9 @@
 import { storage } from "./storage";
-import type { Load, Driver, Invoice, Customer } from "@shared/schema";
+import type { Load, Driver, Invoice, Customer, Settlement } from "@shared/schema";
 import { differenceInDays, format } from "date-fns";
 import { sendEmail, sendSMS } from "./notifications";
 import { generateInvoicePdfBuffer } from "./invoicePdf";
+import { generateSettlementPdfBuffer } from "./settlementPdf";
 
 /**
  * Automation Engine for Ready TMS
@@ -667,6 +668,249 @@ export async function sendInvoiceDunningReminders(): Promise<{
   return result;
 }
 
+// --- Weekly auto-settlement ---------------------------------------------
+//
+// Default driver pay split when none is configured. 70% of revenue to driver
+// — matches the default in POST /api/settlements/auto-generate.
+const DEFAULT_DRIVER_PAY_PERCENT = 0.70;
+
+// Build & persist a settlement for one driver covering [periodStart, periodEnd].
+// Returns the settlement OR null if the driver had no delivered loads in the
+// period (we don't create empty settlements — that's just noise for drivers).
+export async function generateDriverSettlement(args: {
+  driverId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  payRatePercent?: number; // 0-1 (e.g. 0.7 for 70%)
+}): Promise<Settlement | null> {
+  const { driverId, periodStart, periodEnd } = args;
+  const payRatePercent = args.payRatePercent ?? DEFAULT_DRIVER_PAY_PERCENT;
+
+  const allLoads = await storage.getAllLoads();
+  const driverLoads = allLoads.filter(
+    (load) =>
+      load.assignedDriverId === driverId &&
+      load.status === "Delivered" &&
+      new Date(load.deliveryDate) >= periodStart &&
+      new Date(load.deliveryDate) <= periodEnd,
+  );
+  if (driverLoads.length === 0) return null;
+
+  const totalRevenue = driverLoads.reduce(
+    (sum, l) => sum + parseFloat(l.rate.toString()),
+    0,
+  );
+  const totalMiles = driverLoads.reduce((sum, l) => sum + (l.weight || 0), 0);
+  const driverPay = totalRevenue * payRatePercent;
+
+  const recurringExpenses = await storage.getActiveRecurringExpenses(driverId);
+  const deductions = recurringExpenses.reduce(
+    (sum, e) => sum + parseFloat(e.amount.toString()),
+    0,
+  );
+  const netPay = driverPay - deductions;
+
+  const today = new Date();
+  const settlementNumber = `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}-${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;
+
+  const settlement = await storage.createSettlement({
+    driverId,
+    settlementNumber,
+    periodStart: periodStart.toISOString(),
+    periodEnd: periodEnd.toISOString(),
+    totalMiles,
+    totalRevenue: totalRevenue.toFixed(2),
+    driverPayPercentage: (payRatePercent * 100).toFixed(2),
+    deductions: deductions.toFixed(2),
+    netPay: netPay.toFixed(2),
+    status: "Pending",
+  });
+
+  for (const load of driverLoads) {
+    const loadRevenue = parseFloat(load.rate.toString());
+    const loadPay = loadRevenue * payRatePercent;
+    await storage.createSettlementLineItem({
+      settlementId: settlement.id,
+      loadId: load.id,
+      description: `Load ${load.loadNumber} - ${load.pickupLocation} to ${load.deliveryLocation}`,
+      quantity: (load.weight || 0).toString(),
+      rate: payRatePercent.toFixed(4),
+      amount: loadPay.toFixed(2),
+      itemType: "revenue",
+    });
+  }
+  for (const expense of recurringExpenses) {
+    await storage.createSettlementLineItem({
+      settlementId: settlement.id,
+      description: `${expense.name} - ${expense.description || expense.category}`,
+      amount: `-${expense.amount}`,
+      itemType: "deduction",
+    });
+  }
+
+  return settlement;
+}
+
+// Email a driver their settlement with PDF attached.
+async function sendSettlementEmail(
+  settlement: Settlement,
+  driver: Driver,
+): Promise<{ sent: boolean; reason?: string }> {
+  if (!driver.email) return { sent: false, reason: "no email on driver record" };
+  let pdfBuffer: Buffer;
+  try {
+    const lineItems = await storage.getSettlementLineItems(settlement.id);
+    const companySettings = await storage.getCompanySettings();
+    pdfBuffer = generateSettlementPdfBuffer({
+      settlement,
+      lineItems,
+      driver,
+      companySettings: companySettings || null,
+    });
+  } catch (err: any) {
+    return { sent: false, reason: `PDF generation failed: ${err?.message || String(err)}` };
+  }
+
+  const periodStart = format(new Date(settlement.periodStart), "MMM d, yyyy");
+  const periodEnd = format(new Date(settlement.periodEnd), "MMM d, yyyy");
+  const netPay = Number(settlement.netPay).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  const result = await sendEmail({
+    to: driver.email,
+    subject: `Your settlement ${settlement.settlementNumber} — $${netPay}`,
+    html: `
+      <div style="font-family: Helvetica, Arial, sans-serif; color: #222; max-width: 600px;">
+        <p>Hi ${driver.name},</p>
+        <p>Your weekly settlement is ready. PDF attached.</p>
+        <table style="border-collapse: collapse; margin: 16px 0;">
+          <tr><td style="padding: 4px 12px 4px 0; color: #555;">Settlement #</td><td><strong>${settlement.settlementNumber}</strong></td></tr>
+          <tr><td style="padding: 4px 12px 4px 0; color: #555;">Period</td><td>${periodStart} – ${periodEnd}</td></tr>
+          <tr><td style="padding: 4px 12px 4px 0; color: #555;">Net pay</td><td><strong>$${netPay}</strong></td></tr>
+        </table>
+        <p>Reply to this email if anything looks off and we'll review it.</p>
+      </div>
+    `,
+    attachments: [
+      {
+        filename: `Settlement-${settlement.settlementNumber}.pdf`,
+        content: pdfBuffer,
+      },
+    ],
+  });
+
+  if (!result.success) return { sent: false, reason: result.error || "sendEmail failed" };
+  return { sent: true };
+}
+
+// Generate weekly settlements for every active driver who had delivered loads
+// in the past 7 days. Idempotent within the same calendar day — checks
+// activity log to make sure we don't double-fire if the scheduler retries.
+export async function runWeeklyDriverSettlements(): Promise<{
+  drivers: number;
+  generated: number;
+  emailed: number;
+  skipped: number;
+}> {
+  const result = { drivers: 0, generated: 0, emailed: 0, skipped: 0 };
+  try {
+    const setting = await storage.getAutomationSetting("auto_weekly_settlement");
+    if (setting && setting.enabled === "false") return result;
+
+    // Period = the past 7 days ending today (end-of-day).
+    const periodEnd = new Date();
+    periodEnd.setHours(23, 59, 59, 999);
+    const periodStart = new Date(periodEnd);
+    periodStart.setDate(periodStart.getDate() - 7);
+    periodStart.setHours(0, 0, 0, 0);
+
+    const drivers = await storage.getAllDrivers();
+    const activeDrivers = drivers.filter((d) => d.isActive === "true");
+    result.drivers = activeDrivers.length;
+
+    for (const driver of activeDrivers) {
+      try {
+        // Skip if we already ran weekly settlement for this driver today —
+        // prevents duplicates if the cron retries within a day.
+        const priorLogs = await storage
+          .getActivityLogsByEntity("driver", driver.id)
+          .catch(() => []);
+        const todayKey = new Date().toISOString().split("T")[0];
+        const ranToday = priorLogs.some(
+          (l) =>
+            l.action === "weekly_settlement_run" &&
+            (l.metadata as any)?.day === todayKey,
+        );
+        if (ranToday) {
+          result.skipped++;
+          continue;
+        }
+
+        const settlement = await generateDriverSettlement({
+          driverId: driver.id,
+          periodStart,
+          periodEnd,
+        });
+
+        // Mark "ran today" regardless of whether there were loads — saves us
+        // from re-scanning the same driver hourly.
+        await storage.createActivityLog({
+          action: "weekly_settlement_run",
+          entityType: "driver",
+          entityId: driver.id,
+          details: settlement
+            ? `Generated weekly settlement ${settlement.settlementNumber} for ${driver.name}`
+            : `No delivered loads in the past 7 days for ${driver.name} — no settlement generated`,
+          metadata: {
+            day: todayKey,
+            settlementId: settlement?.id,
+            settlementNumber: settlement?.settlementNumber,
+          },
+          status: "success",
+        });
+
+        if (!settlement) {
+          result.skipped++;
+          continue;
+        }
+        result.generated++;
+
+        const emailResult = await sendSettlementEmail(settlement, driver);
+        if (emailResult.sent) {
+          result.emailed++;
+          await storage.createActivityLog({
+            action: "settlement_emailed",
+            entityType: "settlement",
+            entityId: settlement.id,
+            details: `Auto-emailed settlement ${settlement.settlementNumber} to ${driver.email}`,
+            metadata: { driverId: driver.id, to: driver.email },
+            status: "success",
+          });
+        } else {
+          await storage.createActivityLog({
+            action: "settlement_email_skipped",
+            entityType: "settlement",
+            entityId: settlement.id,
+            details: `Skipped emailing ${settlement.settlementNumber}: ${emailResult.reason}`,
+            metadata: { driverId: driver.id, reason: emailResult.reason },
+            status: "warning",
+          });
+        }
+      } catch (err: any) {
+        console.error(
+          `[Settlement] error for driver ${driver.id}:`,
+          err,
+        );
+      }
+    }
+  } catch (err) {
+    console.error("[Settlement] weekly run failed:", err);
+  }
+  return result;
+}
+
 // Initialize default automation settings
 export async function initializeAutomationSettings() {
   try {
@@ -685,6 +929,11 @@ export async function initializeAutomationSettings() {
         name: "auto_invoice_dunning",
         enabled: "true",
         config: { enabled: true, stagesDays: DUNNING_STAGES_DAYS, description: "Email unpaid invoice reminders at 15/30/45 days" },
+      },
+      {
+        name: "auto_weekly_settlement",
+        enabled: "true",
+        config: { enabled: true, payRatePercent: DEFAULT_DRIVER_PAY_PERCENT, description: "Generate & email driver settlements every Friday at 4 PM" },
       },
       {
         name: "alert_expiring_documents",

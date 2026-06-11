@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { initializeAutomationSettings, sendDailyTaskReminders, checkExpiringDocuments, checkAndSendMissingPODReminders, sendInvoiceDunningReminders } from "./automation";
+import { initializeAutomationSettings, sendDailyTaskReminders, checkExpiringDocuments, checkAndSendMissingPODReminders, sendInvoiceDunningReminders, runWeeklyDriverSettlements } from "./automation";
 import { checkAndSendMaintenanceReminders } from "./notifications";
 import { storage } from "./storage";
 import { startGmailPoller } from "./gmailPoller";
@@ -79,6 +79,28 @@ app.use((req, res, next) => {
         }
       } catch (err) {
         console.error("[Dunning] error:", err);
+      }
+    }
+  }, 60 * 60 * 1000); // check every hour
+
+  // Weekly driver settlement run — Friday at/after 4 PM local time. The
+  // function is itself idempotent (uses an activity-log per-day key), so an
+  // hourly check is safe and forgiving if the server is briefly down at 4 PM.
+  let lastSettlementRunDate = "";
+  setInterval(async () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun, 5=Fri
+    const hour = now.getHours();
+    const dateStr = now.toISOString().split("T")[0];
+    if (dayOfWeek === 5 && hour >= 16 && lastSettlementRunDate !== dateStr) {
+      lastSettlementRunDate = dateStr;
+      try {
+        const result = await runWeeklyDriverSettlements();
+        log(
+          `[Settlement] weekly run: ${result.generated} generated, ${result.emailed} emailed, ${result.skipped} skipped (of ${result.drivers} drivers)`,
+        );
+      } catch (err) {
+        console.error("[Settlement] weekly run error:", err);
       }
     }
   }, 60 * 60 * 1000); // check every hour
