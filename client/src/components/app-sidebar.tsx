@@ -82,9 +82,15 @@ const menuItems = [
     access: "all",
   },
   {
+    title: "Insurance",
+    url: "/insurance",
+    icon: ShieldCheck,
+    access: "all",
+  },
+  {
     title: "Safety",
     url: "/safety",
-    icon: ShieldCheck,
+    icon: AlertTriangle,
     access: "all",
   },
   {

@@ -722,6 +722,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Insurance Management Routes
+  app.get("/api/insurance", async (req: any, res) => {
+    try {
+      const trucks = await storage.db.query('SELECT *, "truck" as unitType FROM insurance_trucks ORDER BY unit_number');
+      const trailers = await storage.db.query('SELECT *, "trailer" as unitType FROM insurance_trailers ORDER BY unit_number');
+      res.json([...trucks, ...trailers]);
+    } catch (error) {
+      console.error("Failed to fetch insurance records:", error);
+      res.status(500).json({ error: "Failed to fetch insurance records" });
+    }
+  });
+
+  app.get("/api/insurance/:id", async (req, res) => {
+    try {
+      const truck = await storage.db.query('SELECT *, "truck" as unitType FROM insurance_trucks WHERE id = ?', [req.params.id]);
+      if (truck.length > 0) return res.json(truck[0]);
+
+      const trailer = await storage.db.query('SELECT *, "trailer" as unitType FROM insurance_trailers WHERE id = ?', [req.params.id]);
+      if (trailer.length > 0) return res.json(trailer[0]);
+
+      res.status(404).json({ error: "Record not found" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch record" });
+    }
+  });
+
+  app.post("/api/insurance", async (req: any, res) => {
+    try {
+      const { unitNumber, unitType, year, make, model, vin, status } = req.body;
+
+      if (!unitNumber || !unitType) {
+        return res.status(400).json({ error: "Unit number and type are required" });
+      }
+
+      const table = unitType === 'truck' ? 'insurance_trucks' : 'insurance_trailers';
+      const result = await storage.db.run(
+        `INSERT INTO ${table} (unit_number, year, make, model, vin, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+        [unitNumber, year || null, make || null, model || null, vin || null, status || 'active']
+      );
+
+      const newRecord = await storage.db.query(
+        `SELECT *, ? as unitType FROM ${table} WHERE id = ?`,
+        [unitType, result.lastID]
+      );
+
+      res.status(201).json(newRecord[0]);
+    } catch (error) {
+      console.error("Failed to create insurance record:", error);
+      res.status(500).json({ error: "Failed to create insurance record" });
+    }
+  });
+
+  app.patch("/api/insurance/:id", async (req, res) => {
+    try {
+      const { unitNumber, year, make, model, vin, status } = req.body;
+
+      await storage.db.run(
+        'UPDATE insurance_trucks SET unit_number = ?, year = ?, make = ?, model = ?, vin = ?, status = ?, updated_at = datetime("now") WHERE id = ?',
+        [unitNumber, year, make, model, vin, status, req.params.id]
+      );
+
+      await storage.db.run(
+        'UPDATE insurance_trailers SET unit_number = ?, year = ?, make = ?, model = ?, vin = ?, status = ?, updated_at = datetime("now") WHERE id = ?',
+        [unitNumber, year, make, model, vin, status, req.params.id]
+      );
+
+      res.json({ message: "Record updated" });
+    } catch (error) {
+      console.error("Failed to update insurance record:", error);
+      res.status(500).json({ error: "Failed to update record" });
+    }
+  });
+
+  app.delete("/api/insurance/:id", async (req, res) => {
+    try {
+      await storage.db.run('DELETE FROM insurance_trucks WHERE id = ?', [req.params.id]);
+      await storage.db.run('DELETE FROM insurance_trailers WHERE id = ?', [req.params.id]);
+      res.json({ message: "Record deleted" });
+    } catch (error) {
+      console.error("Failed to delete insurance record:", error);
+      res.status(500).json({ error: "Failed to delete record" });
+    }
+  });
+
   app.get("/api/trailers", async (req: any, res) => {
     try {
       const trailers = await storage.getAllTrailers(req.user?.divisionId || undefined);
