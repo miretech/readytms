@@ -42,6 +42,11 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  // In production, the mobile app at capacitor://localhost / https://localhost
+  // hits the same backend cross-origin, so we need SameSite=None to send the
+  // session cookie. SameSite=None requires Secure, which production has.
+  // In dev we keep SameSite=Lax to avoid the Secure requirement.
+  const isProd = process.env.NODE_ENV === "production";
   return session({
     secret: process.env.SESSION_SECRET || "default-secret-change-in-production",
     store: sessionStore,
@@ -49,8 +54,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
       maxAge: sessionTtl,
     },
   });
