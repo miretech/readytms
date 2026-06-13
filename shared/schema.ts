@@ -1123,3 +1123,65 @@ export const companyUsers = pgTable("company_users", {
   isPrimary: text("is_primary").notNull().default("false"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Insurance records for trucks. Columns mirror the raw SQL in
+// server/routes.ts (the /api/insurance endpoints) so `drizzle-kit push`
+// can create the table on a fresh database.
+export const insuranceTrucks = pgTable("insurance_trucks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  unitNumber: text("unit_number").notNull().unique(), // upsert target (ON CONFLICT)
+  year: integer("year"),
+  make: text("make"),
+  model: text("model"),
+  vin: text("vin"),
+  physicalDamage: text("physical_damage"),
+  specificType: text("specific_type"),
+  ownerOperator: text("owner_operator"),
+  lossPayeeName: text("loss_payee_name"),
+  lossPayeeAddress: text("loss_payee_address"),
+  lossPayeeCity: text("loss_payee_city"),
+  lossPayeeState: text("loss_payee_state"),
+  lossPayeeZip: text("loss_payee_zip"),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInsuranceTruckSchema = createInsertSchema(insuranceTrucks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertInsuranceTruck = z.infer<typeof insertInsuranceTruckSchema>;
+export type InsuranceTruck = typeof insuranceTrucks.$inferSelect;
+
+// Insurance records for trailers. Same shape as insurance_trucks minus the
+// owner_operator column (which the trailer queries do not reference).
+export const insuranceTrailers = pgTable("insurance_trailers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  unitNumber: text("unit_number").notNull().unique(), // upsert target (ON CONFLICT)
+  year: integer("year"),
+  make: text("make"),
+  model: text("model"),
+  vin: text("vin"),
+  physicalDamage: text("physical_damage"),
+  specificType: text("specific_type"),
+  lossPayeeName: text("loss_payee_name"),
+  lossPayeeAddress: text("loss_payee_address"),
+  lossPayeeCity: text("loss_payee_city"),
+  lossPayeeState: text("loss_payee_state"),
+  lossPayeeZip: text("loss_payee_zip"),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInsuranceTrailerSchema = createInsertSchema(insuranceTrailers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertInsuranceTrailer = z.infer<typeof insertInsuranceTrailerSchema>;
+export type InsuranceTrailer = typeof insuranceTrailers.$inferSelect;

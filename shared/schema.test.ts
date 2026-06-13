@@ -4,6 +4,8 @@ import {
   insertTruckSchema,
   insertLoadSchema,
   insertCustomerSchema,
+  insertInsuranceTruckSchema,
+  insertInsuranceTrailerSchema,
 } from "./schema";
 
 describe("insertDriverSchema", () => {
@@ -137,5 +139,54 @@ describe("insertCustomerSchema", () => {
     expect(insertCustomerSchema.safeParse({ name: "Acme Corp" }).success).toBe(
       true,
     );
+  });
+});
+
+describe("insertInsuranceTruckSchema", () => {
+  it("requires a unitNumber", () => {
+    expect(insertInsuranceTruckSchema.safeParse({ make: "Volvo" }).success).toBe(
+      false,
+    );
+  });
+
+  it("accepts a minimal record (status defaults at the DB)", () => {
+    const result = insertInsuranceTruckSchema.safeParse({ unitNumber: "450" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts the full truck payload from the insurance route", () => {
+    const result = insertInsuranceTruckSchema.safeParse({
+      unitNumber: "450",
+      year: 2020,
+      make: "Freightliner",
+      model: "Cascadia",
+      vin: "1FUJGLDR0CSBP1234",
+      physicalDamage: "100000",
+      ownerOperator: "John Smith",
+      lossPayeeName: "Bank of Trucking",
+      status: "active",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a non-integer year", () => {
+    expect(
+      insertInsuranceTruckSchema.safeParse({ unitNumber: "450", year: "twenty" })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("insertInsuranceTrailerSchema", () => {
+  it("requires a unitNumber", () => {
+    expect(insertInsuranceTrailerSchema.safeParse({ make: "Wabash" }).success).toBe(
+      false,
+    );
+  });
+
+  it("accepts a minimal trailer record", () => {
+    expect(
+      insertInsuranceTrailerSchema.safeParse({ unitNumber: "T-200" }).success,
+    ).toBe(true);
   });
 });
