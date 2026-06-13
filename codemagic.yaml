@@ -1,0 +1,140 @@
+# Codemagic build config for the ReadyTMS Driver app.
+#
+# This file makes the iOS + Android builds reproducible. Once you sign up
+# at codemagic.io and connect this repo (the `feat/mobile-driver-app`
+# branch), Codemagic will read this YAML automatically and run the
+# workflows below.
+#
+# What you still need to set in the Codemagic UI before the FIRST build:
+#   1. App Store Connect API key (Settings → Integrations → App Store)
+#   2. Android keystore (Settings → Code signing identities → Android)
+#   3. Apple Developer team & bundle ID `com.readytms.driver`
+#   4. Google Play service account JSON (Settings → Integrations → Google Play)
+#
+# All of these are one-time setups in the Codemagic dashboard.
+
+workflows:
+  # ── iOS — build an .ipa, push to TestFlight ─────────────────────────────
+  ios-workflow:
+    name: ReadyTMS Driver — iOS
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      ios_signing:
+        provisioning_profiles:
+          - ReadyTMS_Driver_AppStore
+        certificates:
+          - distribution
+      vars:
+        APP_STORE_APPLE_ID: $APP_STORE_APPLE_ID
+        BUNDLE_ID: "com.readytms.driver"
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 20
+      xcode: 15.4
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: feat/mobile-driver-app
+          include: true
+        - pattern: main
+          include: true
+    scripts:
+      - name: Install npm deps
+        script: |
+          npm ci
+      - name: Build the mobile JS bundle
+        script: |
+          npm run mobile:build
+      - name: Initialize iOS project if missing
+        script: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+      - name: Set build number
+        script: |
+          cd ios/App
+          agvtool new-version -all $(($BUILD_NUMBER + 100))
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+    publishing:
+      app_store_connect:
+        # Set this secret in Codemagic UI → Settings → Integrations.
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - ReadyTMS Drivers
+        submit_to_app_store: false
+
+  # ── Android — build an .aab, push to Play Internal Testing ─────────────
+  android-workflow:
+    name: ReadyTMS Driver — Android
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      android_signing:
+        - readytms_driver_keystore
+      vars:
+        PACKAGE_NAME: "com.readytms.driver"
+      node: 20
+      java: 17
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: feat/mobile-driver-app
+          include: true
+        - pattern: main
+          include: true
+    scripts:
+      - name: Install npm deps
+        script: |
+          npm ci
+      - name: Build the mobile JS bundle
+        script: |
+          npm run mobile:build
+      - name: Initialize Android project if missing
+        script: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+      - name: Inject signing config
+        script: |
+          cat > android/key.properties <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
+      - name: Bump versionCode
+        script: |
+          cd android
+          # Use Codemagic's BUILD_NUMBER as versionCode so each build is unique.
+          sed -i.bak "s/versionCode .*/versionCode $BUILD_NUMBER/" app/build.gradle || true
+      - name: Build release AAB
+        script: |
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/*.apk
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        in_app_update_priority: 0
