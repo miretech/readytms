@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import type { Load, Driver } from "@shared/schema";
 import { differenceInDays, format } from "date-fns";
 import { sendEmail, sendSMS } from "./notifications";
+import { calculateInvoiceTotals, generateDocumentNumber } from "./lib/calculations";
 
 /**
  * Automation Engine for Ready TMS
@@ -27,13 +28,10 @@ export async function autoGenerateInvoice(load: Load) {
     }
 
     // Generate invoice number
-    const today = new Date();
-    const invoiceNumber = `INV-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+    const invoiceNumber = generateDocumentNumber("INV");
 
-    // Calculate invoice details
-    const subtotal = parseFloat(load.rate.toString());
-    const tax = subtotal * 0.0; // No tax by default, can be configured
-    const total = subtotal + tax;
+    // Calculate invoice details (no tax by default, can be configured)
+    const { subtotal, tax, total } = calculateInvoiceTotals(load.rate, 0);
 
     // Create the invoice
     const invoice = await storage.createInvoice({

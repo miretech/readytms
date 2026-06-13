@@ -30,6 +30,7 @@ import bcrypt from "bcrypt";
 import { extractLoadFromDocument, extractPaperworkDocument } from "./aiExtraction";
 import { uploadPaperworkToS3 } from "./s3";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
+import { calculateDriverPay, generateDocumentNumber } from "./lib/calculations";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
 import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail, scanRateConEmails } from "./gmail";
 import { emailProcessorRoute } from "./email_processor.js";
@@ -1847,23 +1848,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "No delivered loads found for this driver in the period" });
       }
 
-      // Calculate totals
-      const totalRevenue = driverLoads.reduce((sum, load) => sum + parseFloat(load.rate.toString()), 0);
-      const totalMiles = driverLoads.reduce((sum, load) => sum + (load.weight || 0), 0); // Using weight as placeholder for miles
-
-      // Calculate driver pay (using percentage or per-mile rate)
-      const rateValue = parseFloat(payRate || "0.70"); // Default 70% of revenue
-      const driverPay = payRate && payRate < 10 ? totalRevenue * rateValue : totalMiles * rateValue;
-
       // Get recurring expenses for this driver
       const recurringExpenses = await storage.getActiveRecurringExpenses(driverId);
-      const deductions = recurringExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount.toString()), 0);
 
-      const netPay = driverPay - deductions;
+      // Calculate totals and driver pay (note: weight is used as a placeholder for miles)
+      const {
+        totalRevenue,
+        totalMiles,
+        rateValue,
+        deductions,
+        netPay,
+        perLoadPay,
+      } = calculateDriverPay(driverLoads, recurringExpenses, payRate);
 
       // Generate settlement number
-      const today = new Date();
-      const settlementNumber = `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+      const settlementNumber = generateDocumentNumber("SETTLE");
 
       // Create settlement
       const settlement = await storage.createSettlement({
@@ -1880,10 +1879,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Create line items for each load
-      for (const load of driverLoads) {
-        const loadRevenue = parseFloat(load.rate.toString());
-        const loadPay = payRate && payRate < 10 ? loadRevenue * rateValue : (load.weight || 0) * rateValue;
-        
+      for (const [index, load] of driverLoads.entries()) {
+        const loadPay = perLoadPay[index];
+
         await storage.createSettlementLineItem({
           settlementId: settlement.id,
           loadId: load.id,
