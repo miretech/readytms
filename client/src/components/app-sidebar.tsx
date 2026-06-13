@@ -1,10 +1,11 @@
-import { 
-  LayoutDashboard, 
-  Package, 
-  Truck, 
-  Users, 
+import {
+  LayoutDashboard,
+  Package,
+  Truck,
+  Users,
   UserCog,
   ShieldCheck,
+  Shield,
   Wrench,
   Fuel,
   MapPin,
@@ -85,6 +86,12 @@ const menuItems = [
     title: "Safety",
     url: "/safety",
     icon: ShieldCheck,
+    access: "all",
+  },
+  {
+    title: "Insurance",
+    url: "/insurance",
+    icon: Shield,
     access: "all",
   },
   {

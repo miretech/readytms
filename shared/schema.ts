@@ -69,6 +69,12 @@ export const trucks = pgTable("trucks", {
   dotInspectionAttachments: jsonb("dot_inspection_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
   // Repair Receipts
   repairReceiptAttachments: jsonb("repair_receipt_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
+  // Insurance section
+  insuranceProvider: text("insurance_provider"),
+  insurancePolicyNumber: text("insurance_policy_number"),
+  insuranceStartDate: text("insurance_start_date"), // "Added" date — when the policy became active
+  insuranceExpirationDate: text("insurance_expiration_date"), // "Remove" date — when the policy ends
+  insuranceAttachments: jsonb("insurance_attachments").$type<Array<{ fileName: string; fileData: string; uploadedAt: string }>>(),
   // Company Dates
   dateAddedToCompany: text("date_added_to_company"),
   dateTerminated: text("date_terminated"),
@@ -100,7 +106,8 @@ export const trailers = pgTable("trailers", {
   // Insurance section
   insuranceProvider: text("insurance_provider"),
   insurancePolicyNumber: text("insurance_policy_number"),
-  insuranceExpirationDate: text("insurance_expiration_date"),
+  insuranceStartDate: text("insurance_start_date"), // "Added" date — when policy became active
+  insuranceExpirationDate: text("insurance_expiration_date"), // "Remove" date — when policy ends
   // Dates section
   pickupDate: text("pickup_date"),
   dropOffDate: text("drop_off_date"),
