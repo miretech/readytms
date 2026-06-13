@@ -32,6 +32,8 @@ import { uploadPaperworkToS3 } from "./s3";
 import { autoGenerateInvoice, notifyLoadStatusChange, checkExpiringDocuments } from "./automation";
 import { sendGPSEnabledNotification, sendGPSReminderNotification, sendEmail } from "./notifications";
 import { getGmailAuthUrl, exchangeCodeAndSave, getGmailStatus, clearGmailTokens, sendViaGmail, scanRateConEmails } from "./gmail";
+import { emailProcessorRoute } from "./email_processor.js";
+import { pool } from "./db";
 import { z } from "zod";
 import { google } from "googleapis";
 
@@ -725,9 +727,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Insurance Management Routes
   app.get("/api/insurance", async (req: any, res) => {
     try {
-      const trucks = await storage.db.query('SELECT *, "truck" as unitType FROM insurance_trucks ORDER BY unit_number');
-      const trailers = await storage.db.query('SELECT *, "trailer" as unitType FROM insurance_trailers ORDER BY unit_number');
-      res.json([...trucks, ...trailers]);
+      const trucks = await pool.query(`
+        SELECT id, unit_number AS "unitNumber", 'truck' AS "unitType",
+               year, make, model, vin, physical_damage AS "physicalDamage",
+               specific_type AS "specificType", owner_operator AS "ownerOperator",
+               loss_payee_name AS "lossPayeeName", loss_payee_address AS "lossPayeeAddress",
+               loss_payee_city AS "lossPayeeCity", loss_payee_state AS "lossPayeeState",
+               loss_payee_zip AS "lossPayeeZip", status,
+               created_at AS "createdAt", updated_at AS "updatedAt"
+        FROM insurance_trucks ORDER BY unit_number
+      `);
+      const trailers = await pool.query(`
+        SELECT id, unit_number AS "unitNumber", 'trailer' AS "unitType",
+               year, make, model, vin, physical_damage AS "physicalDamage",
+               specific_type AS "specificType",
+               loss_payee_name AS "lossPayeeName", loss_payee_address AS "lossPayeeAddress",
+               loss_payee_city AS "lossPayeeCity", loss_payee_state AS "lossPayeeState",
+               loss_payee_zip AS "lossPayeeZip", status,
+               created_at AS "createdAt", updated_at AS "updatedAt"
+        FROM insurance_trailers ORDER BY unit_number
+      `);
+      res.json([...trucks.rows, ...trailers.rows]);
     } catch (error) {
       console.error("Failed to fetch insurance records:", error);
       res.status(500).json({ error: "Failed to fetch insurance records" });
@@ -736,11 +756,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/insurance/:id", async (req, res) => {
     try {
-      const truck = await storage.db.query('SELECT *, "truck" as unitType FROM insurance_trucks WHERE id = ?', [req.params.id]);
-      if (truck.length > 0) return res.json(truck[0]);
+      const truck = await pool.query(
+        `SELECT id, unit_number AS "unitNumber", 'truck' AS "unitType",
+                year, make, model, vin, physical_damage AS "physicalDamage",
+                status, created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM insurance_trucks WHERE id = $1`,
+        [req.params.id]
+      );
+      if (truck.rows.length > 0) return res.json(truck.rows[0]);
 
-      const trailer = await storage.db.query('SELECT *, "trailer" as unitType FROM insurance_trailers WHERE id = ?', [req.params.id]);
-      if (trailer.length > 0) return res.json(trailer[0]);
+      const trailer = await pool.query(
+        `SELECT id, unit_number AS "unitNumber", 'trailer' AS "unitType",
+                year, make, model, vin, physical_damage AS "physicalDamage",
+                status, created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM insurance_trailers WHERE id = $1`,
+        [req.params.id]
+      );
+      if (trailer.rows.length > 0) return res.json(trailer.rows[0]);
 
       res.status(404).json({ error: "Record not found" });
     } catch (error) {
@@ -750,25 +782,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/insurance", async (req: any, res) => {
     try {
-      const { unitNumber, unitType, year, make, model, vin, status } = req.body;
+      const { unitNumber, unitType, year, make, model, vin, physicalDamage, lossPayeeName, status } = req.body;
 
       if (!unitNumber || !unitType) {
         return res.status(400).json({ error: "Unit number and type are required" });
       }
 
-      const table = unitType === 'truck' ? 'insurance_trucks' : 'insurance_trailers';
-      const result = await storage.db.run(
-        `INSERT INTO ${table} (unit_number, year, make, model, vin, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-        [unitNumber, year || null, make || null, model || null, vin || null, status || 'active']
-      );
-
-      const newRecord = await storage.db.query(
-        `SELECT *, ? as unitType FROM ${table} WHERE id = ?`,
-        [unitType, result.lastID]
-      );
-
-      res.status(201).json(newRecord[0]);
+      if (unitType === 'truck') {
+        const result = await pool.query(
+          `INSERT INTO insurance_trucks (unit_number, year, make, model, vin, physical_damage, loss_payee_name, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+           ON CONFLICT (unit_number) DO UPDATE SET
+             year=EXCLUDED.year, make=EXCLUDED.make, model=EXCLUDED.model, vin=EXCLUDED.vin,
+             physical_damage=EXCLUDED.physical_damage, loss_payee_name=EXCLUDED.loss_payee_name,
+             status=EXCLUDED.status, updated_at=NOW()
+           RETURNING id, unit_number AS "unitNumber", 'truck' AS "unitType", year, make, model, vin,
+                     physical_damage AS "physicalDamage", status, created_at AS "createdAt"`,
+          [unitNumber, year || null, make || null, model || null, vin || null, physicalDamage || null, lossPayeeName || null, status || 'active']
+        );
+        return res.status(201).json(result.rows[0]);
+      } else {
+        const result = await pool.query(
+          `INSERT INTO insurance_trailers (unit_number, year, make, model, vin, physical_damage, loss_payee_name, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+           ON CONFLICT (unit_number) DO UPDATE SET
+             year=EXCLUDED.year, make=EXCLUDED.make, model=EXCLUDED.model, vin=EXCLUDED.vin,
+             physical_damage=EXCLUDED.physical_damage, loss_payee_name=EXCLUDED.loss_payee_name,
+             status=EXCLUDED.status, updated_at=NOW()
+           RETURNING id, unit_number AS "unitNumber", 'trailer' AS "unitType", year, make, model, vin,
+                     physical_damage AS "physicalDamage", status, created_at AS "createdAt"`,
+          [unitNumber, year || null, make || null, model || null, vin || null, physicalDamage || null, lossPayeeName || null, status || 'active']
+        );
+        return res.status(201).json(result.rows[0]);
+      }
     } catch (error) {
       console.error("Failed to create insurance record:", error);
       res.status(500).json({ error: "Failed to create insurance record" });
@@ -777,16 +823,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/insurance/:id", async (req, res) => {
     try {
-      const { unitNumber, year, make, model, vin, status } = req.body;
+      const { unitNumber, year, make, model, vin, physicalDamage, lossPayeeName, status, unitType } = req.body;
 
-      await storage.db.run(
-        'UPDATE insurance_trucks SET unit_number = ?, year = ?, make = ?, model = ?, vin = ?, status = ?, updated_at = datetime("now") WHERE id = ?',
-        [unitNumber, year, make, model, vin, status, req.params.id]
-      );
-
-      await storage.db.run(
-        'UPDATE insurance_trailers SET unit_number = ?, year = ?, make = ?, model = ?, vin = ?, status = ?, updated_at = datetime("now") WHERE id = ?',
-        [unitNumber, year, make, model, vin, status, req.params.id]
+      const table = unitType === 'trailer' ? 'insurance_trailers' : 'insurance_trucks';
+      await pool.query(
+        `UPDATE ${table} SET unit_number=$1, year=$2, make=$3, model=$4, vin=$5,
+         physical_damage=$6, loss_payee_name=$7, status=$8, updated_at=NOW() WHERE id=$9`,
+        [unitNumber, year, make, model, vin, physicalDamage || null, lossPayeeName || null, status, req.params.id]
       );
 
       res.json({ message: "Record updated" });
@@ -798,8 +841,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/insurance/:id", async (req, res) => {
     try {
-      await storage.db.run('DELETE FROM insurance_trucks WHERE id = ?', [req.params.id]);
-      await storage.db.run('DELETE FROM insurance_trailers WHERE id = ?', [req.params.id]);
+      await pool.query('DELETE FROM insurance_trucks WHERE id = $1', [req.params.id]);
+      await pool.query('DELETE FROM insurance_trailers WHERE id = $1', [req.params.id]);
       res.json({ message: "Record deleted" });
     } catch (error) {
       console.error("Failed to delete insurance record:", error);
@@ -3467,6 +3510,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // POST /api/email/process - Auto-add equipment from info@readycarrier.com emails
+  app.post("/api/email/process", emailProcessorRoute);
 
   const httpServer = createServer(app);
 

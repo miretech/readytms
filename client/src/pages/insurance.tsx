@@ -33,6 +33,8 @@ interface InsuranceRecord {
   make?: string;
   model?: string;
   vin?: string;
+  physicalDamage?: string;
+  lossPayeeName?: string;
   status: string;
   createdAt: string;
   updatedAt?: string;
@@ -166,6 +168,8 @@ export default function Insurance() {
                   <TableHead>Make</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead>VIN</TableHead>
+                  <TableHead>Physical Damage</TableHead>
+                  <TableHead>Loss Payee</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date Added</TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -184,6 +188,12 @@ export default function Insurance() {
                     <TableCell>{record.make || "-"}</TableCell>
                     <TableCell>{record.model || "-"}</TableCell>
                     <TableCell className="font-mono text-sm">{record.vin || "-"}</TableCell>
+                    <TableCell>
+                      {record.physicalDamage
+                        ? `$${parseInt(record.physicalDamage).toLocaleString()}`
+                        : <span className="text-muted-foreground text-xs">None</span>}
+                    </TableCell>
+                    <TableCell className="text-sm">{record.lossPayeeName || "-"}</TableCell>
                     <TableCell>
                       <Badge
                         variant={record.status === "active" ? "default" : "secondary"}
