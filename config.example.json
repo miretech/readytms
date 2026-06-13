@@ -1,0 +1,39 @@
+{
+  "gmail": {
+    "client_secrets_path": "./client_secrets.json",
+    "monitor_emails": [
+      "readycarriers@gmail.com",
+      "info@readycarrier.com"
+    ],
+    "insurance_keywords": [
+      "insurance",
+      "certificate",
+      "policy",
+      "coverage",
+      "unit list",
+      "tractor",
+      "trailer"
+    ]
+  },
+  "readytms": {
+    "database_url": "postgresql://neondb_owner:npg_XXXXX@ep-XXXXX.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require",
+    "api_url": "https://readytms.replit.dev"
+  },
+  "telegram": {
+    "bot_token": "123456789:ABCdeFGHij-KlMnOpQrStUvWxYz-AbCdEfG",
+    "primary_chat_id": "-5240100622",
+    "dispatch_chat_id": "-5155963875",
+    "operations_chat_id": "-5240100622"
+  },
+  "schedule": {
+    "daily_check_time": "08:00",
+    "timezone": "US/Eastern"
+  },
+  "database": {
+    "sqlite_path": "./insurance_audit.db"
+  },
+  "logging": {
+    "level": "INFO",
+    "log_file": "./logs/insurance_monitor.log"
+  }
+}
