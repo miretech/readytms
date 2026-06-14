@@ -1,4 +1,8 @@
 #!/bin/bash
 set -e
-npm install
+echo "🔄 Post-merge: rebuilding ReadyTMS..."
+npm install --silent
+npm run build
 npm run db:push
+echo "✅ Build complete — restarting server..."
+kill 1
