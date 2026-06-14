@@ -1,4 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
+import fs from "fs";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeAutomationSettings, sendDailyTaskReminders, checkExpiringDocuments, checkAndSendMissingPODReminders } from "./automation";
@@ -75,6 +77,23 @@ app.use((req, res, next) => {
   }, 60 * 60 * 1000); // check every hour
   
   const server = await registerRoutes(app);
+
+  // Mobile driver app preview — served at /m, /m/*
+  // This is the exact same bundle that ships in the native iOS/Android app,
+  // just running in a mobile browser. Lets the carrier preview the driver
+  // experience before paying for app store accounts. Static assets live in
+  // dist-mobile/, committed at build time.
+  const mobileDist = path.resolve(import.meta.dirname, "..", "dist-mobile");
+  if (fs.existsSync(mobileDist)) {
+    app.use("/m", express.static(mobileDist));
+    app.get(/^\/m(\/.*)?$/, (_req, res) => {
+      res.sendFile(path.join(mobileDist, "index.html"));
+    });
+  } else {
+    app.get("/m", (_req, res) => {
+      res.status(503).send("Mobile preview not built. Run: npm run mobile:build");
+    });
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
