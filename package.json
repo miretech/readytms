@@ -5,12 +5,27 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "start": "NODE_ENV=production node dist/index.js",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist"
+    "build": "vite build && vite build --config vite.config.mobile.ts && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "mobile:build": "vite build --config vite.config.mobile.ts",
+    "mobile:sync": "npm run mobile:build && cap sync",
+    "mobile:open:ios": "npm run mobile:sync && cap open ios",
+    "mobile:open:android": "npm run mobile:sync && cap open android",
+    "mobile:add:ios": "npm run mobile:build && cap add ios",
+    "mobile:add:android": "npm run mobile:build && cap add android"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@aws-sdk/client-s3": "^3.1058.0",
     "@aws-sdk/lib-storage": "^3.1058.0",
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/camera": "^6.1.2",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/geolocation": "^6.1.0",
+    "@capacitor/ios": "^6.2.1",
+    "@capacitor/network": "^6.0.3",
+    "@capacitor/push-notifications": "^6.0.4",
+    "@capacitor/status-bar": "^6.0.2",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
