@@ -5,7 +5,7 @@ workflows:
               environment:
                     ios_signing:
                             distribution_type: app_store
-                                    bundle_id: com.readytms.driver
+                                    bundle_id: com.readycarrier.driver
                                           vars:
                                                   XCODE_WORKSPACE: mobile/ios/App/App.xcworkspace
                                                           XCODE_SCHEME: App
