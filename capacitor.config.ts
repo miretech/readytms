@@ -6,7 +6,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // dispatcher tool; the mobile app is driver-focused.
 const config: CapacitorConfig = {
   appId: "com.readycarrier.driver",
-  appName: "ReadyTMS Driver",
+  appName: "ReadyTMS",
   webDir: "dist-mobile",
   bundledWebRuntime: false,
   // The mobile WebView talks to the production API directly.
