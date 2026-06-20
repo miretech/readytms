@@ -5,7 +5,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // production server. The TMS web app at readytms.com stays the
 // dispatcher tool; the mobile app is driver-focused.
 const config: CapacitorConfig = {
-  appId: "com.readytms.driver",
+  appId: "com.readycarrier.driver",
   appName: "ReadyTMS Driver",
   webDir: "dist-mobile",
   bundledWebRuntime: false,
