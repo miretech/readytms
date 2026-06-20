@@ -34,6 +34,12 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: "always",
     scheme: "ReadyTMSDriver",
+    infoPlist: {
+      NSLocationWhenInUseUsageDescription:
+        "ReadyTMS needs your location to track your delivery route and help dispatch optimize driver assignments.",
+      NSPhotoLibraryUsageDescription:
+        "ReadyTMS may access your photo library for uploading delivery proof or documentation.",
+    },
   },
   android: {
     allowMixedContent: false,
