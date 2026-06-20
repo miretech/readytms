@@ -1,3 +1,4 @@
+import cors from "cors";
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
@@ -12,6 +13,19 @@ import { startPaperworkPoller } from "./paperworkPoller";
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+// Allow Capacitor (iOS/Android) and browser origins
+app.use(cors({
+    origin: [
+          "https://readytms.com",
+          "capacitor://localhost",
+          "http://localhost",
+          "http://localhost:5000",
+          "ionic://localhost",
+        ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();
