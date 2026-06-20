@@ -5,7 +5,7 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_id: com.readycarrier.driver
+        bundle_identifier: com.readycarrier.driver
       vars:
         XCODE_WORKSPACE: mobile/ios/App/App.xcworkspace
         XCODE_SCHEME: App
@@ -13,9 +13,10 @@ workflows:
     triggering:
       events:
         - push
-      branch:
-        include:
-          - main
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
     scripts:
       - name: Install dependencies
         script: npm install
@@ -25,8 +26,15 @@ workflows:
         script: cd mobile/ios/App && pod install && cd ../../..
       - name: Sync Capacitor to iOS
         script: npx cap sync ios
+      - name: Set up code signing
+        script: xcode-project use-profiles
       - name: Build iOS app
-        script: xcodebuild build -workspace "$XCODE_WORKSPACE" -scheme "$XCODE_SCHEME" -configuration "$XCODE_CONFIGURATION" -derivedDataPath build
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
     artifacts:
-      - build/**/*.app
-      - build/**/*.ipa
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
