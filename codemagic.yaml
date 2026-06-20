@@ -1,13 +1,13 @@
 workflows:
   ios-build:
     name: Build ReadyTMS iOS App
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     environment:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.readycarrier.driver
       vars:
-        XCODE_WORKSPACE: mobile/ios/App/App.xcworkspace
+        XCODE_WORKSPACE: ios/App/App.xcworkspace
         XCODE_SCHEME: App
         XCODE_CONFIGURATION: Release
     triggering:
@@ -20,12 +20,14 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm install
-      - name: Build web app
-        script: npm run build
-      - name: Install iOS dependencies
-        script: cd mobile/ios/App && pod install && cd ../../..
+      - name: Build mobile web app
+        script: npm run mobile:build
+      - name: Add iOS platform
+        script: npx cap add ios
       - name: Sync Capacitor to iOS
         script: npx cap sync ios
+      - name: Install iOS dependencies
+        script: cd ios/App && pod install
       - name: Set up code signing
         script: xcode-project use-profiles
       - name: Build iOS app
