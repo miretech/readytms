@@ -25,7 +25,9 @@ workflows:
       - name: Build mobile web app
         script: npm run mobile:build
       - name: Add iOS platform
-        script: npx cap add ios
+        script: |
+          rm -rf ios
+          npx cap add ios
       - name: Sync Capacitor to iOS
         script: npx cap sync ios
       - name: Add iOS privacy permission strings
