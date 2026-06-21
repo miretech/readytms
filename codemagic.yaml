@@ -29,12 +29,9 @@ workflows:
       - name: Add iOS privacy permission strings
         script: |
           PLIST=ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'This app uses your location to show nearby loads and track active deliveries.'" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :NSLocationAlwaysAndWhenInUseUsageDescription string 'This app uses your location in the background to track active deliveries while you are on duty.'" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :NSLocationAlwaysUsageDescription string 'This app uses your location in the background to track active deliveries while you are on duty.'" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'This app accesses your photo library to let you attach photos to delivery documents and proof of delivery.'" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'This app uses the camera to capture photos for proof of delivery and document scanning.'" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :NSMotionUsageDescription string 'This app uses motion data to improve location accuracy during deliveries.'" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :NSMotionUsageDescription string" "$PLIST"
       - name: Install iOS dependencies
         script: cd ios/App && pod install
       - name: Set up code signing
@@ -50,7 +47,7 @@ workflows:
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
     publishing:
-          app_store_connect:
-                  auth: integration
-                          submit_to_testflight: true
-                                  submit_to_app_store: false
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
