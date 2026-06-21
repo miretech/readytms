@@ -168,7 +168,11 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
           // Attach user to request
           (req as any).user = sess.passport.user;
           return next();
+        } else {
+          console.warn("Token found but no passport.user in session:", sessionId);
         }
+      } else {
+        console.warn("Token not found or expired in sessions table:", sessionId);
       }
     } catch (err) {
       console.error("Token verification error:", err);

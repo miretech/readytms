@@ -8,6 +8,7 @@ import path from "path";
 //
 // API requests still hit the production server at readytms.com.
 export default defineConfig({
+  base: "/m/",
   plugins: [react()],
   resolve: {
     alias: {

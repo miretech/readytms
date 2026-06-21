@@ -3612,8 +3612,8 @@ var init_automation = __esm({
 });
 
 // server/index.ts
-import express2 from "express";
 import cors from "cors";
+import express2 from "express";
 import path3 from "path";
 import fs2 from "fs";
 
@@ -3763,7 +3763,11 @@ var isAuthenticated = async (req, res, next) => {
         if (sess.passport && sess.passport.user) {
           req.user = sess.passport.user;
           return next();
+        } else {
+          console.warn("Token found but no passport.user in session:", sessionId);
         }
+      } else {
+        console.warn("Token not found or expired in sessions table:", sessionId);
       }
     } catch (err) {
       console.error("Token verification error:", err);
@@ -7727,6 +7731,7 @@ app.use(cors({
     "capacitor://localhost",
     "http://localhost",
     "http://localhost:5000",
+    "http://localhost:3001",
     "ionic://localhost"
   ],
   credentials: true,
@@ -7781,10 +7786,9 @@ app.use((req, res, next) => {
       await checkAndSendMissingPODReminders();
     }
   }, 60 * 60 * 1e3);
-  const server = await registerRoutes(app);
   const mobileDist = path3.resolve(import.meta.dirname, "..", "dist-mobile");
   if (fs2.existsSync(mobileDist)) {
-    app.use("/m", express2.static(mobileDist));
+    app.use("/m", express2.static(mobileDist, { index: "index.html" }));
     app.get(/^\/m(\/.*)?$/, (_req, res) => {
       res.sendFile(path3.join(mobileDist, "index.html"));
     });
@@ -7793,6 +7797,7 @@ app.use((req, res, next) => {
       res.status(503).send("Mobile preview not built. Run: npm run mobile:build");
     });
   }
+  const server = await registerRoutes(app);
   app.use((err, _req, res, _next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -7805,7 +7810,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
   const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen(port, "localhost", () => {
+  server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
 })();

@@ -1,5 +1,7 @@
 // Tiny API client. Points at the production server by default;
-// override at build time via VITE_API_BASE_URL.
+// For local development on mobile, set VITE_API_BASE_URL at build time:
+//   VITE_API_BASE_URL=http://192.168.x.x:3001 npm run mobile:build
+// Or set CAPACITOR_SERVER_URL in capacitor.config.ts to override
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "https://readytms.com";
 

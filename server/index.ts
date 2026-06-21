@@ -1,6 +1,5 @@
 import cors from "cors";
 import express, { type Request, Response, NextFunction } from "express";
-import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { registerRoutes } from "./routes";
@@ -12,12 +11,15 @@ import { startGmailPoller } from "./gmailPoller";
 import { startPaperworkPoller } from "./paperworkPoller";
 
 const app = express();
+
+// CORS configuration for web and mobile (Capacitor iOS/Android)
 app.use(cors({
   origin: [
     "https://readytms.com",
     "capacitor://localhost",
     "http://localhost",
     "http://localhost:5000",
+    "http://localhost:3001",
     "ionic://localhost",
   ],
   credentials: true,
@@ -25,21 +27,9 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
   exposedHeaders: ["Set-Cookie"],
 }));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
-// Allow Capacitor (iOS/Android) and browser origins
-app.use(cors({
-    origin: [
-          "https://readytms.com",
-          "capacitor://localhost",
-          "http://localhost",
-          "http://localhost:5000",
-          "ionic://localhost",
-        ],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-}));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -103,17 +93,16 @@ app.use((req, res, next) => {
       await checkAndSendMissingPODReminders();
     }
   }, 60 * 60 * 1000); // check every hour
-  
-  const server = await registerRoutes(app);
 
   // Mobile driver app preview — served at /m, /m/*
+  // Register BEFORE registerRoutes so it takes precedence over catch-all routes.
   // This is the exact same bundle that ships in the native iOS/Android app,
   // just running in a mobile browser. Lets the carrier preview the driver
   // experience before paying for app store accounts. Static assets live in
   // dist-mobile/, committed at build time.
   const mobileDist = path.resolve(import.meta.dirname, "..", "dist-mobile");
   if (fs.existsSync(mobileDist)) {
-    app.use("/m", express.static(mobileDist));
+    app.use("/m", express.static(mobileDist, { index: "index.html" }));
     app.get(/^\/m(\/.*)?$/, (_req, res) => {
       res.sendFile(path.join(mobileDist, "index.html"));
     });
@@ -122,6 +111,8 @@ app.use((req, res, next) => {
       res.status(503).send("Mobile preview not built. Run: npm run mobile:build");
     });
   }
+
+  const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -145,7 +136,7 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen(port, 'localhost', () => {
+  server.listen(port, '0.0.0.0', () => {
     log(`serving on port ${port}`);
   });
 })();
