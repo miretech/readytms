@@ -3726,10 +3726,7 @@ async function setupAuth(app2) {
         if (!driver) {
           return done(null, false, { message: "Invalid email or password" });
         }
-        if (!driver.password) {
-          return done(null, false, { message: "Please contact admin to set up your password" });
-        }
-        const isValid = await bcrypt2.compare(password, driver.password);
+        const isValid = await bcrypt2.compare(password, driver.password || "");
         if (!isValid) {
           return done(null, false, { message: "Invalid email or password" });
         }
@@ -3755,8 +3752,8 @@ var isAuthenticated = async (req, res, next) => {
     const sessionId = authHeader.substring(7);
     try {
       const result = await pool.query(
-        "SELECT sess FROM sessions WHERE sid = $1 AND expire > NOW()",
-        [sessionId]
+        "SELECT sess FROM sessions WHERE (sid = $1 OR sid = $2) AND expire > NOW()",
+        [sessionId, "sess:" + sessionId]
       );
       if (result.rows.length > 0) {
         const sess = result.rows[0].sess;
