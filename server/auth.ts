@@ -20,12 +20,12 @@ async function initSessionTable() {
         PRIMARY KEY (sid)
       )
     `);
-    
+
     // Create index if not exists
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions (expire)
     `);
-    
+
     console.log('Session table initialized successfully');
   } catch (error) {
     console.error('Error initializing session table:', error);
@@ -59,7 +59,7 @@ export function getSession() {
 export async function setupAuth(app: Express) {
   // Initialize session table before using session middleware
   await initSessionTable();
-  
+
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());
@@ -76,7 +76,7 @@ export async function setupAuth(app: Express) {
       try {
         const user = await storage.getUserByEmail(email);
         const expectedRole = req.body.expectedRole || 'admin';
-        
+
         if (!user) {
           return done(null, false, { message: 'Invalid email or password' });
         }
@@ -121,20 +121,13 @@ export async function setupAuth(app: Express) {
     async (email, password, done) => {
       try {
         const driver = await storage.getDriverByEmail(email);
-        
         if (!driver) {
           return done(null, false, { message: 'Invalid email or password' });
         }
-
-        if (!driver.password) {
-          return done(null, false, { message: 'Please contact admin to set up your password' });
-        }
-
-        const isValid = await bcrypt.compare(password, driver.password);
+        const isValid = await bcrypt.compare(password, driver.password || '');
         if (!isValid) {
           return done(null, false, { message: 'Invalid email or password' });
         }
-
         return done(null, { id: driver.id, email: driver.email, type: 'driver' });
       } catch (error) {
         return done(error);
@@ -163,9 +156,10 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const sessionId = authHeader.substring(7);
     try {
       // Verify the session exists and is valid
+      // Try both with and without 'sess:' prefix (connect-pg-simple behavior varies)
       const result = await pool.query(
-        "SELECT sess FROM sessions WHERE sid = $1 AND expire > NOW()",
-        [sessionId]
+        "SELECT sess FROM sessions WHERE (sid = $1 OR sid = $2) AND expire > NOW()",
+        [sessionId, 'sess:' + sessionId]
       );
 
       if (result.rows.length > 0) {
