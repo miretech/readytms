@@ -60,3 +60,38 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
+  android-build:
+    name: Build ReadyTMS Android App
+    instance_type: linux_x2
+    environment:
+      android_signing:
+        - readytms_keystore
+      vars:
+        JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+    triggering:
+      events:
+        - push
+      branch:
+        pattern: main
+        include: true
+        source: true
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build mobile web app
+        script: npm run mobile:build
+      - name: Add Android platform
+        script: |
+          rm -rf android
+          npx cap add android
+      - name: Build Android APK
+        script: |
+          cd android
+          ./gradlew assembleRelease
+    artifacts:
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
