@@ -1,5 +1,6 @@
 import cors from "cors";
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { registerRoutes } from "./routes";
@@ -11,6 +12,19 @@ import { startGmailPoller } from "./gmailPoller";
 import { startPaperworkPoller } from "./paperworkPoller";
 
 const app = express();
+app.use(cors({
+  origin: [
+    "https://readytms.com",
+    "capacitor://localhost",
+    "http://localhost",
+    "http://localhost:5000",
+    "ionic://localhost",
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["Set-Cookie"],
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 // Allow Capacitor (iOS/Android) and browser origins
@@ -131,7 +145,7 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen(port, () => {
+  server.listen(port, 'localhost', () => {
     log(`serving on port ${port}`);
   });
 })();

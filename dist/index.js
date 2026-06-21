@@ -46,6 +46,7 @@ __export(schema_exports, {
   insertGpsLocationSchema: () => insertGpsLocationSchema,
   insertInspectionSchema: () => insertInspectionSchema,
   insertInvoiceSchema: () => insertInvoiceSchema,
+  insertLoadDocumentSchema: () => insertLoadDocumentSchema,
   insertLoadSchema: () => insertLoadSchema,
   insertMaintenanceSchema: () => insertMaintenanceSchema,
   insertNotificationSchema: () => insertNotificationSchema,
@@ -63,6 +64,7 @@ __export(schema_exports, {
   insertViolationSchema: () => insertViolationSchema,
   inspections: () => inspections,
   invoices: () => invoices,
+  loadDocuments: () => loadDocuments,
   loads: () => loads,
   maintenance: () => maintenance,
   notifications: () => notifications,
@@ -86,7 +88,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, decimal, timestamp, integer, index, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, users, passwordResetTokens, trucks, insertTruckSchema, trailers, insertTrailerSchema, trailerTruckAssignments, insertTrailerTruckAssignmentSchema, trailerDotInspections, insertTrailerDotInspectionSchema, drivers, insertDriverSchema, customers, insertCustomerSchema, loads, insertLoadSchema, documents, insertDocumentSchema, expenses, insertExpenseSchema, invoices, insertInvoiceSchema, payments, insertPaymentSchema, inspections, insertInspectionSchema, accidents, insertAccidentSchema, violations, insertViolationSchema, settlements, insertSettlementSchema, settlementLineItems, insertSettlementLineItemSchema, recurringExpenses, insertRecurringExpenseSchema, maintenance, insertMaintenanceSchema, fuelCards, insertFuelCardSchema, fuelTransactions, insertFuelTransactionSchema, gpsLocations, insertGpsLocationSchema, automationSettings, insertAutomationSettingSchema, notifications, insertNotificationSchema, activityLog, insertActivityLogSchema, shortPays, insertShortPaySchema, chargeBacks, insertChargeBackSchema, tasks, insertTaskSchema, companySettings, insertCompanySettingsSchema, divisions, insertDivisionSchema, divisionInvitations, insertDivisionInvitationSchema, gmailTokens, feedbacks, insertFeedbackSchema, sentEmails, insertSentEmailSchema, companies, companyUsers;
+var sessions, users, passwordResetTokens, trucks, insertTruckSchema, trailers, insertTrailerSchema, trailerTruckAssignments, insertTrailerTruckAssignmentSchema, trailerDotInspections, insertTrailerDotInspectionSchema, drivers, insertDriverSchema, customers, insertCustomerSchema, loads, insertLoadSchema, documents, insertDocumentSchema, expenses, insertExpenseSchema, invoices, insertInvoiceSchema, payments, insertPaymentSchema, inspections, insertInspectionSchema, accidents, insertAccidentSchema, violations, insertViolationSchema, settlements, insertSettlementSchema, settlementLineItems, insertSettlementLineItemSchema, recurringExpenses, insertRecurringExpenseSchema, maintenance, insertMaintenanceSchema, fuelCards, insertFuelCardSchema, fuelTransactions, insertFuelTransactionSchema, gpsLocations, insertGpsLocationSchema, automationSettings, insertAutomationSettingSchema, notifications, insertNotificationSchema, activityLog, insertActivityLogSchema, shortPays, insertShortPaySchema, chargeBacks, insertChargeBackSchema, tasks, insertTaskSchema, companySettings, insertCompanySettingsSchema, divisions, insertDivisionSchema, divisionInvitations, insertDivisionInvitationSchema, gmailTokens, feedbacks, insertFeedbackSchema, sentEmails, insertSentEmailSchema, loadDocuments, insertLoadDocumentSchema, companies, companyUsers;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -317,7 +319,11 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow().notNull(),
       companyId: varchar("company_id"),
       source: text("source").default("manual"),
-      rateConUrl: text("rate_con_url")
+      rateConUrl: text("rate_con_url"),
+      paperworkStatus: text("paperwork_status").default("missing"),
+      paperworkReceivedAt: timestamp("paperwork_received_at"),
+      paperworkApprovedAt: timestamp("paperwork_approved_at"),
+      paperworkNotes: text("paperwork_notes")
     });
     insertLoadSchema = createInsertSchema(loads).omit({
       id: true,
@@ -1020,6 +1026,36 @@ var init_schema = __esm({
     insertSentEmailSchema = createInsertSchema(sentEmails).omit({
       id: true,
       sentAt: true
+    });
+    loadDocuments = pgTable("load_documents", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      loadId: varchar("load_id"),
+      emailMessageId: text("email_message_id"),
+      fileName: text("file_name").notNull(),
+      fileType: text("file_type").notNull(),
+      fileData: text("file_data"),
+      documentType: text("document_type").notNull().default("other"),
+      extractedLoadNumber: text("extracted_load_number"),
+      extractedDriverName: text("extracted_driver_name"),
+      extractedTruckNumber: text("extracted_truck_number"),
+      extractedPickupDate: text("extracted_pickup_date"),
+      extractedDeliveryDate: text("extracted_delivery_date"),
+      extractedPickupLocation: text("extracted_pickup_location"),
+      extractedDeliveryLocation: text("extracted_delivery_location"),
+      extractedShipper: text("extracted_shipper"),
+      extractedReceiver: text("extracted_receiver"),
+      isSigned: boolean("is_signed"),
+      pageCount: integer("page_count"),
+      confidenceScore: decimal("confidence_score", { precision: 4, scale: 3 }),
+      status: text("status").notNull().default("received"),
+      rejectionReason: text("rejection_reason"),
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      updatedAt: timestamp("updated_at").defaultNow().notNull()
+    });
+    insertLoadDocumentSchema = createInsertSchema(loadDocuments).omit({
+      id: true,
+      createdAt: true,
+      updatedAt: true
     });
     companies = pgTable("companies", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2377,6 +2413,38 @@ var init_storage = __esm({
       async deleteGmailTokens() {
         await db.delete(gmailTokens);
       }
+      async createLoadDocument(doc) {
+        const [created] = await db.insert(loadDocuments).values(doc).returning();
+        return created;
+      }
+      async getLoadDocuments(filters) {
+        const conditions = [];
+        if (filters?.loadId) conditions.push(eq(loadDocuments.loadId, filters.loadId));
+        if (filters?.status) conditions.push(eq(loadDocuments.status, filters.status));
+        const query = db.select().from(loadDocuments);
+        if (conditions.length > 0) {
+          return await query.where(and(...conditions)).orderBy(desc(loadDocuments.createdAt));
+        }
+        return await query.orderBy(desc(loadDocuments.createdAt));
+      }
+      async getLoadDocument(id) {
+        const [doc] = await db.select().from(loadDocuments).where(eq(loadDocuments.id, id));
+        return doc || void 0;
+      }
+      async getLoadDocumentByEmailAndFile(emailMessageId, fileName) {
+        const [doc] = await db.select().from(loadDocuments).where(
+          and(eq(loadDocuments.emailMessageId, emailMessageId), eq(loadDocuments.fileName, fileName))
+        );
+        return doc || void 0;
+      }
+      async updateLoadDocument(id, data) {
+        const [updated] = await db.update(loadDocuments).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(loadDocuments.id, id)).returning();
+        return updated || void 0;
+      }
+      async deleteLoadDocument(id) {
+        const result = await db.delete(loadDocuments).where(eq(loadDocuments.id, id));
+        return true;
+      }
     };
     storage = new DatabaseStorage();
   }
@@ -2385,10 +2453,40 @@ var init_storage = __esm({
 // server/aiExtraction.ts
 var aiExtraction_exports = {};
 __export(aiExtraction_exports, {
-  extractLoadFromDocument: () => extractLoadFromDocument
+  extractLoadFromDocument: () => extractLoadFromDocument,
+  extractPaperworkDocument: () => extractPaperworkDocument
 });
 import Anthropic from "@anthropic-ai/sdk";
 import { z as z2 } from "zod";
+async function extractPaperworkDocument(fileData, fileType) {
+  const base64Content = fileData.split(",")[1] || fileData;
+  let userContent;
+  if (fileType === "application/pdf") {
+    userContent = [
+      { type: "text", text: "Extract driver paperwork details from this transportation document:" },
+      { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64Content } }
+    ];
+  } else {
+    const mediaType = fileType;
+    userContent = [
+      { type: "text", text: "Extract driver paperwork details from this transportation document:" },
+      { type: "image", source: { type: "base64", media_type: mediaType, data: base64Content } }
+    ];
+  }
+  const response = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1024,
+    system: "You are an expert at reading transportation paperwork including PODs (Proof of Delivery), BOLs (Bill of Lading), and delivery receipts. Extract all relevant fields accurately. Return null for missing fields.",
+    messages: [{ role: "user", content: userContent }],
+    tools: [EXTRACT_PAPERWORK_TOOL],
+    tool_choice: { type: "tool", name: "extract_paperwork" }
+  });
+  const toolUseBlock = response.content.find(
+    (block) => block.type === "tool_use"
+  );
+  if (!toolUseBlock) throw new Error("No structured response from AI");
+  return extractedPaperworkSchema.parse(toolUseBlock.input);
+}
 async function extractLoadFromDocument(fileData, fileType) {
   try {
     const isImage = fileType.startsWith("image/");
@@ -2465,7 +2563,7 @@ ${textContent}`;
     throw new Error(message);
   }
 }
-var ANTHROPIC_KEY, anthropic, extractedLoadSchema, SYSTEM_PROMPT, EXTRACT_LOAD_TOOL;
+var ANTHROPIC_KEY, anthropic, extractedLoadSchema, SYSTEM_PROMPT, EXTRACT_LOAD_TOOL, extractedPaperworkSchema, EXTRACT_PAPERWORK_TOOL;
 var init_aiExtraction = __esm({
   "server/aiExtraction.ts"() {
     "use strict";
@@ -2584,6 +2682,151 @@ Guidelines:
         ]
       }
     };
+    extractedPaperworkSchema = z2.object({
+      documentType: z2.enum(["pod", "bol", "rate_confirmation", "lumper", "other"]),
+      extractedLoadNumber: z2.string().nullable(),
+      extractedDriverName: z2.string().nullable(),
+      extractedTruckNumber: z2.string().nullable(),
+      extractedPickupDate: z2.string().nullable(),
+      extractedDeliveryDate: z2.string().nullable(),
+      extractedPickupLocation: z2.string().nullable(),
+      extractedDeliveryLocation: z2.string().nullable(),
+      extractedShipper: z2.string().nullable(),
+      extractedReceiver: z2.string().nullable(),
+      isSigned: z2.boolean().nullable(),
+      pageCount: z2.number().nullable(),
+      confidenceScore: z2.number()
+    });
+    EXTRACT_PAPERWORK_TOOL = {
+      name: "extract_paperwork",
+      description: "Extract structured information from driver paperwork documents like POD, BOL, delivery receipts",
+      input_schema: {
+        type: "object",
+        properties: {
+          documentType: {
+            type: "string",
+            enum: ["pod", "bol", "rate_confirmation", "lumper", "other"],
+            description: "Type of document: pod=Proof of Delivery, bol=Bill of Lading, rate_confirmation, lumper receipt, or other"
+          },
+          extractedLoadNumber: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Load number, reference number, or shipment ID visible on the document"
+          },
+          extractedDriverName: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Driver name if visible"
+          },
+          extractedTruckNumber: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Truck number or unit number if visible"
+          },
+          extractedPickupDate: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Pickup date in YYYY-MM-DD format"
+          },
+          extractedDeliveryDate: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Delivery date in YYYY-MM-DD format"
+          },
+          extractedPickupLocation: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Pickup city and state"
+          },
+          extractedDeliveryLocation: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Delivery city and state"
+          },
+          extractedShipper: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Shipper company name"
+          },
+          extractedReceiver: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "Receiver/consignee company name"
+          },
+          isSigned: {
+            anyOf: [{ type: "boolean" }, { type: "null" }],
+            description: "Whether the document appears to have a signature"
+          },
+          pageCount: {
+            anyOf: [{ type: "number" }, { type: "null" }],
+            description: "Number of pages in the document if determinable"
+          },
+          confidenceScore: {
+            type: "number",
+            description: "Confidence score 0.0 to 1.0 that this is a valid transportation paperwork document"
+          }
+        },
+        required: [
+          "documentType",
+          "extractedLoadNumber",
+          "extractedDriverName",
+          "extractedTruckNumber",
+          "extractedPickupDate",
+          "extractedDeliveryDate",
+          "extractedPickupLocation",
+          "extractedDeliveryLocation",
+          "extractedShipper",
+          "extractedReceiver",
+          "isSigned",
+          "pageCount",
+          "confidenceScore"
+        ]
+      }
+    };
+  }
+});
+
+// server/s3.ts
+var s3_exports = {};
+__export(s3_exports, {
+  uploadBufferPaperworkToS3: () => uploadBufferPaperworkToS3,
+  uploadPaperworkToS3: () => uploadPaperworkToS3,
+  uploadPdfToS3: () => uploadPdfToS3
+});
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+async function uploadBufferToS3(buffer, key, mimeType) {
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType
+    })
+  );
+  return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+}
+async function uploadPdfToS3(base64Data, fileName, mimeType = "application/pdf") {
+  const base64 = base64Data.includes(",") ? base64Data.split(",")[1] : base64Data;
+  const buffer = Buffer.from(base64, "base64");
+  const key = `ratecons/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  return uploadBufferToS3(buffer, key, mimeType);
+}
+async function uploadPaperworkToS3(base64Data, fileName, mimeType) {
+  const base64 = base64Data.includes(",") ? base64Data.split(",")[1] : base64Data;
+  const buffer = Buffer.from(base64, "base64");
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const key = `paperwork/${Date.now()}-${safe}`;
+  return uploadBufferToS3(buffer, key, mimeType);
+}
+async function uploadBufferPaperworkToS3(buffer, fileName, mimeType) {
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const key = `paperwork/${Date.now()}-${safe}`;
+  return uploadBufferToS3(buffer, key, mimeType);
+}
+var s3Client, BUCKET, REGION;
+var init_s3 = __esm({
+  "server/s3.ts"() {
+    "use strict";
+    s3Client = new S3Client({
+      region: process.env.AWS_REGION || "us-east-1",
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ""
+      }
+    });
+    BUCKET = process.env.AWS_S3_BUCKET || "readytms-documents";
+    REGION = process.env.AWS_REGION || "us-east-1";
   }
 });
 
@@ -2683,10 +2926,18 @@ async function sendSMS(options) {
     console.error("[Notifications] RC_PHONE_NUMBER not configured");
     return false;
   }
+  const normalizePhone = (num) => {
+    const digits = num.replace(/\D/g, "");
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+    return `+${digits}`;
+  };
+  const fromNumber = normalizePhone(RC_PHONE_NUMBER);
+  const toNumber = normalizePhone(options.to);
   try {
     const response = await rcPlatform.post("/restapi/v1.0/account/~/extension/~/sms", {
-      from: { phoneNumber: RC_PHONE_NUMBER },
-      to: [{ phoneNumber: options.to }],
+      from: { phoneNumber: fromNumber },
+      to: [{ phoneNumber: toNumber }],
       text: options.message
     });
     const data = await response.json();
@@ -2968,6 +3219,7 @@ var init_notifications = __esm({
 var automation_exports = {};
 __export(automation_exports, {
   autoGenerateInvoice: () => autoGenerateInvoice,
+  checkAndSendMissingPODReminders: () => checkAndSendMissingPODReminders,
   checkExpiringDocuments: () => checkExpiringDocuments,
   initializeAutomationSettings: () => initializeAutomationSettings,
   notifyLoadStatusChange: () => notifyLoadStatusChange,
@@ -3067,6 +3319,12 @@ async function checkExpiringDocuments() {
             details: `CDL license expired for driver ${driver.name}`,
             status: "success"
           });
+          if (driver.phone) {
+            await sendSMS({
+              to: driver.phone,
+              message: `Ready TMS ALERT: Your CDL license has EXPIRED. Please renew immediately and contact dispatch. - Ready TMS`
+            });
+          }
         } else if (daysUntilExpiration > 0 && daysUntilExpiration <= warningDays) {
           await storage.createNotification({
             type: "warning",
@@ -3078,6 +3336,12 @@ async function checkExpiringDocuments() {
             recipientEmail: driver.email,
             isRead: "false"
           });
+          if (driver.phone) {
+            await sendSMS({
+              to: driver.phone,
+              message: `Ready TMS Reminder: Your CDL license expires in ${daysUntilExpiration} day${daysUntilExpiration === 1 ? "" : "s"}. Please renew soon and contact dispatch. - Ready TMS`
+            });
+          }
         }
       }
       if (driver.medicalCardExpiration) {
@@ -3100,6 +3364,12 @@ async function checkExpiringDocuments() {
             details: `Medical card expired for driver ${driver.name}`,
             status: "success"
           });
+          if (driver.phone) {
+            await sendSMS({
+              to: driver.phone,
+              message: `Ready TMS ALERT: Your medical card has EXPIRED. You cannot legally drive until it is renewed. Contact dispatch immediately. - Ready TMS`
+            });
+          }
         } else if (daysUntilExpiration > 0 && daysUntilExpiration <= warningDays) {
           await storage.createNotification({
             type: "warning",
@@ -3111,6 +3381,12 @@ async function checkExpiringDocuments() {
             recipientEmail: driver.email,
             isRead: "false"
           });
+          if (driver.phone) {
+            await sendSMS({
+              to: driver.phone,
+              message: `Ready TMS Reminder: Your medical card expires in ${daysUntilExpiration} day${daysUntilExpiration === 1 ? "" : "s"}. Please schedule your DOT physical soon. - Ready TMS`
+            });
+          }
         }
       }
     }
@@ -3270,6 +3546,33 @@ async function sendDailyTaskReminders() {
     console.error("[Automation] Error sending daily task reminders:", error);
   }
 }
+async function checkAndSendMissingPODReminders() {
+  try {
+    const loads2 = await storage.getAllLoads();
+    const drivers2 = await storage.getAllDrivers();
+    const missingPODLoads = loads2.filter((load) => {
+      const isMissingPOD = !load.podAttachment || load.podAttachment === "";
+      const isActiveOrDelivered = load.status === "in_transit" || load.status === "delivered";
+      const notCancelled = load.status !== "cancelled";
+      return isMissingPOD && isActiveOrDelivered && notCancelled;
+    });
+    let sent = 0;
+    for (const load of missingPODLoads) {
+      if (!load.assignedDriverId) continue;
+      const driver = drivers2.find((d) => d.id === load.assignedDriverId);
+      if (!driver || !driver.phone) continue;
+      const statusLabel = load.status === "delivered" ? "delivered" : "in transit";
+      await sendSMS({
+        to: driver.phone,
+        message: `Ready TMS: Load ${load.loadNumber} is ${statusLabel} but no POD has been submitted. Please upload your Proof of Delivery at readytms.com/driver-pod. - Ready TMS`
+      });
+      sent++;
+    }
+    console.log(`[Automation] Missing POD reminders sent: ${sent}`);
+  } catch (error) {
+    console.error("[Automation] Error sending missing POD reminders:", error);
+  }
+}
 async function initializeAutomationSettings() {
   try {
     const defaultSettings = [
@@ -3308,43 +3611,11 @@ var init_automation = __esm({
   }
 });
 
-// server/s3.ts
-var s3_exports = {};
-__export(s3_exports, {
-  uploadPdfToS3: () => uploadPdfToS3
-});
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-async function uploadPdfToS3(base64Data, fileName, mimeType = "application/pdf") {
-  const base64 = base64Data.includes(",") ? base64Data.split(",")[1] : base64Data;
-  const buffer = Buffer.from(base64, "base64");
-  const key = `ratecons/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: buffer,
-      ContentType: mimeType
-    })
-  );
-  return `https://${BUCKET}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
-}
-var s3Client, BUCKET;
-var init_s3 = __esm({
-  "server/s3.ts"() {
-    "use strict";
-    s3Client = new S3Client({
-      region: process.env.AWS_REGION || "us-east-1",
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ""
-      }
-    });
-    BUCKET = process.env.AWS_S3_BUCKET || "readytms-documents";
-  }
-});
-
 // server/index.ts
 import express2 from "express";
+import cors from "cors";
+import path3 from "path";
+import fs2 from "fs";
 
 // server/routes.ts
 init_storage();
@@ -3395,7 +3666,7 @@ function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
       sameSite: "lax",
       maxAge: sessionTtl
     }
@@ -3475,9 +3746,28 @@ async function setupAuth(app2) {
     done(null, user);
   });
 }
-var isAuthenticated = (req, res, next) => {
+var isAuthenticated = async (req, res, next) => {
   if (req.isAuthenticated()) {
     return next();
+  }
+  const authHeader = req.get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const sessionId = authHeader.substring(7);
+    try {
+      const result = await pool.query(
+        "SELECT sess FROM sessions WHERE sid = $1 AND expire > NOW()",
+        [sessionId]
+      );
+      if (result.rows.length > 0) {
+        const sess = result.rows[0].sess;
+        if (sess.passport && sess.passport.user) {
+          req.user = sess.passport.user;
+          return next();
+        }
+      }
+    } catch (err) {
+      console.error("Token verification error:", err);
+    }
   }
   res.status(401).json({ message: "Unauthorized" });
 };
@@ -3496,6 +3786,7 @@ var isDriver = (req, res, next) => {
 
 // server/routes.ts
 init_aiExtraction();
+init_s3();
 init_automation();
 init_notifications();
 import passport2 from "passport";
@@ -3714,7 +4005,255 @@ async function scanRateConEmails(companyId) {
   return results;
 }
 
+// server/email_processor.js
+init_db();
+import { Telegraf } from "telegraf";
+var TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+var TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+var bot = TELEGRAM_BOT_TOKEN ? new Telegraf(TELEGRAM_BOT_TOKEN) : null;
+function parseEmailContent(emailBody) {
+  const result = {
+    trucks: [],
+    trailers: [],
+    drivers: [],
+    rawActions: []
+  };
+  const simplePatterns = [
+    { pattern: /add\s+truck\s+(?:#)?(\d+)/gi, type: "add_truck" },
+    { pattern: /remove\s+truck\s+(?:#)?(\d+)/gi, type: "remove_truck" },
+    { pattern: /add\s+driver\s+([^\n]+)/gi, type: "add_driver" },
+    { pattern: /add\s+trailer\s+(?:#)?([A-Z0-9\-]+)/gi, type: "add_trailer" },
+    { pattern: /remove\s+trailer\s+(?:#)?([A-Z0-9\-]+)/gi, type: "remove_trailer" }
+  ];
+  for (const { pattern, type } of simplePatterns) {
+    let match;
+    while ((match = pattern.exec(emailBody)) !== null) {
+      const value = match[1].trim();
+      result.rawActions.push({ type, value });
+      if (type === "add_truck") {
+        result.trucks.push({ action: "add", truck_number: value, status: "active" });
+      } else if (type === "remove_truck") {
+        result.trucks.push({ action: "remove", truck_number: value });
+      } else if (type === "add_driver") {
+        result.drivers.push({ action: "add", name: value, status: "active" });
+      } else if (type === "add_trailer") {
+        result.trailers.push({ action: "add", trailer_number: value, status: "active" });
+      } else if (type === "remove_trailer") {
+        result.trailers.push({ action: "remove", trailer_number: value });
+      }
+    }
+  }
+  const csvLines = emailBody.split("\n").filter((line) => line.trim());
+  for (let i = 1; i < csvLines.length; i++) {
+    const parts = csvLines[i].split(",").map((p) => p.trim());
+    if (parts.length >= 2) {
+      const truckNum = parts[0].replace(/[^\d]/g, "");
+      const vin = parts[1];
+      if (truckNum && vin) {
+        result.trucks.push({
+          action: "add",
+          truck_number: truckNum,
+          vin,
+          status: parts[2]?.toLowerCase() || "active"
+        });
+      }
+    }
+  }
+  return result;
+}
+async function addTruck(truckNumber, vin = null, status = "active") {
+  try {
+    const result = await db.query(
+      `INSERT INTO trucks (truck_number, vin, status, created_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (truck_number) DO UPDATE SET status = $3
+       RETURNING *`,
+      [truckNumber, vin, status]
+    );
+    return { success: true, truck: result.rows[0] };
+  } catch (error) {
+    console.error(`Failed to add truck ${truckNumber}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+async function removeTruck(truckNumber) {
+  try {
+    const result = await db.query(
+      `UPDATE trucks SET status = 'removed', removed_at = NOW()
+       WHERE truck_number = $1
+       RETURNING *`,
+      [truckNumber]
+    );
+    return { success: true, truck: result.rows[0] };
+  } catch (error) {
+    console.error(`Failed to remove truck ${truckNumber}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+async function addDriver(name, licenseNumber = null, status = "active") {
+  try {
+    const result = await db.query(
+      `INSERT INTO drivers (name, license_number, status, hire_date)
+       VALUES ($1, $2, $3, CURRENT_DATE)
+       ON CONFLICT (name) DO UPDATE SET status = $3
+       RETURNING *`,
+      [name, licenseNumber, status]
+    );
+    return { success: true, driver: result.rows[0] };
+  } catch (error) {
+    console.error(`Failed to add driver ${name}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+async function addTrailer(trailerNumber, status = "active") {
+  try {
+    const result = await db.query(
+      `INSERT INTO trailers (trailer_number, status)
+       VALUES ($1, $2)
+       ON CONFLICT (trailer_number) DO UPDATE SET status = $2
+       RETURNING *`,
+      [trailerNumber, status]
+    );
+    return { success: true, trailer: result.rows[0] };
+  } catch (error) {
+    console.error(`Failed to add trailer ${trailerNumber}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+async function removeTrailer(trailerNumber) {
+  try {
+    const result = await db.query(
+      `UPDATE trailers SET status = 'removed'
+       WHERE trailer_number = $1
+       RETURNING *`,
+      [trailerNumber]
+    );
+    return { success: true, trailer: result.rows[0] };
+  } catch (error) {
+    console.error(`Failed to remove trailer ${trailerNumber}:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+async function notifyTelegram(title, message) {
+  if (!bot || !TELEGRAM_CHAT_ID) return;
+  try {
+    await bot.telegram.sendMessage(
+      TELEGRAM_CHAT_ID,
+      `${title}
+${message}`,
+      { parse_mode: "HTML" }
+    );
+  } catch (error) {
+    console.error("Failed to send Telegram notification:", error.message);
+  }
+}
+async function processEmail(emailData) {
+  const { subject, sender, body, date } = emailData;
+  const result = {
+    email: { subject, sender, date },
+    parsed: parseEmailContent(body),
+    changes: {
+      trucks_added: [],
+      trucks_removed: [],
+      drivers_added: [],
+      trailers_added: [],
+      trailers_removed: [],
+      errors: []
+    }
+  };
+  for (const truck of result.parsed.trucks) {
+    if (truck.action === "add") {
+      const res = await addTruck(truck.truck_number, truck.vin, truck.status);
+      if (res.success) {
+        result.changes.trucks_added.push(truck.truck_number);
+      } else {
+        result.changes.errors.push(`Truck ${truck.truck_number}: ${res.error}`);
+      }
+    } else if (truck.action === "remove") {
+      const res = await removeTruck(truck.truck_number);
+      if (res.success) {
+        result.changes.trucks_removed.push(truck.truck_number);
+      } else {
+        result.changes.errors.push(`Remove truck ${truck.truck_number}: ${res.error}`);
+      }
+    }
+  }
+  for (const driver of result.parsed.drivers) {
+    if (driver.action === "add") {
+      const res = await addDriver(driver.name, driver.license_number, driver.status);
+      if (res.success) {
+        result.changes.drivers_added.push(driver.name);
+      } else {
+        result.changes.errors.push(`Driver ${driver.name}: ${res.error}`);
+      }
+    }
+  }
+  for (const trailer of result.parsed.trailers) {
+    if (trailer.action === "add") {
+      const res = await addTrailer(trailer.trailer_number, trailer.status);
+      if (res.success) {
+        result.changes.trailers_added.push(trailer.trailer_number);
+      } else {
+        result.changes.errors.push(`Trailer ${trailer.trailer_number}: ${res.error}`);
+      }
+    } else if (trailer.action === "remove") {
+      const res = await removeTrailer(trailer.trailer_number);
+      if (res.success) {
+        result.changes.trailers_removed.push(trailer.trailer_number);
+      } else {
+        result.changes.errors.push(`Remove trailer ${trailer.trailer_number}: ${res.error}`);
+      }
+    }
+  }
+  if (result.changes.trucks_added.length > 0 || result.changes.trucks_removed.length > 0 || result.changes.drivers_added.length > 0 || result.changes.trailers_added.length > 0 || result.changes.trailers_removed.length > 0) {
+    let msg = `\u2705 <b>EQUIPMENT UPDATE FROM EMAIL</b>
+
+`;
+    msg += `<b>From:</b> ${sender}
+`;
+    msg += `<b>Subject:</b> ${subject}
+
+`;
+    if (result.changes.trucks_added.length > 0) {
+      msg += `\u2705 Trucks Added: ${result.changes.trucks_added.join(", ")}
+`;
+    }
+    if (result.changes.trucks_removed.length > 0) {
+      msg += `\u274C Trucks Removed: ${result.changes.trucks_removed.join(", ")}
+`;
+    }
+    if (result.changes.drivers_added.length > 0) {
+      msg += `\u2705 Drivers Added: ${result.changes.drivers_added.join(", ")}
+`;
+    }
+    if (result.changes.trailers_added.length > 0) {
+      msg += `\u2705 Trailers Added: ${result.changes.trailers_added.join(", ")}
+`;
+    }
+    if (result.changes.trailers_removed.length > 0) {
+      msg += `\u274C Trailers Removed: ${result.changes.trailers_removed.join(", ")}
+`;
+    }
+    await notifyTelegram("\u{1F4E7} EQUIPMENT AUTO-UPDATE", msg);
+  }
+  return result;
+}
+var emailProcessorRoute = async (req, res) => {
+  try {
+    const { subject, sender, body, date } = req.body;
+    if (!sender || !sender.includes("info@readycarrier.com")) {
+      return res.status(403).json({ error: "Only info@readycarrier.com emails are processed" });
+    }
+    const result = await processEmail({ subject, sender, body, date });
+    res.json(result);
+  } catch (error) {
+    console.error("Email processing error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // server/routes.ts
+init_db();
 import { z as z3 } from "zod";
 async function registerRoutes(app2) {
   await setupAuth(app2);
@@ -3796,7 +4335,11 @@ async function registerRoutes(app2) {
         if (err2) {
           return res.status(500).json({ message: "Login failed" });
         }
-        return res.json({ message: "Login successful", user: { id: user.id, email: user.email, type: user.type } });
+        return res.json({
+          message: "Login successful",
+          token: req.sessionID,
+          user: { id: user.id, email: user.email, type: user.type }
+        });
       });
     })(req, res, next);
   });
@@ -3917,6 +4460,17 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Error rejecting admin:", error);
       res.status(500).json({ message: "Failed to reject admin" });
+    }
+  });
+  app2.post("/api/admin/test-sms", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { to, message } = req.body;
+      if (!to || !message) return res.status(400).json({ message: "to and message are required" });
+      const { sendSMS: sendSMS2 } = await Promise.resolve().then(() => (init_notifications(), notifications_exports));
+      const success = await sendSMS2({ to, message });
+      res.json({ success, to, message });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
   });
   app2.get("/api/loads", async (req, res) => {
@@ -4244,6 +4798,120 @@ async function registerRoutes(app2) {
       return res.status(404).json({ error: "Truck not found" });
     }
     res.status(204).send();
+  });
+  app2.get("/api/insurance", async (req, res) => {
+    try {
+      const trucks2 = await pool.query(`
+        SELECT id, unit_number AS "unitNumber", 'truck' AS "unitType",
+               year, make, model, vin, physical_damage AS "physicalDamage",
+               specific_type AS "specificType", owner_operator AS "ownerOperator",
+               loss_payee_name AS "lossPayeeName", loss_payee_address AS "lossPayeeAddress",
+               loss_payee_city AS "lossPayeeCity", loss_payee_state AS "lossPayeeState",
+               loss_payee_zip AS "lossPayeeZip", status,
+               created_at AS "createdAt", updated_at AS "updatedAt"
+        FROM insurance_trucks ORDER BY unit_number
+      `);
+      const trailers2 = await pool.query(`
+        SELECT id, unit_number AS "unitNumber", 'trailer' AS "unitType",
+               year, make, model, vin, physical_damage AS "physicalDamage",
+               specific_type AS "specificType",
+               loss_payee_name AS "lossPayeeName", loss_payee_address AS "lossPayeeAddress",
+               loss_payee_city AS "lossPayeeCity", loss_payee_state AS "lossPayeeState",
+               loss_payee_zip AS "lossPayeeZip", status,
+               created_at AS "createdAt", updated_at AS "updatedAt"
+        FROM insurance_trailers ORDER BY unit_number
+      `);
+      res.json([...trucks2.rows, ...trailers2.rows]);
+    } catch (error) {
+      console.error("Failed to fetch insurance records:", error);
+      res.status(500).json({ error: "Failed to fetch insurance records" });
+    }
+  });
+  app2.get("/api/insurance/:id", async (req, res) => {
+    try {
+      const truck = await pool.query(
+        `SELECT id, unit_number AS "unitNumber", 'truck' AS "unitType",
+                year, make, model, vin, physical_damage AS "physicalDamage",
+                status, created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM insurance_trucks WHERE id = $1`,
+        [req.params.id]
+      );
+      if (truck.rows.length > 0) return res.json(truck.rows[0]);
+      const trailer = await pool.query(
+        `SELECT id, unit_number AS "unitNumber", 'trailer' AS "unitType",
+                year, make, model, vin, physical_damage AS "physicalDamage",
+                status, created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM insurance_trailers WHERE id = $1`,
+        [req.params.id]
+      );
+      if (trailer.rows.length > 0) return res.json(trailer.rows[0]);
+      res.status(404).json({ error: "Record not found" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch record" });
+    }
+  });
+  app2.post("/api/insurance", async (req, res) => {
+    try {
+      const { unitNumber, unitType, year, make, model, vin, physicalDamage, lossPayeeName, status } = req.body;
+      if (!unitNumber || !unitType) {
+        return res.status(400).json({ error: "Unit number and type are required" });
+      }
+      if (unitType === "truck") {
+        const result = await pool.query(
+          `INSERT INTO insurance_trucks (unit_number, year, make, model, vin, physical_damage, loss_payee_name, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+           ON CONFLICT (unit_number) DO UPDATE SET
+             year=EXCLUDED.year, make=EXCLUDED.make, model=EXCLUDED.model, vin=EXCLUDED.vin,
+             physical_damage=EXCLUDED.physical_damage, loss_payee_name=EXCLUDED.loss_payee_name,
+             status=EXCLUDED.status, updated_at=NOW()
+           RETURNING id, unit_number AS "unitNumber", 'truck' AS "unitType", year, make, model, vin,
+                     physical_damage AS "physicalDamage", status, created_at AS "createdAt"`,
+          [unitNumber, year || null, make || null, model || null, vin || null, physicalDamage || null, lossPayeeName || null, status || "active"]
+        );
+        return res.status(201).json(result.rows[0]);
+      } else {
+        const result = await pool.query(
+          `INSERT INTO insurance_trailers (unit_number, year, make, model, vin, physical_damage, loss_payee_name, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+           ON CONFLICT (unit_number) DO UPDATE SET
+             year=EXCLUDED.year, make=EXCLUDED.make, model=EXCLUDED.model, vin=EXCLUDED.vin,
+             physical_damage=EXCLUDED.physical_damage, loss_payee_name=EXCLUDED.loss_payee_name,
+             status=EXCLUDED.status, updated_at=NOW()
+           RETURNING id, unit_number AS "unitNumber", 'trailer' AS "unitType", year, make, model, vin,
+                     physical_damage AS "physicalDamage", status, created_at AS "createdAt"`,
+          [unitNumber, year || null, make || null, model || null, vin || null, physicalDamage || null, lossPayeeName || null, status || "active"]
+        );
+        return res.status(201).json(result.rows[0]);
+      }
+    } catch (error) {
+      console.error("Failed to create insurance record:", error);
+      res.status(500).json({ error: "Failed to create insurance record" });
+    }
+  });
+  app2.patch("/api/insurance/:id", async (req, res) => {
+    try {
+      const { unitNumber, year, make, model, vin, physicalDamage, lossPayeeName, status, unitType } = req.body;
+      const table = unitType === "trailer" ? "insurance_trailers" : "insurance_trucks";
+      await pool.query(
+        `UPDATE ${table} SET unit_number=$1, year=$2, make=$3, model=$4, vin=$5,
+         physical_damage=$6, loss_payee_name=$7, status=$8, updated_at=NOW() WHERE id=$9`,
+        [unitNumber, year, make, model, vin, physicalDamage || null, lossPayeeName || null, status, req.params.id]
+      );
+      res.json({ message: "Record updated" });
+    } catch (error) {
+      console.error("Failed to update insurance record:", error);
+      res.status(500).json({ error: "Failed to update record" });
+    }
+  });
+  app2.delete("/api/insurance/:id", async (req, res) => {
+    try {
+      await pool.query("DELETE FROM insurance_trucks WHERE id = $1", [req.params.id]);
+      await pool.query("DELETE FROM insurance_trailers WHERE id = $1", [req.params.id]);
+      res.json({ message: "Record deleted" });
+    } catch (error) {
+      console.error("Failed to delete insurance record:", error);
+      res.status(500).json({ error: "Failed to delete record" });
+    }
   });
   app2.get("/api/trailers", async (req, res) => {
     try {
@@ -5684,8 +6352,8 @@ async function registerRoutes(app2) {
       const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
       const uniqueFilename = `${timestamp2}-${sanitizedFilename}`;
       const filePath = `uploaded_files/${uniqueFilename}`;
-      const fs2 = await import("fs/promises");
-      await fs2.writeFile(filePath, buffer);
+      const fs3 = await import("fs/promises");
+      await fs3.writeFile(filePath, buffer);
       res.json({
         success: true,
         filename: uniqueFilename,
@@ -5701,14 +6369,14 @@ async function registerRoutes(app2) {
       const { filename } = req.params;
       const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
       const filePath = `uploaded_files/${sanitizedFilename}`;
-      const fs2 = await import("fs/promises");
-      const path3 = await import("path");
+      const fs3 = await import("fs/promises");
+      const path4 = await import("path");
       try {
-        await fs2.access(filePath);
+        await fs3.access(filePath);
       } catch {
         return res.status(404).json({ error: "File not found" });
       }
-      const ext = path3.extname(sanitizedFilename).toLowerCase();
+      const ext = path4.extname(sanitizedFilename).toLowerCase();
       const contentTypes = {
         ".pdf": "application/pdf",
         ".png": "image/png",
@@ -5720,7 +6388,7 @@ async function registerRoutes(app2) {
       const contentType = contentTypes[ext] || "application/octet-stream";
       res.setHeader("Content-Type", contentType);
       res.setHeader("Content-Disposition", `inline; filename="${sanitizedFilename}"`);
-      const fileBuffer = await fs2.readFile(filePath);
+      const fileBuffer = await fs3.readFile(filePath);
       res.send(fileBuffer);
     } catch (error) {
       console.error("File serve error:", error);
@@ -5732,9 +6400,9 @@ async function registerRoutes(app2) {
       const { filename } = req.params;
       const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
       const filePath = `uploaded_files/${sanitizedFilename}`;
-      const fs2 = await import("fs/promises");
+      const fs3 = await import("fs/promises");
       try {
-        await fs2.unlink(filePath);
+        await fs3.unlink(filePath);
         res.json({ success: true });
       } catch {
         return res.status(404).json({ error: "File not found" });
@@ -6310,6 +6978,166 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Failed to look up POD status" });
     }
   });
+  app2.get("/api/load-documents", isAuthenticated, async (req, res) => {
+    try {
+      const { loadId, status } = req.query;
+      const docs = await storage.getLoadDocuments({ loadId, status });
+      res.json(docs);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.get("/api/load-documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      const doc = await storage.getLoadDocument(req.params.id);
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      res.json(doc);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.post("/api/load-documents", isAuthenticated, async (req, res) => {
+    try {
+      const { loadId, fileData, fileName, fileType } = req.body;
+      if (!fileData || !fileName || !fileType) {
+        return res.status(400).json({ error: "fileData, fileName, and fileType are required" });
+      }
+      let extracted = {};
+      try {
+        extracted = await extractPaperworkDocument(fileData, fileType);
+      } catch (err) {
+        console.error("[Paperwork] AI extraction error:", err.message);
+        extracted = { documentType: "other", confidenceScore: 0 };
+      }
+      let storedFileData = fileData;
+      try {
+        storedFileData = await uploadPaperworkToS3(fileData, fileName, fileType);
+        console.log(`[Paperwork] Uploaded to S3: ${storedFileData}`);
+      } catch (err) {
+        console.error("[Paperwork] S3 upload failed, storing base64 fallback:", err.message);
+      }
+      let resolvedLoadId = loadId || null;
+      let confidence = extracted.confidenceScore || 0;
+      if (!resolvedLoadId && extracted.extractedLoadNumber) {
+        const byNumber = await storage.getLoadByNumber(extracted.extractedLoadNumber);
+        if (byNumber) {
+          resolvedLoadId = byNumber.id;
+          confidence = 0.9;
+        }
+      }
+      let docStatus = "received";
+      if (!resolvedLoadId) docStatus = "needs_review";
+      else if (!extracted.extractedLoadNumber) docStatus = "needs_review";
+      else if (extracted.isSigned === false) docStatus = "needs_review";
+      else if ((extracted.confidenceScore || 0) < 0.75) docStatus = "needs_review";
+      const doc = await storage.createLoadDocument({
+        loadId: resolvedLoadId,
+        fileName,
+        fileType,
+        fileData: storedFileData,
+        documentType: extracted.documentType || "other",
+        extractedLoadNumber: extracted.extractedLoadNumber || null,
+        extractedDriverName: extracted.extractedDriverName || null,
+        extractedTruckNumber: extracted.extractedTruckNumber || null,
+        extractedPickupDate: extracted.extractedPickupDate || null,
+        extractedDeliveryDate: extracted.extractedDeliveryDate || null,
+        extractedPickupLocation: extracted.extractedPickupLocation || null,
+        extractedDeliveryLocation: extracted.extractedDeliveryLocation || null,
+        extractedShipper: extracted.extractedShipper || null,
+        extractedReceiver: extracted.extractedReceiver || null,
+        isSigned: extracted.isSigned ?? null,
+        pageCount: extracted.pageCount ?? null,
+        confidenceScore: String(confidence),
+        status: docStatus
+      });
+      if (resolvedLoadId && docStatus === "received") {
+        await storage.updateLoad(resolvedLoadId, {
+          paperworkStatus: "received",
+          paperworkReceivedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        await storage.createActivityLog({
+          action: "paperwork_uploaded",
+          entityType: "load",
+          entityId: resolvedLoadId,
+          details: `Manual paperwork upload: ${fileName}`,
+          metadata: { documentId: doc.id }
+        });
+      } else if (docStatus === "needs_review" && resolvedLoadId) {
+        await storage.createActivityLog({
+          action: "paperwork_needs_review",
+          entityType: "load",
+          entityId: resolvedLoadId,
+          details: `Paperwork needs review after upload: ${fileName}`,
+          metadata: { documentId: doc.id }
+        });
+      }
+      res.status(201).json(doc);
+    } catch (err) {
+      console.error("[Paperwork] Upload error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.patch("/api/load-documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { status, rejectionReason, loadId } = req.body;
+      const doc = await storage.getLoadDocument(req.params.id);
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      const updateData = {};
+      if (status) updateData.status = status;
+      if (rejectionReason !== void 0) updateData.rejectionReason = rejectionReason;
+      if (loadId !== void 0) updateData.loadId = loadId;
+      const updated = await storage.updateLoadDocument(req.params.id, updateData);
+      const targetLoadId = loadId ?? doc.loadId;
+      if (targetLoadId) {
+        if (status === "approved") {
+          await storage.updateLoad(targetLoadId, {
+            paperworkStatus: "approved",
+            paperworkApprovedAt: (/* @__PURE__ */ new Date()).toISOString()
+          });
+          await storage.createActivityLog({
+            action: "paperwork_approved",
+            entityType: "load",
+            entityId: targetLoadId,
+            details: `Paperwork approved: ${doc.fileName}`,
+            metadata: { documentId: doc.id }
+          });
+        } else if (status === "rejected") {
+          await storage.updateLoad(targetLoadId, {
+            paperworkStatus: "rejected",
+            paperworkNotes: rejectionReason || null
+          });
+          await storage.createActivityLog({
+            action: "paperwork_rejected",
+            entityType: "load",
+            entityId: targetLoadId,
+            details: `Paperwork rejected: ${doc.fileName}. Reason: ${rejectionReason || "none"}`,
+            metadata: { documentId: doc.id }
+          });
+        } else if (status === "needs_review") {
+          await storage.updateLoad(targetLoadId, { paperworkStatus: "needs_review" });
+          await storage.createActivityLog({
+            action: "paperwork_needs_review",
+            entityType: "load",
+            entityId: targetLoadId,
+            details: `Paperwork flagged for review: ${doc.fileName}`,
+            metadata: { documentId: doc.id }
+          });
+        }
+      }
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.delete("/api/load-documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteLoadDocument(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.post("/api/email/process", emailProcessorRoute);
   const httpServer = createServer(app2);
   return httpServer;
 }
@@ -6427,6 +7255,8 @@ function serveStatic(app2) {
 
 // server/index.ts
 init_automation();
+init_notifications();
+init_storage();
 
 // server/gmailPoller.ts
 init_storage();
@@ -6629,13 +7459,286 @@ function startGmailPoller() {
   }, POLL_INTERVAL_MS);
 }
 
+// server/paperworkPoller.ts
+init_storage();
+init_aiExtraction();
+init_s3();
+import { google as google3 } from "googleapis";
+var REDIRECT_URI3 = process.env.GOOGLE_REDIRECT_URI || "https://readytms.com/api/gmail/oauth/callback";
+var PAPERWORK_KEYWORDS = ["pod", "bol", "paperwork", "delivery receipt", "signed", "proof of delivery", "bill of lading"];
+function buildOAuth2Client2() {
+  return new google3.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    REDIRECT_URI3
+  );
+}
+function decodeBase64Url2(data) {
+  const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
+  return Buffer.from(base64, "base64");
+}
+function isPaperworkEmail(subject, body) {
+  const text2 = (subject + " " + body).toLowerCase();
+  return PAPERWORK_KEYWORDS.some((kw) => text2.includes(kw));
+}
+async function matchLoadForDocument(extracted) {
+  const allLoads = await storage.getAllLoads();
+  if (extracted.extractedLoadNumber) {
+    const byNumber = allLoads.find(
+      (l) => l.loadNumber.toLowerCase().trim() === extracted.extractedLoadNumber.toLowerCase().trim()
+    );
+    if (byNumber) return { loadId: byNumber.id, confidence: 0.95 };
+  }
+  if (extracted.extractedTruckNumber && extracted.extractedDeliveryDate) {
+    const allTrucks = await storage.getAllTrucks();
+    const truck = allTrucks.find(
+      (t) => t.truckNumber?.toLowerCase() === extracted.extractedTruckNumber.toLowerCase()
+    );
+    if (truck) {
+      const delivDate = new Date(extracted.extractedDeliveryDate);
+      const byTruckDate = allLoads.find((l) => {
+        if (l.assignedTruckId !== truck.id) return false;
+        const diff = Math.abs(new Date(l.deliveryDate).getTime() - delivDate.getTime());
+        return diff < 864e5;
+      });
+      if (byTruckDate) return { loadId: byTruckDate.id, confidence: 0.8 };
+    }
+  }
+  if (extracted.extractedDriverName && extracted.extractedDeliveryLocation) {
+    const allDrivers = await storage.getAllDrivers();
+    const driver = allDrivers.find((d) => {
+      const fullName = `${d.firstName} ${d.lastName}`.toLowerCase();
+      return fullName.includes(extracted.extractedDriverName.toLowerCase()) || extracted.extractedDriverName.toLowerCase().includes(fullName);
+    });
+    if (driver) {
+      const byDriver = allLoads.find(
+        (l) => l.assignedDriverId === driver.id && l.deliveryLocation.toLowerCase().includes(
+          extracted.extractedDeliveryLocation.toLowerCase().split(",")[0]
+        )
+      );
+      if (byDriver) return { loadId: byDriver.id, confidence: 0.7 };
+    }
+  }
+  return { loadId: null, confidence: 0 };
+}
+function determineStatus(params) {
+  const { confidence, loadId, extracted, load } = params;
+  if (!loadId) return "needs_review";
+  if (!extracted.extractedLoadNumber) return "needs_review";
+  if (extracted.isSigned === false) return "needs_review";
+  if (confidence < 0.75) return "needs_review";
+  if (extracted.extractedDeliveryDate && load?.deliveryDate) {
+    const diff = Math.abs(
+      new Date(extracted.extractedDeliveryDate).getTime() - new Date(load.deliveryDate).getTime()
+    );
+    if (diff > 864e5 * 2) return "needs_review";
+  }
+  return "received";
+}
+async function processPaperworkMessage(gmail, messageId) {
+  const msgResp = await gmail.users.messages.get({
+    userId: "me",
+    id: messageId,
+    format: "full"
+  });
+  const msg = msgResp.data;
+  const payload = msg.payload;
+  if (!payload) return;
+  const subjectHeader = payload.headers?.find((h) => h.name?.toLowerCase() === "subject");
+  const subject = subjectHeader?.value || "";
+  const body = msg.snippet || "";
+  if (!isPaperworkEmail(subject, body)) {
+    console.log(`[PaperworkPoller] Skipping non-paperwork email: "${subject}"`);
+    return;
+  }
+  const attachments = [];
+  const findAttachments = (parts) => {
+    if (!parts) return;
+    for (const part of parts) {
+      const mime = part.mimeType || "";
+      const filename = part.filename || "";
+      if (part.body?.attachmentId && filename && (mime.includes("pdf") || mime.startsWith("image/") || filename.toLowerCase().endsWith(".pdf"))) {
+        attachments.push({
+          partId: part.partId || "",
+          filename,
+          attachmentId: part.body.attachmentId,
+          mimeType: mime || "application/pdf"
+        });
+      }
+      if (part.parts) findAttachments(part.parts);
+    }
+  };
+  findAttachments(payload.parts);
+  if (attachments.length === 0) {
+    console.log(`[PaperworkPoller] No PDF/image attachments in: "${subject}"`);
+    return;
+  }
+  console.log(`[PaperworkPoller] Processing paperwork email: "${subject}" \u2014 ${attachments.length} attachment(s)`);
+  for (const att of attachments) {
+    const existing = await storage.getLoadDocumentByEmailAndFile(messageId, att.filename);
+    if (existing) {
+      console.log(`[PaperworkPoller] Duplicate skipped: ${att.filename}`);
+      continue;
+    }
+    const attachResp = await gmail.users.messages.attachments.get({
+      userId: "me",
+      messageId,
+      id: att.attachmentId
+    });
+    const rawData = attachResp.data.data;
+    if (!rawData) continue;
+    const fileBuffer = decodeBase64Url2(rawData);
+    const tempBase64DataUrl = `data:${att.mimeType};base64,${fileBuffer.toString("base64")}`;
+    console.log(`[PaperworkPoller] Extracting data from ${att.filename} (${fileBuffer.length} bytes)`);
+    let extracted = {};
+    try {
+      extracted = await extractPaperworkDocument(tempBase64DataUrl, att.mimeType);
+    } catch (err) {
+      console.error(`[PaperworkPoller] AI extraction failed for ${att.filename}:`, err.message);
+      extracted = { confidenceScore: 0 };
+    }
+    let fileUrl;
+    try {
+      fileUrl = await uploadBufferPaperworkToS3(fileBuffer, att.filename, att.mimeType);
+      console.log(`[PaperworkPoller] Uploaded to S3: ${fileUrl}`);
+    } catch (err) {
+      console.error(`[PaperworkPoller] S3 upload failed for ${att.filename}:`, err.message);
+      fileUrl = tempBase64DataUrl;
+    }
+    const { loadId, confidence } = await matchLoadForDocument(extracted);
+    const load = loadId ? await storage.getLoad(loadId) : null;
+    const docStatus = determineStatus({ confidence, loadId, extracted, load });
+    const doc = await storage.createLoadDocument({
+      loadId: loadId ?? void 0,
+      emailMessageId: messageId,
+      fileName: att.filename,
+      fileType: att.mimeType,
+      fileData: fileUrl,
+      documentType: extracted.documentType || "other",
+      extractedLoadNumber: extracted.extractedLoadNumber || null,
+      extractedDriverName: extracted.extractedDriverName || null,
+      extractedTruckNumber: extracted.extractedTruckNumber || null,
+      extractedPickupDate: extracted.extractedPickupDate || null,
+      extractedDeliveryDate: extracted.extractedDeliveryDate || null,
+      extractedPickupLocation: extracted.extractedPickupLocation || null,
+      extractedDeliveryLocation: extracted.extractedDeliveryLocation || null,
+      extractedShipper: extracted.extractedShipper || null,
+      extractedReceiver: extracted.extractedReceiver || null,
+      isSigned: extracted.isSigned ?? null,
+      pageCount: extracted.pageCount ?? null,
+      confidenceScore: String(extracted.confidenceScore ?? confidence),
+      status: docStatus
+    });
+    if (loadId && docStatus === "received") {
+      await storage.updateLoad(loadId, {
+        paperworkStatus: "received",
+        paperworkReceivedAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      await storage.createActivityLog({
+        action: "paperwork_received",
+        entityType: "load",
+        entityId: loadId,
+        details: `Paperwork received via Gmail: ${att.filename}`,
+        metadata: { documentId: doc.id, emailSubject: subject, confidence }
+      });
+      console.log(`[PaperworkPoller] Matched to load ${load?.loadNumber} \u2014 status: received`);
+    } else if (docStatus === "needs_review") {
+      if (loadId) {
+        await storage.createActivityLog({
+          action: "paperwork_needs_review",
+          entityType: "load",
+          entityId: loadId,
+          details: `Paperwork needs review: ${att.filename} (confidence: ${confidence.toFixed(2)})`,
+          metadata: { documentId: doc.id, emailSubject: subject }
+        });
+      }
+      console.log(`[PaperworkPoller] Document needs review: ${att.filename}`);
+    }
+  }
+}
+async function pollGmailForPaperwork() {
+  const settings = await storage.getCompanySettings();
+  if (!settings?.gmailRefreshToken) return;
+  try {
+    const auth = buildOAuth2Client2();
+    auth.setCredentials({
+      refresh_token: settings.gmailRefreshToken,
+      access_token: settings.gmailAccessToken ?? void 0
+    });
+    const { credentials } = await auth.refreshAccessToken();
+    auth.setCredentials(credentials);
+    if (credentials.access_token) {
+      await storage.updateCompanySettings({
+        gmailAccessToken: credentials.access_token,
+        gmailTokenExpiry: credentials.expiry_date ? String(credentials.expiry_date) : void 0
+      });
+    }
+    const gmail = google3.gmail({ version: "v1", auth });
+    const subjectQuery = PAPERWORK_KEYWORDS.map((k) => `subject:${k}`).join(" OR ");
+    const query = `(${subjectQuery} OR has:attachment) is:unread newer_than:7d`;
+    const listResp = await gmail.users.messages.list({ userId: "me", q: query, maxResults: 30 });
+    const messages = listResp.data.messages || [];
+    if (messages.length === 0) {
+      console.log("[PaperworkPoller] No new paperwork emails");
+      return;
+    }
+    console.log(`[PaperworkPoller] Found ${messages.length} email(s) to check`);
+    for (const message of messages) {
+      if (!message.id) continue;
+      try {
+        await processPaperworkMessage(gmail, message.id);
+        await gmail.users.messages.modify({
+          userId: "me",
+          id: message.id,
+          requestBody: { removeLabelIds: ["UNREAD"] }
+        });
+      } catch (err) {
+        console.error(`[PaperworkPoller] Error processing message ${message.id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("[PaperworkPoller] Poll error:", err.message);
+    if (err.message?.includes("invalid_grant") || err.message?.includes("Token has been expired")) {
+      await storage.updateCompanySettings({
+        gmailAccessToken: void 0,
+        gmailRefreshToken: void 0,
+        gmailEmail: void 0,
+        gmailTokenExpiry: void 0
+      });
+    }
+  }
+}
+var POLL_INTERVAL_MS2 = 5 * 60 * 1e3;
+var pollerInterval2 = null;
+function startPaperworkPoller() {
+  if (pollerInterval2) return;
+  console.log("[PaperworkPoller] Starting (5-minute interval)");
+  pollGmailForPaperwork().catch((err) => console.error("[PaperworkPoller] Initial poll error:", err));
+  pollerInterval2 = setInterval(() => {
+    pollGmailForPaperwork().catch((err) => console.error("[PaperworkPoller] Poll error:", err));
+  }, POLL_INTERVAL_MS2);
+}
+
 // server/index.ts
 var app = express2();
+app.use(cors({
+  origin: [
+    "https://readytms.com",
+    "capacitor://localhost",
+    "http://localhost",
+    "http://localhost:5000",
+    "ionic://localhost"
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["Set-Cookie"]
+}));
 app.use(express2.json({ limit: "50mb" }));
 app.use(express2.urlencoded({ extended: false, limit: "50mb" }));
 app.use((req, res, next) => {
   const start = Date.now();
-  const path3 = req.path;
+  const path4 = req.path;
   let capturedJsonResponse = void 0;
   const originalResJson = res.json;
   res.json = function(bodyJson, ...args) {
@@ -6644,8 +7747,8 @@ app.use((req, res, next) => {
   };
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path3.startsWith("/api")) {
-      let logLine = `${req.method} ${path3} ${res.statusCode} in ${duration}ms`;
+    if (path4.startsWith("/api")) {
+      let logLine = `${req.method} ${path4} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -6660,17 +7763,36 @@ app.use((req, res, next) => {
 (async () => {
   await initializeAutomationSettings();
   startGmailPoller();
-  let lastReminderDate = "";
+  startPaperworkPoller();
+  let lastDailyCheckDate = "";
   setInterval(async () => {
     const now = /* @__PURE__ */ new Date();
     const dateStr = now.toISOString().split("T")[0];
     const hour = now.getHours();
-    if (hour >= 8 && lastReminderDate !== dateStr) {
-      lastReminderDate = dateStr;
+    if (hour >= 8 && lastDailyCheckDate !== dateStr) {
+      lastDailyCheckDate = dateStr;
       await sendDailyTaskReminders();
+      await checkExpiringDocuments();
+      await checkAndSendMaintenanceReminders(
+        () => storage.getAllMaintenance(),
+        () => storage.getAllTrucks(),
+        () => storage.getAllDrivers()
+      );
+      await checkAndSendMissingPODReminders();
     }
   }, 60 * 60 * 1e3);
   const server = await registerRoutes(app);
+  const mobileDist = path3.resolve(import.meta.dirname, "..", "dist-mobile");
+  if (fs2.existsSync(mobileDist)) {
+    app.use("/m", express2.static(mobileDist));
+    app.get(/^\/m(\/.*)?$/, (_req, res) => {
+      res.sendFile(path3.join(mobileDist, "index.html"));
+    });
+  } else {
+    app.get("/m", (_req, res) => {
+      res.status(503).send("Mobile preview not built. Run: npm run mobile:build");
+    });
+  }
   app.use((err, _req, res, _next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -6683,11 +7805,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
   const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true
-  }, () => {
+  server.listen(port, "localhost", () => {
     log(`serving on port ${port}`);
   });
 })();

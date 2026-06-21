@@ -134,7 +134,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (err) {
           return res.status(500).json({ message: "Login failed" });
         }
-        return res.json({ message: "Login successful", user: { id: user.id, email: user.email, type: user.type } });
+        // Return session ID as token for mobile app (iOS WebView cookie issues)
+        return res.json({
+          message: "Login successful",
+          token: req.sessionID,
+          user: { id: user.id, email: user.email, type: user.type }
+        });
       });
     })(req, res, next);
   });

@@ -51,15 +51,15 @@ async function request<T>(
 // --- Auth ----------------------------------------------------------------
 
 export async function login(email: string, password: string) {
-  const result = await request<{ user: { id: string; email: string; type: string } }>(
+  const result = await request<{ token: string; user: { id: string; email: string; type: string } }>(
     "/api/driver/login",
     {
       method: "POST",
       body: JSON.stringify({ email, password }),
     },
   );
-  // Session cookie set by the server; store driver ID for routing.
-  setSession({ token: "", driverId: result.user.id });
+  // Store the token returned by the server for iOS WebView compatibility
+  setSession({ token: result.token, driverId: result.user.id });
   return result.user;
 }
 

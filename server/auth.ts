@@ -5,7 +5,7 @@ import type { Express, RequestHandler } from "express";
 import bcrypt from "bcrypt";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 
 // Initialize session table
@@ -49,7 +49,7 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
       sameSite: "lax",
       maxAge: sessionTtl,
     },
@@ -151,10 +151,36 @@ export async function setupAuth(app: Express) {
   });
 }
 
-export const isAuthenticated: RequestHandler = (req, res, next) => {
+export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // Check passport session first
   if (req.isAuthenticated()) {
     return next();
   }
+
+  // Check for token in Authorization header (for mobile app)
+  const authHeader = req.get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const sessionId = authHeader.substring(7);
+    try {
+      // Verify the session exists and is valid
+      const result = await pool.query(
+        "SELECT sess FROM sessions WHERE sid = $1 AND expire > NOW()",
+        [sessionId]
+      );
+
+      if (result.rows.length > 0) {
+        const sess = result.rows[0].sess;
+        if (sess.passport && sess.passport.user) {
+          // Attach user to request
+          (req as any).user = sess.passport.user;
+          return next();
+        }
+      }
+    } catch (err) {
+      console.error("Token verification error:", err);
+    }
+  }
+
   res.status(401).json({ message: "Unauthorized" });
 };
 
