@@ -8,7 +8,7 @@ import path from "path";
 //
 // API requests still hit the production server at readytms.com.
 export default defineConfig({
-  base: "/m/",
+  base: "/",
   plugins: [react()],
   resolve: {
     alias: {
@@ -31,6 +31,8 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist-mobile"),
     emptyOutDir: true,
     target: "es2020",
-    sourcemap: false,
+    rollupOptions: {
+      input: path.resolve(import.meta.dirname, "mobile", "index.html"),
+    },
   },
 });
