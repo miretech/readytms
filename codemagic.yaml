@@ -72,9 +72,9 @@ workflows:
       events:
         - push
       branch_patterns:
-        pattern: main
-        include: true
-        source: true
+        - pattern: main
+          include: true
+          source: true
     scripts:
       - name: Install dependencies
         script: npm install
