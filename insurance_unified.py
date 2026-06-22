@@ -290,91 +290,68 @@ class UnifiedEmailMonitor:
         return commands
 
     def add_trailer(self, unit_number, vin=None, year=None, make=None, model=None, status='active'):
-        """Add trailer to insurance_trailers"""
-        try:
-            cursor = self.db.cursor()
-            cursor.execute(
-                """INSERT INTO insurance_trailers
-                     (unit_number, vin, year, make, model, status, created_at, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
-                   ON CONFLICT (unit_number) DO UPDATE
-                     SET status = EXCLUDED.status,
-                         vin = COALESCE(EXCLUDED.vin, insurance_trailers.vin),
-                         year = COALESCE(EXCLUDED.year, insurance_trailers.year),
-                         make = COALESCE(EXCLUDED.make, insurance_trailers.make),
-                         model = COALESCE(EXCLUDED.model, insurance_trailers.model),
-                         updated_at = NOW()""",
-                (unit_number, vin, year, make, model, status)
-            )
-            self.db.commit()
-            cursor.close()
-            logger.info(f"✅ Added trailer: {unit_number}")
-            return True
-        except Exception as e:
-            logger.error(f"❌ Failed to add trailer {unit_number}: {e}")
-            self.db.rollback()
-            return False
+        """Add trailer into insurance_records (unit_type='trailer')"""
+        return self._upsert_record('trailer', unit_number, vin, year, make, model, status)
 
     def add_truck(self, unit_number, vin=None, year=None, make=None, model=None, status='active'):
-        """Add truck to insurance_trucks"""
+        """Add truck into insurance_records (unit_type='truck')"""
+        return self._upsert_record('truck', unit_number, vin, year, make, model, status)
+
+    def _upsert_record(self, unit_type, unit_number, vin, year, make, model, status):
+        """Insert-or-update a row in insurance_records keyed on (unit_number, unit_type)."""
         try:
             cursor = self.db.cursor()
+            # Try UPDATE first. If no row affected, INSERT.
             cursor.execute(
-                """INSERT INTO insurance_trucks
-                     (unit_number, vin, year, make, model, status, created_at, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
-                   ON CONFLICT (unit_number) DO UPDATE
-                     SET status = EXCLUDED.status,
-                         vin = COALESCE(EXCLUDED.vin, insurance_trucks.vin),
-                         year = COALESCE(EXCLUDED.year, insurance_trucks.year),
-                         make = COALESCE(EXCLUDED.make, insurance_trucks.make),
-                         model = COALESCE(EXCLUDED.model, insurance_trucks.model),
-                         updated_at = NOW()""",
-                (unit_number, vin, year, make, model, status)
+                """UPDATE insurance_records
+                     SET status = %s,
+                         vin = COALESCE(%s, vin),
+                         year = COALESCE(%s, year),
+                         make = COALESCE(%s, make),
+                         model = COALESCE(%s, model),
+                         updated_at = NOW()
+                   WHERE unit_number = %s AND unit_type = %s""",
+                (status, vin, year, make, model, unit_number, unit_type)
             )
-            self.db.commit()
+            if cursor.rowcount == 0:
+                cursor.execute(
+                    """INSERT INTO insurance_records
+                         (unit_number, unit_type, vin, year, make, model, status, created_at, updated_at)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())""",
+                    (unit_number, unit_type, vin, year, make, model, status)
+                )
             cursor.close()
-            logger.info(f"✅ Added truck: {unit_number}")
+            logger.info(f"✅ Added {unit_type}: {unit_number}")
             return True
         except Exception as e:
-            logger.error(f"❌ Failed to add truck {unit_number}: {e}")
-            self.db.rollback()
+            logger.error(f"❌ Failed to add {unit_type} {unit_number}: {e}")
+            try: self.db.rollback()
+            except Exception: pass
             return False
 
     def remove_truck(self, unit_number):
-        """Remove truck from insurance_trucks"""
-        try:
-            cursor = self.db.cursor()
-            cursor.execute(
-                """UPDATE insurance_trucks SET status = 'removed', updated_at = NOW()
-                   WHERE unit_number = %s""",
-                (unit_number,)
-            )
-            self.db.commit()
-            cursor.close()
-            logger.info(f"❌ Removed truck: {unit_number}")
-            return True
-        except Exception as e:
-            logger.error(f"❌ Failed to remove truck {unit_number}: {e}")
-            self.db.rollback()
-            return False
+        """Mark truck row removed in insurance_records"""
+        return self._mark_removed('truck', unit_number)
 
     def remove_trailer(self, unit_number):
-        """Remove trailer from insurance_trailers"""
+        """Mark trailer row removed in insurance_records"""
+        return self._mark_removed('trailer', unit_number)
+
+    def _mark_removed(self, unit_type, unit_number):
         try:
             cursor = self.db.cursor()
             cursor.execute(
-                """UPDATE insurance_trailers SET status = 'removed', updated_at = NOW()
-                   WHERE unit_number = %s""",
-                (unit_number,)
+                """UPDATE insurance_records SET status = 'removed', updated_at = NOW()
+                   WHERE unit_number = %s AND unit_type = %s""",
+                (unit_number, unit_type)
             )
-            self.db.commit()
             cursor.close()
-            logger.info(f"❌ Removed trailer: {unit_number}")
+            logger.info(f"❌ Removed {unit_type}: {unit_number}")
             return True
         except Exception as e:
-            logger.error(f"❌ Failed to remove trailer {unit_number}: {e}")
-            self.db.rollback()
+            logger.error(f"❌ Failed to remove {unit_type} {unit_number}: {e}")
+            try: self.db.rollback()
+            except Exception: pass
             return False
 
     def _status_line(self):
@@ -394,10 +371,16 @@ class UnifiedEmailMonitor:
             pass
         try:
             cursor = self.db.cursor(cursor_factory=RealDictCursor)
-            cursor.execute("SELECT unit_number FROM insurance_trucks WHERE status = 'active'")
+            cursor.execute(
+                "SELECT unit_number FROM insurance_records "
+                "WHERE status = 'active' AND unit_type = 'truck'"
+            )
             trucks = [row['unit_number'] for row in cursor.fetchall()]
 
-            cursor.execute("SELECT unit_number FROM insurance_trailers WHERE status = 'active'")
+            cursor.execute(
+                "SELECT unit_number FROM insurance_records "
+                "WHERE status = 'active' AND unit_type = 'trailer'"
+            )
             trailers = [row['unit_number'] for row in cursor.fetchall()]
 
             cursor.close()
