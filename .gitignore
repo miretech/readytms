@@ -65,3 +65,6 @@ temp/
 
 # Email attachments (if downloaded)
 attachments/
+
+# Node (not used on this branch — gitignore in case of cross-branch leak)
+node_modules/
