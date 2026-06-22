@@ -109,6 +109,12 @@ class UnifiedEmailMonitor:
             conn = psycopg2.connect(
                 self.config.get('readytms', {}).get('database_url')
             )
+            # autocommit=True so each statement is its own transaction.
+            # Without this, ANY query error leaves the session in "transaction
+            # aborted" state and every subsequent query fails until rollback().
+            # This is what was causing the bogus "Active Trucks: 0" at the
+            # bottom of every run.
+            conn.autocommit = True
             logger.info("✅ Connected to ReadyTMS database")
             return conn
         except Exception as e:
@@ -379,6 +385,13 @@ class UnifiedEmailMonitor:
 
     def get_current_status(self):
         """Get current insurance status"""
+        # Defensive: if a prior query left the connection in an aborted
+        # transaction state, clear it before we try our SELECTs. With
+        # autocommit=True (set in _connect_db) this is normally a no-op.
+        try:
+            self.db.rollback()
+        except Exception:
+            pass
         try:
             cursor = self.db.cursor(cursor_factory=RealDictCursor)
             cursor.execute("SELECT unit_number FROM insurance_trucks WHERE status = 'active'")
@@ -391,6 +404,10 @@ class UnifiedEmailMonitor:
             return {'trucks': trucks, 'trailers': trailers}
         except Exception as e:
             logger.error(f"❌ Failed to get status: {e}")
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return {'trucks': [], 'trailers': []}
 
     def send_telegram(self, title, message):
