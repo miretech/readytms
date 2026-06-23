@@ -394,29 +394,46 @@ class UnifiedEmailMonitor:
             return {'trucks': [], 'trailers': []}
 
     def send_telegram(self, title, message):
-        """Send Telegram alert"""
+        """Send Telegram alert to ALL configured chats (primary, dispatch,
+        operations, and any other *_chat_id key in config.telegram)."""
         try:
-            bot_token = self.config.get('telegram', {}).get('bot_token')
-            chat_id = self.config.get('telegram', {}).get('primary_chat_id')
+            tg = self.config.get('telegram', {}) or {}
+            bot_token = tg.get('bot_token')
+            if not bot_token:
+                logger.warning("⚠️ Telegram bot_token not configured")
+                return False
 
-            if not bot_token or not chat_id:
-                logger.warning("⚠️ Telegram not configured")
+            # Collect every value whose key ends in _chat_id (or is plain chat_id).
+            chat_ids = []
+            seen = set()
+            for k, v in tg.items():
+                if (k == 'chat_id' or k.endswith('_chat_id')) and v:
+                    if v not in seen:
+                        chat_ids.append((k, v))
+                        seen.add(v)
+            if not chat_ids:
+                logger.warning("⚠️ No telegram chat_id values configured")
                 return False
 
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = {
-                'chat_id': chat_id,
-                'text': f"{title}\n{message}",
-                'parse_mode': 'HTML'
-            }
-
-            response = requests.post(url, json=payload, timeout=10)
-            if response.status_code == 200:
-                logger.info("✅ Telegram alert sent")
-                return True
-            else:
-                logger.error(f"❌ Telegram error: {response.text}")
-                return False
+            all_ok = True
+            for label, cid in chat_ids:
+                payload = {
+                    'chat_id': cid,
+                    'text': f"{title}\n{message}",
+                    'parse_mode': 'HTML',
+                }
+                try:
+                    response = requests.post(url, json=payload, timeout=10)
+                    if response.status_code == 200:
+                        logger.info(f"✅ Telegram alert sent → {label}")
+                    else:
+                        logger.error(f"❌ Telegram {label} error: {response.text}")
+                        all_ok = False
+                except Exception as e:
+                    logger.error(f"❌ Telegram {label} send failed: {e}")
+                    all_ok = False
+            return all_ok
         except Exception as e:
             logger.error(f"❌ Failed to send Telegram: {e}")
             return False
