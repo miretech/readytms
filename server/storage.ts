@@ -133,6 +133,7 @@ export interface IStorage {
   getAllLoads(companyId?: string): Promise<Load[]>;
   getLoad(id: string): Promise<Load | undefined>;
   getLoadByNumber(loadNumber: string): Promise<Load | undefined>;
+  getLoadByAttachmentHash(attachment: string): Promise<Load | undefined>;
   createLoad(load: InsertLoad, companyId?: string): Promise<Load>;
   updateLoad(id: string, load: Partial<InsertLoad>): Promise<Load | undefined>;
   deleteLoad(id: string): Promise<boolean>;
@@ -648,6 +649,20 @@ export class DatabaseStorage implements IStorage {
     return load || undefined;
   }
 
+  // Dedup by attachment content: the AI parses the same rate con's load number
+  // inconsistently (e.g. "2623793" vs "MCL PO # 2623793"), so an exact load-number
+  // check misses re-imports. The PDF bytes are identical, so compare md5 of the
+  // stored attachment server-side (avoids shipping the blob to the app).
+  async getLoadByAttachmentHash(attachment: string): Promise<Load | undefined> {
+    if (!attachment) return undefined;
+    const [load] = await db
+      .select()
+      .from(loads)
+      .where(sql`md5(${loads.invoiceAttachment}) = md5(${attachment})`)
+      .limit(1);
+    return load || undefined;
+  }
+
   async createLoad(insertLoad: InsertLoad, companyId?: string): Promise<Load> {
     const [load] = await db
       .insert(loads)
@@ -677,6 +692,17 @@ export class DatabaseStorage implements IStorage {
     if (existingLoad) {
       if (values.podAttachments === undefined) {
         values.podAttachments = existingLoad.podAttachments;
+      }
+      // Don't let a blank/empty submission wipe an existing rate-con PDF.
+      // The list view returns invoiceAttachment as null, so a form that round-trips
+      // that value could otherwise overwrite the saved attachment with null/"".
+      if (
+        (values.invoiceAttachment === undefined ||
+          values.invoiceAttachment === null ||
+          values.invoiceAttachment === "") &&
+        existingLoad.invoiceAttachment
+      ) {
+        values.invoiceAttachment = existingLoad.invoiceAttachment;
       }
     }
     
@@ -1501,14 +1527,27 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(settlements).where(eq(settlements.driverId, driverId));
   }
 
+  // All optional timestamp fields on settlements that arrive as date strings
+  // and must be converted to Date objects before drizzle can store them.
+  private static SETTLEMENT_DATE_FIELDS = [
+    "advanceDate", "paidDate",
+    "fuelFlyingJStartDate", "fuelFlyingJEndDate",
+    "fuelFleetOneStartDate", "fuelFleetOneEndDate",
+    "tollsStartDate", "tollsEndDate",
+    "insuranceStartDate", "insuranceEndDate",
+    "trailerStartDate", "trailerEndDate",
+  ] as const;
+
   async createSettlement(insertSettlement: InsertSettlement): Promise<Settlement> {
     const values: any = {
       ...insertSettlement,
       periodStart: new Date(insertSettlement.periodStart),
       periodEnd: new Date(insertSettlement.periodEnd),
-      paidDate: insertSettlement.paidDate ? new Date(insertSettlement.paidDate) : undefined,
-      advanceDate: insertSettlement.advanceDate ? new Date(insertSettlement.advanceDate) : undefined,
     };
+    for (const f of DatabaseStorage.SETTLEMENT_DATE_FIELDS) {
+      const v = (insertSettlement as any)[f];
+      values[f] = v ? new Date(v) : undefined;
+    }
     const [settlement] = await db
       .insert(settlements)
       .values(values)
@@ -1524,11 +1563,10 @@ export class DatabaseStorage implements IStorage {
     if (updateData.periodEnd) {
       values.periodEnd = new Date(updateData.periodEnd);
     }
-    if (updateData.paidDate) {
-      values.paidDate = new Date(updateData.paidDate);
-    }
-    if (updateData.advanceDate) {
-      values.advanceDate = new Date(updateData.advanceDate);
+    for (const f of DatabaseStorage.SETTLEMENT_DATE_FIELDS) {
+      if ((updateData as any)[f]) {
+        values[f] = new Date((updateData as any)[f]);
+      }
     }
     const [settlement] = await db
       .update(settlements)

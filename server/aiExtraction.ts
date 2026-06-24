@@ -14,6 +14,18 @@ const anthropic = new Anthropic({
 });
 
 const extractedLoadSchema = z.object({
+  documentType: z.enum([
+    "rate_confirmation",
+    "load_tender",
+    "bol",
+    "pod",
+    "repair_invoice",
+    "fuel_receipt",
+    "factoring_statement",
+    "carrier_invoice",
+    "other",
+  ]),
+  isRateConfirmation: z.boolean(),
   loadNumber: z.string().nullable(),
   pickupLocation: z.string(),
   pickupDate: z.string(),
@@ -31,7 +43,12 @@ const extractedLoadSchema = z.object({
 
 export type ExtractedLoad = z.infer<typeof extractedLoadSchema>;
 
-const SYSTEM_PROMPT = `You are an expert at extracting load information from transportation documents like rate confirmations, BOLs (Bill of Lading), and load tenders. Extract all relevant load details from the provided document.
+const SYSTEM_PROMPT = `You are an expert at reading transportation documents. First CLASSIFY the document, then extract load details.
+
+Classification (set documentType and isRateConfirmation):
+- Set isRateConfirmation=true ONLY for a rate confirmation or load tender: a document from a broker or shipper hiring THIS carrier to haul a specific load, with a pickup, a delivery, and an agreed linehaul rate the carrier will be PAID to transport freight.
+- Set isRateConfirmation=false for every other document, even if it contains addresses or dollar amounts. This includes: repair/maintenance invoices, fuel receipts, factoring statements, the carrier's own outbound invoices, BOLs, PODs, lumper receipts, insurance or permit documents, and anything else. A repair shop's address is NOT a pickup location; a parts total is NOT a freight rate.
+- Always set documentType to the closest match from the allowed list.
 
 Guidelines:
 - Extract pickup and delivery locations (city, state)
@@ -53,6 +70,19 @@ const EXTRACT_LOAD_TOOL: Anthropic.Tool = {
   input_schema: {
     type: "object",
     properties: {
+      documentType: {
+        type: "string",
+        enum: [
+          "rate_confirmation", "load_tender", "bol", "pod", "repair_invoice",
+          "fuel_receipt", "factoring_statement", "carrier_invoice", "other",
+        ],
+        description: "The kind of document this is",
+      },
+      isRateConfirmation: {
+        type: "boolean",
+        description:
+          "True ONLY if this is a rate confirmation or load tender hiring the carrier to haul a specific load. False for repair invoices, fuel receipts, factoring statements, carrier invoices, BOLs, PODs, etc.",
+      },
       loadNumber: {
         anyOf: [{ type: "string" }, { type: "null" }],
         description: "Load number or reference number if present",
@@ -107,6 +137,7 @@ const EXTRACT_LOAD_TOOL: Anthropic.Tool = {
       },
     },
     required: [
+      "documentType", "isRateConfirmation",
       "loadNumber", "pickupLocation", "pickupDate", "deliveryLocation",
       "deliveryDate", "rate", "weight", "commodity", "notes",
       "brokerName", "brokerAddress", "brokerPhone", "brokerEmail",

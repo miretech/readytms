@@ -101,6 +101,11 @@ async function processMessage(
     const dataUrl = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
     const extracted = await extractLoadFromDocument(dataUrl, "application/pdf");
 
+    if (!extracted.isRateConfirmation) {
+      console.log(`[GmailPoller] Skipping ${extracted.documentType} (not a rate con): "${subject}"`);
+      return { success: false, error: `Not a rate confirmation (documentType=${extracted.documentType})` };
+    }
+
     if (!extracted.pickupLocation || !extracted.deliveryLocation) {
       console.log(`[GmailPoller] Not a rate con (no pickup/delivery): "${subject}"`);
       return { success: false, error: "Not a rate confirmation — no pickup/delivery data" };
@@ -111,6 +116,17 @@ async function processMessage(
     if (existing) {
       console.log(`[GmailPoller] Load ${loadNumber} already exists, skipping`);
       return { success: false, error: `Load ${loadNumber} already exists` };
+    }
+
+    // The AI parses the same rate con's load number inconsistently across runs
+    // (e.g. "2623793" vs "MCL PO # 2623793"), so the exact-number check above can
+    // miss a re-import. Fall back to matching the identical attachment content.
+    const existingByAttachment = await storage.getLoadByAttachmentHash(dataUrl);
+    if (existingByAttachment) {
+      console.log(
+        `[GmailPoller] Same rate con already imported as load ${existingByAttachment.loadNumber}, skipping`
+      );
+      return { success: false, error: `Duplicate rate con of load ${existingByAttachment.loadNumber}` };
     }
 
     const load = await storage.createLoad({

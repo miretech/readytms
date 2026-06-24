@@ -208,6 +208,11 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
         const base64Pdf = rawData.replace(/-/g, '+').replace(/_/g, '/');
         const { extractLoadFromDocument } = await import('./aiExtraction');
         const extracted = await extractLoadFromDocument(`data:${pdfMimeType};base64,${base64Pdf}`, pdfMimeType);
+        if (!extracted.isRateConfirmation) {
+          console.log(`[Gmail Scan] Skipping ${extracted.documentType} (not a rate con)`);
+          await gmail.users.messages.modify({ userId: 'me', id: msg.id, requestBody: { removeLabelIds: ['UNREAD'] } });
+          continue;
+        }
         let rateConUrl = "";
         try {
           const { uploadPdfToS3 } = await import("./s3");
