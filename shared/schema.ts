@@ -260,6 +260,13 @@ export const loads = pgTable("loads", {
   paperworkReceivedAt: timestamp("paperwork_received_at"),
   paperworkApprovedAt: timestamp("paperwork_approved_at"),
   paperworkNotes: text("paperwork_notes"),
+  // Broker fields — populated by Gmail PDF extraction so the Loads page
+  // can show broker name/address/phone/email directly per row instead of
+  // forcing dispatchers to open the load to see who the broker is.
+  brokerName: text("broker_name"),
+  brokerAddress: text("broker_address"),
+  brokerPhone: text("broker_phone"),
+  brokerEmail: text("broker_email"),
 });
 
 export const insertLoadSchema = createInsertSchema(loads).omit({

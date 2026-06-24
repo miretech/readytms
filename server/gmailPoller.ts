@@ -125,12 +125,16 @@ async function processMessage(
       commodity: extracted.commodity ?? undefined,
       source: "ai_extract",
       invoiceAttachment: dataUrl,
+      // Set broker fields directly on the load so they show up in the
+      // dedicated Broker column on the loads list page. Previously these
+      // were stuffed into the notes field as plain text, which is why the
+      // Broker column on the Loads page was always blank.
+      brokerName: extracted.brokerName || undefined,
+      brokerAddress: extracted.brokerAddress || undefined,
+      brokerPhone: extracted.brokerPhone || undefined,
+      brokerEmail: extracted.brokerEmail || undefined,
       notes: [
         extracted.notes,
-        extracted.brokerName ? `Broker: ${extracted.brokerName}` : null,
-        extracted.brokerAddress ? `Broker Address: ${extracted.brokerAddress}` : null,
-        extracted.brokerPhone ? `Broker Phone: ${extracted.brokerPhone}` : null,
-        extracted.brokerEmail ? `Broker Email: ${extracted.brokerEmail}` : null,
         `Auto-imported from Gmail (${pdfPart.filename})`,
         `Email subject: ${subject}`,
       ]
