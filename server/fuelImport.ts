@@ -40,10 +40,10 @@ const FUEL_TOOL: Anthropic.Tool = {
             cardNumber: { anyOf: [{ type: "string" }, { type: "null" }], description: "Card number or last 4 digits" },
             vendor: { type: "string", description: "Merchant/truck-stop brand, e.g. TA, Flying J, Pilot, Love's" },
             location: { type: "string", description: "City and state" },
-            gallons: { type: "number", description: "Gallons purchased (Qty)" },
-            pricePerGallon: { type: "number", description: "NET price per gallon actually paid (the discounted PPU if a discount applies, else the unit price)" },
-            totalCost: { type: "number", description: "NET amount charged for the row, AFTER any discount. On a WEX Cost Plus report this is the 'Disc Cost' / discounted amount, NOT the retail amount." },
-            discount: { type: "number", description: "Discount amount for this row (retail minus net). Use the report's per-transaction discount column. 0 if the report shows no discount." },
+            gallons: { type: "number", description: "Gallons purchased — the 'Qty' column." },
+            pricePerGallon: { type: "number", description: "NET price per gallon actually paid. On a WEX 'Cost Plus' report this is 'Disc PPU' (discounted price/gal), NOT 'Unit Price' (retail). If no discount columns, use Unit Price." },
+            totalCost: { type: "number", description: "NET dollar amount charged for the row = gallons × net price/gal. On a WEX 'Cost Plus' report this is the 'Amt' / 'Amt DB Currency' column (the rightmost dollar TOTAL, tens-to-hundreds of dollars), NOT 'Disc Cost' (a per-gallon number) and NOT the retail amount." },
+            discount: { type: "number", description: "TOTAL discount DOLLARS for the row (retail total − net total). On a WEX 'Cost Plus' report use the 'Disc Amt' column (a dollar total, often tens of dollars), NOT 'Disc Cost' (which is the per-gallon discount). 0 if the report has no discount column." },
             fuelType: { type: "string", description: "Diesel, Gas, or DEF. ULSD = Diesel." },
           },
           required: [
@@ -60,9 +60,15 @@ const FUEL_TOOL: Anthropic.Tool = {
 const SYSTEM = `You parse trucking fuel-card transaction reports (WEX/EFS, Fleet One, Comdata, Pilot Flying J, etc.). Reports vary in column names and order. Extract EVERY fuel purchase line.
 Critical rules:
 - Dates → YYYY-MM-DD. Numbers without currency symbols or commas.
-- totalCost = the NET amount actually charged (AFTER discount). On a WEX "Cost Plus" report this is the discounted amount (column "Disc Cost" or "Amt DB Currency"), NOT the retail "Amount".
-- discount = the per-transaction discount (retail amount − net amount). Use the report's discount column ("Disc Amt"/"Disc"). If the report has no discount columns, discount = 0 and totalCost = the amount shown.
-- pricePerGallon = the net price per gallon paid (discounted PPU if present).
+- WEX "Cost Plus" report columns (memorize these exactly):
+    • "Unit Price" = RETAIL price per gallon — do NOT use it for cost.
+    • "Disc PPU" = NET (discounted) price per gallon paid → pricePerGallon.
+    • "Qty" = gallons → gallons.
+    • "Amt" (a.k.a. "Amt DB Currency", the rightmost dollar total) = NET dollars charged → totalCost. (Sanity: Amt ≈ Disc PPU × Qty.)
+    • "Disc Amt" = TOTAL discount DOLLARS for the row → discount. (Sanity: Disc Amt ≈ (Unit Price − Disc PPU) × Qty, usually tens of dollars.)
+    • "Disc Cost" = the PER-GALLON discount (Unit Price − Disc PPU), a small number (~$1). NEVER use "Disc Cost" for totalCost OR discount.
+- Retail-only report (only Unit Price + Qty + Amt, no Disc columns): discount = 0, totalCost = Amt (= Unit Price × Qty).
+- pricePerGallon = the net price per gallon paid (Disc PPU if present, else Unit Price).
 - Ignore summary/total/grand-total rows, fees-only lines, headers, and balance lines.
 - vendor = truck-stop brand (e.g. "TA" for a "TA MANNING" location). location = city, state.`;
 
