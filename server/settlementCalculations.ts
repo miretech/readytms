@@ -221,9 +221,10 @@ export async function buildSettlementDraft(
     })),
   };
   if (fuelDiscountShare > 0) {
+    // Show only the owner's discount share on the settlement; the company's
+    // half is intentionally NOT displayed.
     formValues.notes =
-      `WEX fuel discount $${s(fuelDiscountTotal)} split 50/50 — owner keeps $${s(fuelDiscountShare)}, ` +
-      `Ready Carrier keeps $${s(fuelDiscountShare)} (included in the Fuel deduction).`;
+      `WEX fuel discount — owner's share $${s(fuelDiscountShare)} (included in the Fuel deduction).`;
   }
 
   return {
