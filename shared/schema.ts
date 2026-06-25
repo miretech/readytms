@@ -255,7 +255,6 @@ export const loads = pgTable("loads", {
   expenses: decimal("expenses", { precision: 10, scale: 2 }).default("0"),
   weight: integer("weight"),
   commodity: text("commodity"),
-  brokerName: text("broker_name"), // Broker/customer name (also referenced by storage.getAllLoads)
   notes: text("notes"),
   invoiceAttachment: text("invoice_attachment"), // Base64 encoded invoice document
   podAttachment: text("pod_attachment"), // Base64 encoded proof of delivery document - DEPRECATED
