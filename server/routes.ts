@@ -2241,6 +2241,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(transactions);
   });
 
+  // Sum a driver's fuel for a date range + card source, so each fuel section on
+  // a settlement can pull just its own week's fuel.
+  // GET /api/fuel/period-total?driverId=&start=YYYY-MM-DD&end=YYYY-MM-DD&cardSource=fleet_one|flying_j
+  app.get("/api/fuel/period-total", async (req, res) => {
+    try {
+      const driverId = String(req.query.driverId ?? "");
+      const start = String(req.query.start ?? "");
+      const end = String(req.query.end ?? "");
+      const cardSource = String(req.query.cardSource ?? "");
+      if (!driverId || !start || !end) {
+        return res.status(400).json({ error: "driverId, start and end are required" });
+      }
+      const startMs = new Date(start).getTime();
+      // Include the whole end day.
+      const endMs = new Date(end).getTime() + 24 * 60 * 60 * 1000 - 1;
+      const tx = await storage.getFuelTransactionsByDriver(driverId);
+      let total = 0, discount = 0, count = 0;
+      for (const t of tx) {
+        const when = t.transactionDate ? new Date(t.transactionDate).getTime() : NaN;
+        if (isNaN(when) || when < startMs || when > endMs) continue;
+        if (cardSource && (t as any).cardSource && (t as any).cardSource !== cardSource) continue;
+        total += Number(t.totalCost) || 0;
+        discount += Number((t as any).discount) || 0;
+        count++;
+      }
+      res.json({ total: Math.round(total * 100) / 100, discount: Math.round(discount * 100) / 100, count });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to total fuel" });
+    }
+  });
+
   app.post("/api/fuel", async (req, res) => {
     try {
       const validatedData = insertFuelTransactionSchema.parse(req.body);

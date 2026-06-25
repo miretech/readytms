@@ -198,6 +198,33 @@ function SettlementDialog({
     name: "additionalAdvances",
   });
 
+  // Pull the selected driver's fuel for one section's own date range + card
+  // source, so each week's fuel (Fleet One / Flying J) can be filled independently.
+  const pullSectionFuel = async (
+    cardSource: "fleet_one" | "flying_j",
+    startField: "fuelFlyingJStartDate" | "fuelFleetOneStartDate",
+    endField: "fuelFlyingJEndDate" | "fuelFleetOneEndDate",
+    amountField: "fuelFlyingJ" | "fuelFleetOne",
+  ) => {
+    const driverId = form.getValues("driverId");
+    const start = form.getValues(startField);
+    const end = form.getValues(endField);
+    if (!driverId) { toast({ title: "Pick a driver first", variant: "destructive" }); return; }
+    if (!start || !end) { toast({ title: "Set the Start and End dates for this fuel section first", variant: "destructive" }); return; }
+    try {
+      const res = await apiRequest("GET", `/api/fuel/period-total?driverId=${driverId}&start=${start}&end=${end}&cardSource=${cardSource}`);
+      const data = await res.json();
+      const total = Number(data.total || 0);
+      form.setValue(amountField, total.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      toast({
+        title: `Pulled ${data.count} fuel transaction${data.count === 1 ? "" : "s"} — $${total.toFixed(2)}`,
+        description: data.discount > 0 ? `Includes $${Number(data.discount).toFixed(2)} WEX discount on these fills.` : undefined,
+      });
+    } catch (err: any) {
+      toast({ title: "Could not pull fuel", description: err?.message || String(err), variant: "destructive" });
+    }
+  };
+
   const totalRevenueRef = useRef<string>("0");
 
   // Fetch existing line items when editing
@@ -1161,7 +1188,18 @@ function SettlementDialog({
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">Fuel - Flying J</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Fuel - Flying J</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => pullSectionFuel("flying_j", "fuelFlyingJStartDate", "fuelFlyingJEndDate", "fuelFlyingJ")}
+                  data-testid="button-pull-fuel-flying-j"
+                >
+                  Pull fuel for these dates
+                </Button>
+              </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
@@ -1212,7 +1250,18 @@ function SettlementDialog({
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">Fuel - Fleet One</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Fuel - Fleet One</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => pullSectionFuel("fleet_one", "fuelFleetOneStartDate", "fuelFleetOneEndDate", "fuelFleetOne")}
+                  data-testid="button-pull-fuel-fleet-one"
+                >
+                  Pull fuel for these dates
+                </Button>
+              </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
