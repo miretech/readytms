@@ -2258,6 +2258,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const text = String((req.body?.text ?? "")).trim();
       const pdfBase64 = String((req.body?.pdfBase64 ?? "")).trim();
+      // Which card this report is from: 'fleet_one' (WEX) | 'flying_j' (Pilot).
+      // Drives the settlement fuel bucket (WEX is used at many truck stops, so the
+      // truck-stop brand alone can't tell us which card was swiped).
+      const cs = String((req.body?.cardSource ?? "")).trim();
+      const cardSource = cs === "fleet_one" || cs === "flying_j" ? cs : undefined;
       if (!text && !pdfBase64) return res.status(400).json({ error: "No report text or PDF provided" });
 
       const { parseFuelReport, parseFuelPdf } = await import("./fuelImport");
@@ -2319,6 +2324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pricePerGallon: row.pricePerGallon.toString(),
           totalCost: row.totalCost.toString(),
           discount: (row.discount || 0).toString(),
+          cardSource,
           cardNumber: row.cardNumber ? row.cardNumber.replace(/\D/g, "").slice(-4) : undefined,
           fuelType: row.fuelType,
           notes: "Imported from fuel-card report",

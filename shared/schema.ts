@@ -767,6 +767,7 @@ export const fuelTransactions = pgTable("fuel_transactions", {
   pricePerGallon: decimal("price_per_gallon", { precision: 10, scale: 3 }).notNull(),
   totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(), // NET amount WEX charged (after discount)
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0"), // WEX fuel discount on this transaction
+  cardSource: text("card_source"), // which card the report came from: 'fleet_one' (WEX) | 'flying_j' (Pilot) — drives settlement fuel bucket
   cardNumber: text("card_number"), // Last 4 digits for security
   receiptNumber: text("receipt_number"),
   odometerReading: integer("odometer_reading"),

@@ -136,12 +136,21 @@ export async function buildSettlementDraft(
   for (const t of fuelTx) {
     const when = t.transactionDate ? new Date(t.transactionDate) : null;
     if (!when || when < start || when > end) continue;
+    // Prefer the explicit card source set at import time (WEX -> fleet_one,
+    // Pilot -> flying_j). Fall back to the truck-stop brand for older rows that
+    // were imported before card source was captured.
+    const cs = (t as Record<string, unknown>).cardSource;
     const v = (t.vendor || "").toLowerCase();
-    const bucket: keyof SettlementExpenses = v.includes("flying j")
-      ? "fuelFlyingJ"
-      : v.includes("fleet")
-      ? "fuelFleetOne"
-      : "fuelOther";
+    const bucket: keyof SettlementExpenses =
+      cs === "flying_j"
+        ? "fuelFlyingJ"
+        : cs === "fleet_one"
+        ? "fuelFleetOne"
+        : v.includes("flying j")
+        ? "fuelFlyingJ"
+        : v.includes("fleet")
+        ? "fuelFleetOne"
+        : "fuelOther";
     addExpense(bucket, num(t.totalCost));
     fuelDiscountTotal += num((t as Record<string, unknown>).discount);
   }

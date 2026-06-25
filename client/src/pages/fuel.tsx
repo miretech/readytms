@@ -889,6 +889,7 @@ export default function Fuel() {
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; unmatched: any[]; totalRows?: number } | null>(null);
   const [importPdf, setImportPdf] = useState<string | null>(null);
   const [importFileName, setImportFileName] = useState<string>("");
+  const [importCardSource, setImportCardSource] = useState<string>("");
   const { toast } = useToast();
 
   const handleImportFile = async (file: File) => {
@@ -915,7 +916,8 @@ export default function Fuel() {
     setImporting(true);
     setImportResult(null);
     try {
-      const res = await apiRequest("POST", "/api/fuel/import", importPdf ? { pdfBase64: importPdf } : { text: importText });
+      const base = importPdf ? { pdfBase64: importPdf } : { text: importText };
+      const res = await apiRequest("POST", "/api/fuel/import", { ...base, cardSource: importCardSource || undefined });
       const result = await res.json();
       setImportResult(result);
       queryClient.invalidateQueries({ queryKey: ["/api/fuel"] });
@@ -935,7 +937,7 @@ export default function Fuel() {
   });
 
   const { data: fuelTransactions = [], isLoading: isLoadingTransactions } = useQuery<FuelTransaction[]>({
-    queryKey: ["/api/fuel-cards"],
+    queryKey: ["/api/fuel"],
   });
 
   const { data: trucks = [] } = useQuery<Truck[]>({
@@ -1231,6 +1233,22 @@ export default function Fuel() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">Card source</label>
+                  <Select value={importCardSource} onValueChange={setImportCardSource}>
+                    <SelectTrigger data-testid="select-card-source" className="mt-1">
+                      <SelectValue placeholder="Which card is this report from?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fleet_one">WEX / Fleet One → Fuel - Fleet One</SelectItem>
+                      <SelectItem value="flying_j">Pilot Flying J → Fuel - Flying J</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tags every row so the settlement puts WEX in Fuel - Fleet One and Pilot in Fuel - Flying J.
+                    Leave blank to bucket by truck-stop brand.
+                  </p>
+                </div>
                 <input
                   type="file"
                   accept=".pdf,.csv,.tsv,.txt,.xls,.xlsx"
