@@ -137,7 +137,9 @@ async function processMessage(
       deliveryLocation: extracted.deliveryLocation,
       deliveryDate: extracted.deliveryDate,
       rate: extracted.rate,
-      weight: extracted.weight ?? undefined,
+      // weight column is an integer; the AI sometimes extracts a decimal
+      // (e.g. 26238.4) which Postgres rejects — round it.
+      weight: extracted.weight != null ? Math.round(extracted.weight) : undefined,
       commodity: extracted.commodity ?? undefined,
       source: "ai_extract",
       invoiceAttachment: dataUrl,

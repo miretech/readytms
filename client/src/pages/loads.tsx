@@ -21,7 +21,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { LoadDialog } from "@/components/load-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Load } from "@shared/schema";
+import type { Load, Customer } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -64,6 +64,15 @@ export default function Loads() {
     queryKey: ["/api/loads"],
   });
 
+  // Manual loads store the company as a linked customer rather than in
+  // brokerName, so resolve customerId -> name for the Broker column fallback.
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/customers"],
+  });
+  const customerNameById = new Map(customers.map((c) => [c.id, c.name]));
+  const brokerLabel = (load: Load) =>
+    load.brokerName || (load.customerId ? customerNameById.get(load.customerId) : undefined);
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/loads/${id}`),
     onSuccess: () => {
@@ -90,7 +99,7 @@ export default function Loads() {
       load.loadNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       load.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
       load.deliveryLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (load.brokerName && load.brokerName.toLowerCase().includes(searchQuery.toLowerCase()))
+      (brokerLabel(load)?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     )
     .sort((a, b) => {
       const aVal = new Date(a[sortColumn] as string).getTime();
@@ -208,8 +217,8 @@ export default function Loads() {
                   <TableRow key={load.id} data-testid={`row-load-${load.id}`}>
                     <TableCell className="font-medium">{load.loadNumber}</TableCell>
                     <TableCell>
-                      {load.brokerName ? (
-                        <span className="text-sm font-medium" data-testid={`text-broker-${load.id}`}>{load.brokerName}</span>
+                      {brokerLabel(load) ? (
+                        <span className="text-sm font-medium" data-testid={`text-broker-${load.id}`}>{brokerLabel(load)}</span>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}

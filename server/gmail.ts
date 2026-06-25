@@ -229,7 +229,7 @@ export async function scanRateConEmails(companyId: string): Promise<{ scanned: n
           deliveryDate: extracted.deliveryDate ? new Date(extracted.deliveryDate) : new Date(),
           rate: extracted.rate || '0',
           commodity: extracted.commodity || '',
-          weight: extracted.weight ? Number(extracted.weight) : null,
+          weight: extracted.weight ? Math.round(Number(extracted.weight)) : null,
           notes: 'Auto-imported from Gmail rate con',
               source: 'ai_extract',
           rateConUrl: rateConUrl,
