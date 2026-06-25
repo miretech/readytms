@@ -625,6 +625,7 @@ export class DatabaseStorage implements IStorage {
       expenses: loads.expenses,
       weight: loads.weight,
       commodity: loads.commodity,
+      brokerName: loads.brokerName,
       notes: loads.notes,
       createdAt: loads.createdAt,
       // Set attachment fields to null in list view for performance
@@ -929,6 +930,10 @@ export class DatabaseStorage implements IStorage {
       lastGpsNotificationSent: drivers.lastGpsNotificationSent,
       gpsNotificationsEnabled: drivers.gpsNotificationsEnabled,
       driverType: drivers.driverType,
+      payPercentage: drivers.payPercentage,
+      factoringFeePercentage: drivers.factoringFeePercentage,
+      dispatchPercentage: drivers.dispatchPercentage,
+      fuelCardNumber: drivers.fuelCardNumber,
       // Set attachment fields to null in list view for performance
       licenseAttachment: sql`null`.as('license_attachment'),
       medicalCardAttachment: sql`null`.as('medical_card_attachment'),

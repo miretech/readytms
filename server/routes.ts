@@ -1735,6 +1735,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(settlements);
   });
 
+  // Next settlement number in YEAR-SEQ format (e.g. 2026-001), sequence resets
+  // each calendar year. Ignores legacy "SETTLE-20251125-…" numbers.
+  app.get("/api/settlements/next-number", async (_req, res) => {
+    try {
+      const settlements = await storage.getAllSettlements();
+      const year = new Date().getFullYear();
+      let max = 0;
+      for (const s of settlements) {
+        const m = (s.settlementNumber || "").trim().match(/^(\d{4})-(\d{1,4})$/);
+        if (m && m[1] === String(year)) {
+          const v = parseInt(m[2], 10);
+          if (v > max) max = v;
+        }
+      }
+      res.json({ nextNumber: `${year}-${String(max + 1).padStart(3, "0")}` });
+    } catch (error) {
+      console.error("Error computing next settlement number:", error);
+      res.status(500).json({ error: "Failed to compute next settlement number" });
+    }
+  });
+
+  // Email a settlement PDF to the driver. Client generates the PDF and sends
+  // it as base64. Uses the existing Resend-backed sendEmail (needs a real
+  // RESEND_API_KEY — returns a clear error if not configured).
+  app.post("/api/settlements/:id/email", async (req, res) => {
+    try {
+      const { to, pdfBase64 } = req.body as { to?: string; pdfBase64?: string };
+      const settlement = await storage.getSettlement(req.params.id);
+      if (!settlement) return res.status(404).json({ error: "Settlement not found" });
+
+      const driver = await storage.getDriver(settlement.driverId);
+      const recipient = to || driver?.email;
+      if (!recipient) return res.status(400).json({ success: false, error: "No recipient email" });
+      if (!pdfBase64) return res.status(400).json({ success: false, error: "Missing PDF" });
+
+      const periodStr = `${new Date(settlement.periodStart).toLocaleDateString()} - ${new Date(settlement.periodEnd).toLocaleDateString()}`;
+      const { sendEmail } = await import("./notifications");
+      const result = await sendEmail({
+        to: recipient,
+        subject: `Your Settlement ${settlement.settlementNumber}`,
+        html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <h2 style="color:#1d4ed8;">Settlement ${settlement.settlementNumber}</h2>
+          <p>Hi ${driver?.name || "there"},</p>
+          <p>Your settlement for <strong>${periodStr}</strong> is attached as a PDF.</p>
+          <p><strong>Net Pay: $${Number(settlement.netPay).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
+          <p style="color:#6b7280;font-size:13px;">— Ready Carrier</p>
+        </div>`,
+        attachments: [{ filename: `Settlement-${settlement.settlementNumber}.pdf`, content: pdfBase64 }],
+      });
+
+      if (!result.success) return res.status(502).json(result);
+
+      await storage.createActivityLog({
+        action: "settlement_emailed",
+        entityType: "settlement",
+        entityId: settlement.id,
+        details: `Emailed settlement ${settlement.settlementNumber} to ${recipient}`,
+        status: "success",
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error emailing settlement:", error);
+      res.status(500).json({ success: false, error: error?.message || "Failed to email settlement" });
+    }
+  });
+
   app.get("/api/settlements/:id", async (req, res) => {
     const settlement = await storage.getSettlement(req.params.id);
     if (!settlement) {
@@ -1808,6 +1874,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear ALL line items for a settlement (idempotent). The editor calls this
+  // before re-creating line items, so it never relies on stale client-side IDs
+  // (which caused "Line item not found" 404s when auto-save had already churned them).
+  app.delete("/api/settlements/:settlementId/line-items", async (req, res) => {
+    try {
+      const items = await storage.getSettlementLineItems(req.params.settlementId);
+      await Promise.all(items.map((i) => storage.deleteSettlementLineItem(i.id)));
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error clearing line items:", error);
+      res.status(500).json({ error: "Failed to clear line items" });
+    }
+  });
+
   app.patch("/api/settlement-line-items/:id", async (req, res) => {
     try {
       const { insertSettlementLineItemSchema } = await import("@shared/schema");
@@ -1823,14 +1903,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/settlement-line-items/:id", async (req, res) => {
-    const deleted = await storage.deleteSettlementLineItem(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: "Line item not found" });
-    }
+    // Idempotent: deleting an already-removed line item is a no-op success.
+    // (The settlement editor + auto-save both delete/recreate line items, so a
+    // stale ID must not 404 and fail the whole settlement save.)
+    await storage.deleteSettlementLineItem(req.params.id);
     res.status(204).send();
   });
 
   // Auto-generate settlement from loads
+  // Settlement DRAFT — returns a pre-calculated settlement (flat-per-load pay
+  // model) WITHOUT persisting anything. Powers the "Load Draft" button in the
+  // settlement form so the dispatcher sees revenue, deductions and net pay
+  // before saving. Fixes the casing bug in auto-generate (delivered/Delivered).
+  app.get("/api/settlements/draft/:driverId", async (req: any, res) => {
+    try {
+      const { driverId } = req.params;
+      const { periodStart, periodEnd, driverPayPercentage, factoringFeePercentage, dispatchPercentage } = req.query;
+
+      if (!periodStart || !periodEnd) {
+        return res.status(400).json({ error: "periodStart and periodEnd query params are required" });
+      }
+
+      const { buildSettlementDraft } = await import("./settlementCalculations");
+      const draft = await buildSettlementDraft(
+        driverId,
+        String(periodStart),
+        String(periodEnd),
+        {
+          driverPayPercentage: driverPayPercentage !== undefined ? Number(driverPayPercentage) : undefined,
+          factoringFeePercentage: factoringFeePercentage !== undefined ? Number(factoringFeePercentage) : undefined,
+          dispatchPercentage: dispatchPercentage !== undefined ? Number(dispatchPercentage) : undefined,
+        }
+      );
+
+      res.json(draft);
+    } catch (error) {
+      console.error("Error building settlement draft:", error);
+      res.status(500).json({ error: "Failed to build settlement draft" });
+    }
+  });
+
   app.post("/api/settlements/auto-generate", async (req, res) => {
     try {
       const { driverId, periodStart, periodEnd, payRate } = req.body;
@@ -2136,6 +2248,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(transaction);
     } catch (error) {
       res.status(400).json({ error: "Invalid fuel transaction data" });
+    }
+  });
+
+  // Import a fuel-card report (any provider). Body: { text }. Claude parses the
+  // rows; we match each to a driver (by fuel card # last-4, else name), resolve
+  // the truck from the driver, dedup, and create fuel transactions.
+  app.post("/api/fuel/import", async (req, res) => {
+    try {
+      const text = String((req.body?.text ?? "")).trim();
+      const pdfBase64 = String((req.body?.pdfBase64 ?? "")).trim();
+      if (!text && !pdfBase64) return res.status(400).json({ error: "No report text or PDF provided" });
+
+      const { parseFuelReport, parseFuelPdf } = await import("./fuelImport");
+      const rows = pdfBase64 ? await parseFuelPdf(pdfBase64) : await parseFuelReport(text);
+      if (rows.length === 0) {
+        return res.json({ imported: 0, skipped: 0, unmatched: [], message: "No fuel rows found in the report." });
+      }
+
+      const [drivers, existing] = await Promise.all([
+        storage.getAllDrivers(),
+        storage.getAllFuelTransactions(),
+      ]);
+
+      const last4 = (s?: string | null) => (s ? s.replace(/\D/g, "").slice(-4) : "");
+      const norm = (s?: string | null) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+      const seen = new Set(
+        existing.map((t) => `${new Date(t.transactionDate).toISOString().slice(0, 10)}|${Number(t.totalCost).toFixed(2)}|${t.driverId}`)
+      );
+
+      const matchDriver = (row: { cardNumber: string | null; driverName: string | null }) => {
+        if (row.cardNumber) {
+          const c = last4(row.cardNumber);
+          const byCard = drivers.find((d) => c && last4((d as any).fuelCardNumber) === c);
+          if (byCard) return byCard;
+        }
+        if (row.driverName) {
+          const n = norm(row.driverName);
+          return drivers.find((d) => {
+            const dn = norm(d.name);
+            return dn && (dn.includes(n) || n.includes(dn));
+          });
+        }
+        return undefined;
+      };
+
+      let imported = 0, skipped = 0;
+      const unmatched: Array<{ date: string; total: number; reason: string; driverName: string | null; cardNumber: string | null }> = [];
+
+      for (const row of rows) {
+        const driver = matchDriver(row);
+        if (!driver) {
+          unmatched.push({ date: row.transactionDate, total: row.totalCost, reason: "no matching driver (set the driver's fuel card # or name)", driverName: row.driverName, cardNumber: row.cardNumber });
+          continue;
+        }
+        if (!driver.assignedTruckId) {
+          unmatched.push({ date: row.transactionDate, total: row.totalCost, reason: `driver ${driver.name.trim()} has no assigned truck`, driverName: row.driverName, cardNumber: row.cardNumber });
+          continue;
+        }
+        const key = `${row.transactionDate}|${row.totalCost.toFixed(2)}|${driver.id}`;
+        if (seen.has(key)) { skipped++; continue; }
+
+        await storage.createFuelTransaction({
+          truckId: driver.assignedTruckId,
+          driverId: driver.id,
+          transactionDate: row.transactionDate,
+          vendor: row.vendor,
+          location: row.location,
+          gallons: row.gallons.toString(),
+          pricePerGallon: row.pricePerGallon.toString(),
+          totalCost: row.totalCost.toString(),
+          discount: (row.discount || 0).toString(),
+          cardNumber: row.cardNumber ? row.cardNumber.replace(/\D/g, "").slice(-4) : undefined,
+          fuelType: row.fuelType,
+          notes: "Imported from fuel-card report",
+        } as any);
+        seen.add(key);
+        imported++;
+      }
+
+      res.json({ imported, skipped, unmatched, totalRows: rows.length });
+    } catch (error: any) {
+      console.error("Fuel import error:", error);
+      res.status(500).json({ error: error?.message || "Failed to import fuel report" });
     }
   });
 
