@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, MoreVertical, Edit, Trash2, Receipt, Eye, Zap, Package, Download, X } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Receipt, Eye, Zap, Package, Download, X, Mail } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,11 @@ const settlementFormSchema = insertSettlementSchema.extend({
   advance: z.string().optional(),
   advanceBalance: z.string().optional(),
   advanceDate: z.string().optional(),
+  additionalAdvances: z.array(z.object({
+    amount: z.string().optional(),
+    date: z.string().optional(),
+    note: z.string().optional(),
+  })).optional(),
   fuelFlyingJ: z.string().optional(),
   fuelFlyingJStartDate: z.string().optional(),
   fuelFlyingJEndDate: z.string().optional(),
@@ -82,7 +87,11 @@ const settlementFormSchema = insertSettlementSchema.extend({
   insurance: z.string().optional(),
   insuranceStartDate: z.string().optional(),
   insuranceEndDate: z.string().optional(),
+  insuranceWeek: z.string().optional(),
   trailerFee: z.string().optional(),
+  trailerWeek: z.string().optional(),
+  trailerStartDate: z.string().optional(),
+  trailerEndDate: z.string().optional(),
   truckRepair: z.string().optional(),
   trailerRepair: z.string().optional(),
   deductions: z.string().optional(),
@@ -112,17 +121,18 @@ function SettlementDialog({
   const { toast } = useToast();
   const isEditing = !!settlement;
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
+  const [autoFilling, setAutoFilling] = useState(false);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Generate new settlement number each time dialog opens for create mode
-  const newSettlementNumber = useMemo(() => {
-    if (isEditing || !open) return "";
-    const today = new Date();
-    const uniqueId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    return `SETTLE-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${uniqueId.slice(-8)}`;
-  }, [open, isEditing]);
+  // Fetch the next clean sequential number (0001, 0002, …) when creating.
+  const { data: nextNumberData } = useQuery<{ nextNumber: string }>({
+    queryKey: ["/api/settlements/next-number"],
+    enabled: open && !isEditing,
+  });
+  const newSettlementNumber = !isEditing && open ? nextNumberData?.nextNumber ?? "" : "";
 
   const { data: drivers = [] } = useQuery<Driver[]>({ queryKey: ["/api/drivers"] });
+  const { data: allLoads = [] } = useQuery<Load[]>({ queryKey: ["/api/loads"] });
 
   const form = useForm<SettlementFormValues>({
     resolver: zodResolver(settlementFormSchema),
@@ -140,6 +150,7 @@ function SettlementDialog({
       advance: "0",
       advanceBalance: "0",
       advanceDate: "",
+      additionalAdvances: [],
       fuelFlyingJ: "0",
       fuelFlyingJStartDate: "",
       fuelFlyingJEndDate: "",
@@ -154,7 +165,11 @@ function SettlementDialog({
       insurance: "0",
       insuranceStartDate: "",
       insuranceEndDate: "",
+      insuranceWeek: "",
       trailerFee: "0",
+      trailerWeek: "",
+      trailerStartDate: "",
+      trailerEndDate: "",
       truckRepair: "0",
       trailerRepair: "0",
       deductions: "0",
@@ -176,6 +191,11 @@ function SettlementDialog({
   const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "lineItems",
+  });
+
+  const { fields: advanceFields, append: appendAdvance, remove: removeAdvance } = useFieldArray({
+    control: form.control,
+    name: "additionalAdvances",
   });
 
   const totalRevenueRef = useRef<string>("0");
@@ -235,6 +255,11 @@ function SettlementDialog({
         advance: settlement.advance?.toString() || "0",
         advanceBalance: settlement.advanceBalance?.toString() || "0",
         advanceDate: settlement.advanceDate ? new Date(settlement.advanceDate).toISOString().split("T")[0] : "",
+        additionalAdvances: ((settlement as any).additionalAdvances || []).map((a: any) => ({
+          amount: a?.amount?.toString() || "",
+          date: a?.date ? new Date(a.date).toISOString().split("T")[0] : "",
+          note: a?.note || "",
+        })),
         fuelFlyingJ: settlement.fuelFlyingJ?.toString() || "0",
         fuelFlyingJStartDate: settlement.fuelFlyingJStartDate ? new Date(settlement.fuelFlyingJStartDate).toISOString().split("T")[0] : "",
         fuelFlyingJEndDate: settlement.fuelFlyingJEndDate ? new Date(settlement.fuelFlyingJEndDate).toISOString().split("T")[0] : "",
@@ -249,7 +274,11 @@ function SettlementDialog({
         insurance: settlement.insurance?.toString() || "0",
         insuranceStartDate: settlement.insuranceStartDate ? new Date(settlement.insuranceStartDate).toISOString().split("T")[0] : "",
         insuranceEndDate: settlement.insuranceEndDate ? new Date(settlement.insuranceEndDate).toISOString().split("T")[0] : "",
+        insuranceWeek: settlement.insuranceWeek || "",
         trailerFee: settlement.trailerFee?.toString() || "0",
+        trailerWeek: settlement.trailerWeek || "",
+        trailerStartDate: settlement.trailerStartDate ? new Date(settlement.trailerStartDate).toISOString().split("T")[0] : "",
+        trailerEndDate: settlement.trailerEndDate ? new Date(settlement.trailerEndDate).toISOString().split("T")[0] : "",
         truckRepair: settlement.truckRepair?.toString() || "0",
         trailerRepair: settlement.trailerRepair?.toString() || "0",
         deductions: settlement.deductions?.toString() || "0",
@@ -281,13 +310,18 @@ function SettlementDialog({
         advance: "0",
         advanceBalance: "0",
         advanceDate: "",
+        additionalAdvances: [],
         fuelFlyingJ: "0",
         fuelFleetOne: "0",
         tolls: "0",
         fuel: "0",
         factoringFeePercentage: "0",
         insurance: "0",
+        insuranceWeek: "",
         trailerFee: "0",
+        trailerWeek: "",
+        trailerStartDate: "",
+        trailerEndDate: "",
         truckRepair: "0",
         trailerRepair: "0",
         deductions: "0",
@@ -312,7 +346,7 @@ function SettlementDialog({
       // Calculate total deductions and net pay when any relevant field changes
       const relevantFields = ["driverPayPercentage", "dispatchPercentage", "totalRevenue", "factoringFeePercentage", "tolls", "fuel", "fuelFlyingJ", "fuelFleetOne", "advance", "insurance", "trailerFee", "truckRepair", "trailerRepair", "prepassFee", "eldFee", "plateFee", "fee2290", "parkingFee", "truckCredit", "previousSettlement"];
       
-      if (relevantFields.includes(name || "")) {
+      if (relevantFields.includes(name || "") || (name || "").startsWith("additionalAdvances")) {
         const totalRevenue = parseFloat(value.totalRevenue || "0");
         const driverPayPct = parseFloat(value.driverPayPercentage || "0");
         const dispatchPct = parseFloat(value.dispatchPercentage || "0");
@@ -333,6 +367,10 @@ function SettlementDialog({
         const fuelFlyingJ = parseFloat(value.fuelFlyingJ || "0");
         const fuelFleetOne = parseFloat(value.fuelFleetOne || "0");
         const advance = parseFloat(value.advance || "0");
+        const additionalAdvancesTotal = (value.additionalAdvances || []).reduce(
+          (sum: number, a: any) => sum + (parseFloat((a && a.amount) || "0") || 0),
+          0
+        );
         const insurance = parseFloat(value.insurance || "0");
         const trailerFee = parseFloat(value.trailerFee || "0");
         const truckRepair = parseFloat(value.truckRepair || "0");
@@ -346,7 +384,7 @@ function SettlementDialog({
         const previousSettlement = parseFloat(value.previousSettlement || "0");
         
         // Total deductions = dispatch + factoring + fuel sections + all other deductions + new fees
-        const totalDeductions = dispatchFee + factoringFee + tolls + fuel + fuelFlyingJ + fuelFleetOne + advance + insurance + trailerFee + truckRepair + trailerRepair + prepassFee + eldFee + plateFee + fee2290 + parkingFee + truckCredit + previousSettlement;
+        const totalDeductions = dispatchFee + factoringFee + tolls + fuel + fuelFlyingJ + fuelFleetOne + advance + additionalAdvancesTotal + insurance + trailerFee + truckRepair + trailerRepair + prepassFee + eldFee + plateFee + fee2290 + parkingFee + truckCredit + previousSettlement;
         
         // Debug logging
         console.log("Settlement Calculation:", {
@@ -380,6 +418,52 @@ function SettlementDialog({
     });
     return () => subscription.unsubscribe();
   }, [form]);
+
+  // Auto-fill the whole settlement from the driver's real loads + pay model.
+  // Calls GET /api/settlements/draft; the form's watchers recompute netPay.
+  const watchedDriverId = form.watch("driverId");
+  const selectedDriver = drivers.find((d) => d.id === watchedDriverId);
+
+  const handleAutoFill = async () => {
+    const driverId = form.getValues("driverId");
+    const periodStart = form.getValues("periodStart");
+    const periodEnd = form.getValues("periodEnd");
+    if (!driverId || !periodStart || !periodEnd) {
+      toast({
+        title: "Pick a driver and period first",
+        description: "Driver, period start, and period end are required to auto-fill.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setAutoFilling(true);
+    try {
+      const res = await apiRequest(
+        "GET",
+        `/api/settlements/draft/${driverId}?periodStart=${periodStart}&periodEnd=${periodEnd}`
+      );
+      const draft = await res.json();
+      const fv = draft.formValues || {};
+      if (Array.isArray(fv.lineItems) && fv.lineItems.length > 0) {
+        replace(fv.lineItems);
+      }
+      Object.entries(fv).forEach(([k, v]) => {
+        if (k === "lineItems") return;
+        form.setValue(k as any, v as any, { shouldValidate: true, shouldDirty: true });
+      });
+      toast({
+        title: `Auto-filled ${draft.loadCount} load${draft.loadCount === 1 ? "" : "s"}`,
+        description: `${(draft.driverName || "").trim()} • ${draft.driverType} • Net $${Number(draft.netPay).toFixed(2)}`,
+      });
+      if (draft.warnings?.length) {
+        toast({ title: "Heads up", description: draft.warnings.join(" "), variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Auto-fill failed", description: err?.message || String(err), variant: "destructive" });
+    } finally {
+      setAutoFilling(false);
+    }
+  };
 
   // Auto-save functionality - saves draft every 3 seconds while editing
   useEffect(() => {
@@ -416,6 +500,9 @@ function SettlementDialog({
             advance: parseFloat(values.advance || "0"),
             advanceBalance: parseFloat(values.advanceBalance || "0"),
             advanceDate: values.advanceDate || undefined,
+            additionalAdvances: (values.additionalAdvances || [])
+              .filter((a) => a && a.amount && parseFloat(a.amount) > 0)
+              .map((a) => ({ amount: a.amount as string, date: a.date || undefined, note: a.note || undefined })),
             fuelFlyingJ: parseFloat(values.fuelFlyingJ || "0"),
             fuelFlyingJStartDate: values.fuelFlyingJStartDate || undefined,
             fuelFlyingJEndDate: values.fuelFlyingJEndDate || undefined,
@@ -430,7 +517,11 @@ function SettlementDialog({
             insurance: parseFloat(values.insurance || "0"),
             insuranceStartDate: values.insuranceStartDate || undefined,
             insuranceEndDate: values.insuranceEndDate || undefined,
+            insuranceWeek: values.insuranceWeek || undefined,
             trailerFee: parseFloat(values.trailerFee || "0"),
+            trailerWeek: values.trailerWeek || undefined,
+            trailerStartDate: values.trailerStartDate || undefined,
+            trailerEndDate: values.trailerEndDate || undefined,
             truckRepair: parseFloat(values.truckRepair || "0"),
             trailerRepair: parseFloat(values.trailerRepair || "0"),
             deductions: parseFloat(values.deductions || "0"),
@@ -449,16 +540,10 @@ function SettlementDialog({
           };
 
           await apiRequest("PATCH", `/api/settlements/${settlement.id}`, payload);
-          
-          // Auto-save line items
-          if (existingLineItems.length > 0) {
-            await Promise.all(
-              existingLineItems.map(item =>
-                apiRequest("DELETE", `/api/settlement-line-items/${item.id}`)
-              )
-            );
-          }
-          
+
+          // Clear then re-create line items via the idempotent bulk endpoint.
+          await apiRequest("DELETE", `/api/settlements/${settlement.id}/line-items`);
+
           const lineItems = values.lineItems || [];
           await Promise.all(
             lineItems
@@ -520,6 +605,9 @@ function SettlementDialog({
         advance: parseFloat(values.advance || "0"),
         advanceBalance: parseFloat(values.advanceBalance || "0"),
         advanceDate: values.advanceDate || undefined,
+        additionalAdvances: (values.additionalAdvances || [])
+          .filter((a) => a && a.amount && parseFloat(a.amount) > 0)
+          .map((a) => ({ amount: a.amount as string, date: a.date || undefined, note: a.note || undefined })),
         fuelFlyingJ: parseFloat(values.fuelFlyingJ || "0"),
         fuelFlyingJStartDate: values.fuelFlyingJStartDate || undefined,
         fuelFlyingJEndDate: values.fuelFlyingJEndDate || undefined,
@@ -534,7 +622,11 @@ function SettlementDialog({
         insurance: parseFloat(values.insurance || "0"),
         insuranceStartDate: values.insuranceStartDate || undefined,
         insuranceEndDate: values.insuranceEndDate || undefined,
+        insuranceWeek: values.insuranceWeek || undefined,
         trailerFee: parseFloat(values.trailerFee || "0"),
+        trailerWeek: values.trailerWeek || undefined,
+        trailerStartDate: values.trailerStartDate || undefined,
+        trailerEndDate: values.trailerEndDate || undefined,
         truckRepair: parseFloat(values.truckRepair || "0"),
         trailerRepair: parseFloat(values.trailerRepair || "0"),
         deductions: parseFloat(values.deductions || "0"),
@@ -561,13 +653,10 @@ function SettlementDialog({
       
       const savedSettlement = await savedSettlementRes.json();
 
-      // Delete existing line items if editing
-      if (isEditing && existingLineItems.length > 0) {
-        await Promise.all(
-          existingLineItems.map(item =>
-            apiRequest("DELETE", `/api/settlement-line-items/${item.id}`)
-          )
-        );
+      // Clear existing line items in one idempotent call (no stale-ID 404s),
+      // then re-create from the current form values.
+      if (isEditing) {
+        await apiRequest("DELETE", `/api/settlements/${savedSettlement.id}/line-items`);
       }
 
       // Save line items
@@ -635,17 +724,44 @@ function SettlementDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {drivers.map((driver) => (
-                          <SelectItem key={driver.id} value={driver.id}>
-                            {driver.name}
-                          </SelectItem>
-                        ))}
+                        {drivers
+                          .filter((driver) => driver.isActive !== "false" || driver.id === settlement?.driverId)
+                          .map((driver) => (
+                            <SelectItem key={driver.id} value={driver.id}>
+                              {driver.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {/* Pay model + one-click auto-fill from the driver's real loads */}
+              <FormItem>
+                <FormLabel>Pay Model &amp; Auto-Fill</FormLabel>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedDriver ? (
+                    <Badge variant="secondary" data-testid="badge-pay-model">
+                      {selectedDriver.driverType === "owner-operator" ? "Owner-Operator" : "Company Driver"}
+                      {selectedDriver.payPercentage ? ` • ${selectedDriver.payPercentage}%` : " • pay % not set"}
+                    </Badge>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Select a driver to see pay model</span>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAutoFill}
+                    disabled={autoFilling || !selectedDriver}
+                    data-testid="button-autofill"
+                  >
+                    {autoFilling ? "Loading…" : "Auto-Fill from Loads"}
+                  </Button>
+                </div>
+              </FormItem>
 
               <FormField
                 control={form.control}
@@ -738,7 +854,20 @@ function SettlementDialog({
                   Add Load
                 </Button>
               </div>
-              
+
+              {/* Load-number suggestions from the TMS (selected driver's loads
+                  first). Picking/typing a load # auto-fills the gross amount. */}
+              <datalist id="settlement-load-numbers">
+                {allLoads
+                  .filter((l) => !watchedDriverId || l.assignedDriverId === watchedDriverId)
+                  .slice(0, 800)
+                  .map((l) => (
+                    <option key={l.id} value={l.loadNumber}>
+                      {l.brokerName || ""}
+                    </option>
+                  ))}
+              </datalist>
+
               <div className="space-y-2">
                 {fields.map((field, index) => (
                   <div key={field.id} className="grid gap-3 md:grid-cols-[2fr,3fr,2fr,auto] items-start p-3 border rounded-md">
@@ -769,8 +898,36 @@ function SettlementDialog({
                           <FormControl>
                             <Input
                               {...field}
-                              placeholder="Load #12345"
+                              list="settlement-load-numbers"
+                              placeholder="Type or pick a load #"
                               data-testid={`input-description-${index}`}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                // Auto-pick: if the entered text matches a TMS load number,
+                                // fill the gross amount, broker, and lane (pickup → delivery).
+                                const val = e.target.value.trim().toLowerCase();
+                                const match = allLoads.find(
+                                  (l) => (l.loadNumber || "").trim().toLowerCase() === val
+                                );
+                                if (match) {
+                                  form.setValue(
+                                    `lineItems.${index}.grossAmount`,
+                                    Number(match.rate).toFixed(2),
+                                    { shouldValidate: true, shouldDirty: true }
+                                  );
+                                  if (match.brokerName) {
+                                    form.setValue(`lineItems.${index}.brokerName`, match.brokerName, {
+                                      shouldDirty: true,
+                                    });
+                                  }
+                                  // Fill the description with just the load # (keep it clean).
+                                  form.setValue(
+                                    `lineItems.${index}.description`,
+                                    match.loadNumber,
+                                    { shouldDirty: true }
+                                  );
+                                }
+                              }}
                             />
                           </FormControl>
                           <FormMessage />
@@ -941,6 +1098,66 @@ function SettlementDialog({
                   )}
                 />
               </div>
+
+              {/* Additional advances — add as many as needed over time.
+                  Each amount is added to the settlement's deductions. */}
+              <div className="space-y-2">
+                {advanceFields.map((af, i) => (
+                  <div key={af.id} className="grid gap-3 md:grid-cols-[2fr,2fr,3fr,auto] items-end">
+                    <FormField
+                      control={form.control}
+                      name={`additionalAdvances.${i}.amount`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className={i === 0 ? "" : "sr-only"}>Advance ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid={`input-additional-advance-amount-${i}`} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`additionalAdvances.${i}.date`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className={i === 0 ? "" : "sr-only"}>Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} data-testid={`input-additional-advance-date-${i}`} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`additionalAdvances.${i}.note`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className={i === 0 ? "" : "sr-only"}>Note</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. fuel advance" {...field} data-testid={`input-additional-advance-note-${i}`} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex items-end h-full pb-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeAdvance(i)} data-testid={`button-remove-advance-${i}`}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => appendAdvance({ amount: "", date: "", note: "" })}
+                  data-testid="button-add-advance"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Advance
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -1098,7 +1315,7 @@ function SettlementDialog({
 
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Insurance</h3>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="insurance"
@@ -1120,10 +1337,32 @@ function SettlementDialog({
                 />
                 <FormField
                   control={form.control}
+                  name="insuranceWeek"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Week</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-insurance-week">
+                            <SelectValue placeholder="Select week" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {["1st Week", "2nd Week", "3rd Week", "4th Week", "5th Week", "1st-2nd Week", "2nd-3rd Week", "3rd-4th Week", "Full Month"].map((w) => (
+                            <SelectItem key={w} value={w}>{w}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="insuranceStartDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Date</FormLabel>
+                      <FormLabel>Coverage Start (back-datable)</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} data-testid="input-insurance-start-date" />
                       </FormControl>
@@ -1136,7 +1375,7 @@ function SettlementDialog({
                   name="insuranceEndDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>End Date</FormLabel>
+                      <FormLabel>Coverage End</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} data-testid="input-insurance-end-date" />
                       </FormControl>
@@ -1204,6 +1443,57 @@ function SettlementDialog({
                           data-testid="input-trailer-fee"
                           placeholder="0.00"
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="trailerWeek"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trailer Rent Week</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-trailer-week">
+                            <SelectValue placeholder="Select week" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {["1st Week", "2nd Week", "3rd Week", "4th Week", "5th Week", "1st-2nd Week", "2nd-3rd Week", "3rd-4th Week", "Full Month"].map((w) => (
+                            <SelectItem key={w} value={w}>{w}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="trailerStartDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trailer Rent Start (back-datable)</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-trailer-start-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="trailerEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trailer Rent End</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-trailer-end-date" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1852,15 +2142,18 @@ export default function Settlements() {
     setIsDetailsDialogOpen(true);
   };
 
-  const handleDownloadPDF = async (settlement: Settlement) => {
+  // Builds the settlement PDF and returns the jsPDF doc + driver (no save/email),
+  // so it can be downloaded OR emailed.
+  const buildSettlementDoc = async (settlement: Settlement) => {
     // Fetch company settings
     const companyRes = await fetch("/api/company-settings");
     const companySettings = companyRes.ok ? await companyRes.json() : null;
-    
+
     // Fetch line items
     const lineItemsRes = await fetch(`/api/settlements/${settlement.id}/line-items`);
     const lineItems: SettlementLineItem[] = lineItemsRes.ok ? await lineItemsRes.json() : [];
-    
+
+    const driver = getDriver(settlement.driverId);
     const doc = new jsPDF();
     const driverName = getDriverName(settlement.driverId);
     const pageHeight = doc.internal.pageSize.height;
@@ -1890,76 +2183,109 @@ export default function Settlements() {
     const cityStateZip = companySettings?.cityStateZip || "St Paul, MN 55114";
     const phone = companySettings?.phone || "612-567-5034";
     
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text(companyName.toUpperCase(), 105, 15, { align: "center" });
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text(address, 105, 21, { align: "center" });
-    doc.text(cityStateZip, 105, 26, { align: "center" });
-    doc.text(`Phone: ${phone}`, 105, 31, { align: "center" });
-    
-    // Add company logo if available
+    const companyEmail = companySettings?.email || "";
+
+    // Brand colour. Default = orange (#E67E22). Overridable via company
+    // settings brandColor as "#rrggbb".
+    const hexToRgb = (hex?: string): [number, number, number] => {
+      const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+      if (!m) return [230, 126, 34];
+      const n = parseInt(m[1], 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    };
+    const [br, bg, bb] = hexToRgb(companySettings?.brandColor);
+
+    // ── Coloured header banner ──────────────────────────────────────
+    doc.setFillColor(br, bg, bb);
+    doc.rect(0, 0, 210, 34, "F");
+
+    // Logo on the left, inside the banner (white box backing so it pops)
+    let nameX = 105;
+    let nameAlign: "center" | "left" = "center";
     if (companySettings?.logoUrl) {
       try {
-        doc.addImage(companySettings.logoUrl, 'PNG', 15, 10, 30, 30);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(12, 5, 26, 24, 2, 2, "F");
+        doc.addImage(companySettings.logoUrl, "PNG", 13, 6, 24, 22);
+        nameX = 44;
+        nameAlign = "left";
       } catch (error) {
         console.error("Error adding logo to PDF:", error);
       }
     }
-    
-    // Settlement Title
-    doc.setFontSize(18);
+
+    // Company name + contact in white on the banner
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
-    doc.text("Driver Settlement", 105, 42, { align: "center" });
-    
+    doc.text(companyName.toUpperCase(), nameX, 14, { align: nameAlign });
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${address}, ${cityStateZip}`, nameX, 21, { align: nameAlign });
+    doc.text(companyEmail ? `Phone: ${phone}   •   ${companyEmail}` : `Phone: ${phone}`, nameX, 26, { align: nameAlign });
+
+    // Title bar (brand-coloured text) + meta
+    doc.setTextColor(br, bg, bb);
+    doc.setFontSize(15);
+    doc.setFont("helvetica", "bold");
+    doc.text("DRIVER SETTLEMENT", 105, 44, { align: "center" });
+    doc.setDrawColor(br, bg, bb);
+    doc.setLineWidth(0.6);
+    doc.line(20, 47, 190, 47);
+    doc.setLineWidth(0.2);
+
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Settlement #: ${settlement.settlementNumber}`, 20, 52);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 52);
-    
-    // Driver Info
-    let yPos = 65;
-    doc.setFontSize(14);
+    doc.text(`Settlement #: ${settlement.settlementNumber}`, 20, 54);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 190, 54, { align: "right" });
+
+    // Driver Info — two columns to save vertical space
+    let yPos = 61;
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text("Driver Information", 20, yPos);
-    doc.setFontSize(10);
+    yPos += 6;
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    yPos += 10;
+    const infoTop = yPos;
+    // Right column: truck + period
+    doc.text(`Truck: ${settlement.truckNumber || "N/A"}`, 130, infoTop);
+    doc.text(`Period: ${new Date(settlement.periodStart).toLocaleDateString()} - ${new Date(settlement.periodEnd).toLocaleDateString()}`, 130, infoTop + 5);
+    // Left column: driver contact
     doc.text(`Driver: ${driverName}`, 20, yPos);
-    yPos += 7;
-    doc.text(`Truck: ${settlement.truckNumber || "N/A"}`, 20, yPos);
-    yPos += 7;
-    doc.text(`Period: ${new Date(settlement.periodStart).toLocaleDateString()} - ${new Date(settlement.periodEnd).toLocaleDateString()}`, 20, yPos);
-    
+    yPos += 5;
+    if (driver?.phone) { doc.text(`Phone: ${driver.phone}`, 20, yPos); yPos += 5; }
+    if (driver?.email) { doc.text(`Email: ${driver.email}`, 20, yPos); yPos += 5; }
+    if (driver?.address) { doc.text(`Address: ${driver.address}`, 20, yPos); yPos += 5; }
+    yPos = Math.max(yPos, infoTop + 11) + 3;
+
     // Load Line Items Section
     if (lineItems.length > 0) {
-      yPos += 15;
       yPos = checkPageBreak(yPos, 40);
-      doc.setFontSize(14);
+      doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.text("Load Details", 20, yPos);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      yPos += 10;
-      
+      yPos += 6;
+
       // Table header
+      doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
       doc.text("Broker", 20, yPos);
       doc.text("Description", 75, yPos);
       doc.text("Amount", 150, yPos, { align: "right" });
       doc.setFont("helvetica", "normal");
-      yPos += 2;
+      yPos += 1.5;
       doc.line(20, yPos, 190, yPos);
-      yPos += 5;
-      
+      yPos += 4.5;
+
       // Table rows
       lineItems.forEach((item) => {
         yPos = checkPageBreak(yPos, 10);
-        doc.text(item.brokerName || "N/A", 20, yPos);
-        doc.text(item.description, 75, yPos);
+        doc.text(String(item.brokerName || "N/A").slice(0, 30), 20, yPos);
+        doc.text(String(item.description || "").slice(0, 50), 75, yPos);
         doc.text(`$${Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-        yPos += 7;
+        yPos += 5.5;
       });
       
       // Total line
@@ -1973,152 +2299,46 @@ export default function Settlements() {
       yPos += 10;
     }
     
-    // Revenue Section
-    yPos += 15;
-    yPos = checkPageBreak(yPos, 25);
-    doc.setFontSize(14);
+    // Earnings summary. Each deduction is listed ONCE in "Other Deductions"
+    // below — no duplicate per-category sections (keeps it to one page).
+    yPos += 8;
+    yPos = checkPageBreak(yPos, 22);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("Revenue", 20, yPos);
+    doc.text("Earnings", 20, yPos);
+    yPos += 7;
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    yPos += 10;
-    doc.text(`Total Revenue:`, 20, yPos);
+    doc.text("Total Revenue:", 20, yPos);
     doc.text(`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-    yPos += 7;
+    yPos += 6;
     doc.text(`Driver Pay (${driverPayPct.toFixed(2)}%):`, 20, yPos);
     doc.text(`$${driverPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-    
-    // Dispatch Section
-    yPos += 13;
-    yPos = checkPageBreak(yPos, 25);
-    if (dispatchPct > 0) {
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Dispatch", 20, yPos);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      yPos += 10;
-      doc.text(`Dispatch Fee (${dispatchPct.toFixed(2)}%):`, 20, yPos);
-      doc.text(`$${dispatchFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-      yPos += 13;
-    }
-    
-    // Advance Section
-    yPos = checkPageBreak(yPos, 35);
-    if (Number(settlement.advance || 0) > 0 || Number(settlement.advanceBalance || 0) > 0) {
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Advance", 20, yPos);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      yPos += 10;
-      doc.text(`Advance:`, 20, yPos);
-      doc.text(`$${Number(settlement.advance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-      yPos += 7;
-      doc.text(`Advance Balance:`, 20, yPos);
-      doc.text(`$${Number(settlement.advanceBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-      if (settlement.advanceDate) {
-        yPos += 7;
-        doc.text(`Advance Date:`, 20, yPos);
-        doc.text(new Date(settlement.advanceDate).toLocaleDateString(), 150, yPos, { align: "right" });
-      }
-      yPos += 13;
-    }
-    
-    // Fuel Sections
-    yPos = checkPageBreak(yPos, 30);
-    if (Number(settlement.fuelFlyingJ || 0) > 0 || Number(settlement.fuelFleetOne || 0) > 0) {
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Fuel", 20, yPos);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      yPos += 10;
-      if (Number(settlement.fuelFlyingJ || 0) > 0) {
-        doc.text(`Fuel - Flying J:`, 20, yPos);
-        doc.text(`$${Number(settlement.fuelFlyingJ || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-        yPos += 7;
-        if (settlement.fuelFlyingJStartDate || settlement.fuelFlyingJEndDate) {
-          doc.setFontSize(8);
-          const startDate = settlement.fuelFlyingJStartDate ? new Date(settlement.fuelFlyingJStartDate).toLocaleDateString() : "N/A";
-          const endDate = settlement.fuelFlyingJEndDate ? new Date(settlement.fuelFlyingJEndDate).toLocaleDateString() : "N/A";
-          doc.text(`  Period: ${startDate} - ${endDate}`, 20, yPos);
-          doc.setFontSize(10);
-          yPos += 7;
-        }
-      }
-      if (Number(settlement.fuelFleetOne || 0) > 0) {
-        doc.text(`Fuel - Fleet One:`, 20, yPos);
-        doc.text(`$${Number(settlement.fuelFleetOne || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-        yPos += 7;
-        if (settlement.fuelFleetOneStartDate || settlement.fuelFleetOneEndDate) {
-          doc.setFontSize(8);
-          const startDate = settlement.fuelFleetOneStartDate ? new Date(settlement.fuelFleetOneStartDate).toLocaleDateString() : "N/A";
-          const endDate = settlement.fuelFleetOneEndDate ? new Date(settlement.fuelFleetOneEndDate).toLocaleDateString() : "N/A";
-          doc.text(`  Period: ${startDate} - ${endDate}`, 20, yPos);
-          doc.setFontSize(10);
-          yPos += 7;
-        }
-      }
-      yPos += 6;
-    }
-    
-    // Tolls Section (with dates)
-    yPos = checkPageBreak(yPos, 30);
-    if (Number(settlement.tolls || 0) > 0) {
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Tolls", 20, yPos);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      yPos += 10;
-      doc.text(`Tolls:`, 20, yPos);
-      doc.text(`$${Number(settlement.tolls || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-      yPos += 7;
-      if (settlement.tollsStartDate || settlement.tollsEndDate) {
-        doc.setFontSize(8);
-        const startDate = settlement.tollsStartDate ? new Date(settlement.tollsStartDate).toLocaleDateString() : "N/A";
-        const endDate = settlement.tollsEndDate ? new Date(settlement.tollsEndDate).toLocaleDateString() : "N/A";
-        doc.text(`  Period: ${startDate} - ${endDate}`, 20, yPos);
-        doc.setFontSize(10);
-        yPos += 7;
-      }
-      yPos += 6;
-    }
-    
-    // Insurance Section (with dates)
-    yPos = checkPageBreak(yPos, 30);
-    if (Number(settlement.insurance || 0) > 0) {
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Insurance", 20, yPos);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      yPos += 10;
-      doc.text(`Insurance:`, 20, yPos);
-      doc.text(`$${Number(settlement.insurance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-      yPos += 7;
-      if (settlement.insuranceStartDate || settlement.insuranceEndDate) {
-        doc.setFontSize(8);
-        const startDate = settlement.insuranceStartDate ? new Date(settlement.insuranceStartDate).toLocaleDateString() : "N/A";
-        const endDate = settlement.insuranceEndDate ? new Date(settlement.insuranceEndDate).toLocaleDateString() : "N/A";
-        doc.text(`  Period: ${startDate} - ${endDate}`, 20, yPos);
-        doc.setFontSize(10);
-        yPos += 7;
-      }
-      yPos += 6;
-    }
-    
-    // Other Deductions Section
-    yPos = checkPageBreak(yPos, 30);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Other Deductions", 20, yPos);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
     yPos += 10;
-    
+
+    // Deductions Section
+    yPos = checkPageBreak(yPos, 30);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Deductions", 20, yPos);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    yPos += 6;
+
     // Add dispatch, factoring fee, fuel sections, and all other deductions
+    // Coverage label for insurance/trailer: week + optional back-dated range,
+    // e.g. "Insurance (2nd Week, Apr 26 – May 26)" or just "(4th Week June)".
+    const periodMonth = new Date(settlement.periodStart).toLocaleDateString(undefined, { month: "long" });
+    const shortDate = (d?: string | Date | null) =>
+      d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+    const coverageSuffix = (wk?: string | null, start?: string | Date | null, end?: string | Date | null) => {
+      const range = start && end ? `${shortDate(start)} – ${shortDate(end)}` : "";
+      if (wk && range) return ` (${wk}, ${range})`;
+      if (range) return ` (${range})`;
+      if (wk) return ` (${wk} ${periodMonth})`;
+      return "";
+    };
+
     const deductions = [
       { label: `Dispatch Fee (${dispatchPct.toFixed(2)}%)`, value: dispatchFee },
       { label: `Factoring Fee (${factoringPct.toFixed(2)}%)`, value: factoringFee },
@@ -2127,8 +2347,12 @@ export default function Settlements() {
       { label: "Tolls", value: Number(settlement.tolls || 0) },
       { label: "Fuel (Other)", value: Number(settlement.fuel || 0) },
       { label: "Advance", value: Number(settlement.advance || 0) },
-      { label: "Insurance", value: Number(settlement.insurance || 0) },
-      { label: "Trailer Fee", value: Number(settlement.trailerFee || 0) },
+      ...(((settlement as any).additionalAdvances || []) as Array<{ amount?: string; date?: string; note?: string }>).map((a, i) => ({
+        label: `Advance${a?.note ? ` (${a.note})` : a?.date ? ` (${shortDate(a.date)})` : ` #${i + 2}`}`,
+        value: Number(a?.amount || 0),
+      })),
+      { label: `Insurance${coverageSuffix(settlement.insuranceWeek, settlement.insuranceStartDate, settlement.insuranceEndDate)}`, value: Number(settlement.insurance || 0) },
+      { label: `Trailer Fee${coverageSuffix(settlement.trailerWeek, settlement.trailerStartDate, settlement.trailerEndDate)}`, value: Number(settlement.trailerFee || 0) },
       { label: "Truck Repair", value: Number(settlement.truckRepair || 0) },
       { label: "Trailer Repair", value: Number(settlement.trailerRepair || 0) },
       { label: "PrePass Fee", value: Number(settlement.prepassFee || 0) },
@@ -2145,27 +2369,36 @@ export default function Settlements() {
         yPos = checkPageBreak(yPos, 10);
         doc.text(`${label}:`, 20, yPos);
         doc.text(`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-        yPos += 7;
+        yPos += 5.5;
       }
     });
-    
+
     // Total Deductions - ALL deductions including factoring
     yPos = checkPageBreak(yPos, 15);
     const totalDeductions = deductions.reduce((sum, { value }) => sum + value, 0);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
+    yPos += 1;
+    doc.line(120, yPos, 190, yPos);
     yPos += 5;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
     doc.text(`Total Deductions:`, 20, yPos);
     doc.text(`$${totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
-    
+    doc.setFont("helvetica", "normal");
+
     // Net Pay = driver pay - total deductions
-    yPos = checkPageBreak(yPos, 15);
+    yPos = checkPageBreak(yPos, 18);
     const correctNetPay = driverPay - totalDeductions;
-    yPos += 10;
-    doc.setFontSize(14);
+    yPos += 4;
+    doc.setDrawColor(120);
+    doc.setLineWidth(0.5);
+    doc.line(120, yPos, 190, yPos);
+    doc.setLineWidth(0.2);
+    yPos += 7;
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text(`Net Pay:`, 20, yPos);
+    doc.text(`NET PAY:`, 20, yPos);
     doc.text(`$${correctNetPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, yPos, { align: "right" });
+    doc.setFont("helvetica", "normal");
     
     // Payment Info
     if (settlement.status === "Paid" && settlement.paidDate) {
@@ -2200,13 +2433,46 @@ export default function Settlements() {
       });
     }
     
-    // Save PDF
+    return { doc, driver };
+  };
+
+  const handleDownloadPDF = async (settlement: Settlement) => {
+    const { doc } = await buildSettlementDoc(settlement);
     doc.save(`Settlement-${settlement.settlementNumber}.pdf`);
-    
     toast({
       title: "PDF Downloaded",
       description: `Settlement ${settlement.settlementNumber} has been downloaded as PDF.`,
     });
+  };
+
+  const handleEmailToDriver = async (settlement: Settlement) => {
+    const { doc, driver } = await buildSettlementDoc(settlement);
+    if (!driver?.email) {
+      toast({
+        title: "No email on file",
+        description: `Add an email address to ${driver?.name || "this driver"}'s profile first.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    // jsPDF datauristring → strip the "data:...;base64," prefix
+    const pdfBase64 = doc.output("datauristring").split(",")[1];
+    try {
+      const res = await apiRequest("POST", `/api/settlements/${settlement.id}/email`, {
+        to: driver.email,
+        pdfBase64,
+      });
+      const result = await res.json();
+      toast({
+        title: result.success ? "Settlement emailed" : "Could not send",
+        description: result.success
+          ? `Sent settlement ${settlement.settlementNumber} to ${driver.email}.`
+          : result.error || "Email failed.",
+        variant: result.success ? undefined : "destructive",
+      });
+    } catch (err: any) {
+      toast({ title: "Email failed", description: err?.message || String(err), variant: "destructive" });
+    }
   };
 
   if (isLoading) {
@@ -2375,6 +2641,13 @@ export default function Settlements() {
                           >
                             <Download className="mr-2 h-4 w-4" />
                             Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleEmailToDriver(settlement)}
+                            data-testid={`button-email-driver-${settlement.id}`}
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            Email to Driver
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleEdit(settlement)}

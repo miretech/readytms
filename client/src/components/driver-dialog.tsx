@@ -40,6 +40,11 @@ const formSchema = insertDriverSchema.extend({
   password: z.string().optional(),
   licenseNumber: z.string().min(1, "License number is required"),
   status: z.string().min(1, "Status is required"),
+  // Settlement engine per-driver terms (kept as strings; "" → undefined on submit)
+  payPercentage: z.string().optional(),
+  factoringFeePercentage: z.string().optional(),
+  dispatchPercentage: z.string().optional(),
+  fuelCardNumber: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -92,6 +97,10 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
       dateTerminated: "",
       assignedTruckId: "",
       driverType: "company-driver",
+      payPercentage: "",
+      factoringFeePercentage: "",
+      dispatchPercentage: "",
+      fuelCardNumber: "",
     },
   });
 
@@ -121,6 +130,10 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         dateTerminated: driverData.dateTerminated ? new Date(driverData.dateTerminated).toISOString().split('T')[0] : "",
         assignedTruckId: driverData.assignedTruckId || "",
         driverType: (driverData.driverType || "company-driver") as "company-driver" | "owner-operator",
+        payPercentage: driverData.payPercentage != null ? String(driverData.payPercentage) : "",
+        factoringFeePercentage: driverData.factoringFeePercentage != null ? String(driverData.factoringFeePercentage) : "",
+        dispatchPercentage: driverData.dispatchPercentage != null ? String(driverData.dispatchPercentage) : "",
+        fuelCardNumber: driverData.fuelCardNumber || "",
       });
       // Clear attachments immediately when entity changes, then populate from full data when available
       if (fullDriver) {
@@ -156,6 +169,10 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         dateTerminated: "",
         assignedTruckId: "",
         driverType: "company-driver",
+        payPercentage: "",
+        factoringFeePercentage: "",
+        dispatchPercentage: "",
+        fuelCardNumber: "",
       });
       setLicenseFile(null);
       setMedicalCardFile(null);
@@ -179,6 +196,11 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
         licenseIssuedPlace: values.licenseIssuedPlace || undefined,
         medicalCardNumber: values.medicalCardNumber || undefined,
         socialSecurityNumber: values.socialSecurityNumber || undefined,
+        // Settlement terms: empty → null so Postgres numeric columns clear cleanly
+        payPercentage: values.payPercentage === "" ? null : values.payPercentage,
+        factoringFeePercentage: values.factoringFeePercentage === "" ? null : values.factoringFeePercentage,
+        dispatchPercentage: values.dispatchPercentage === "" ? null : values.dispatchPercentage,
+        fuelCardNumber: values.fuelCardNumber || undefined,
         // Use null to explicitly clear attachments, empty string means remove
         licenseAttachment: values.licenseAttachment === '' ? null : (values.licenseAttachment || undefined),
         medicalCardAttachment: values.medicalCardAttachment === '' ? null : (values.medicalCardAttachment || undefined),
@@ -823,6 +845,117 @@ export function DriverDialog({ open, onOpenChange, driver }: DriverDialogProps) 
                   </FormItem>
                 )}
               />
+
+              {/* ── Settlement terms ─────────────────────────────────────── */}
+              <FormField
+                control={form.control}
+                name="driverType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pay Model</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-driver-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="company-driver">Company Driver (% of linehaul)</SelectItem>
+                        <SelectItem value="owner-operator">Owner-Operator (keeps revenue, bears costs)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="payPercentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Driver Pay % {form.watch("driverType") === "owner-operator" ? "(usually 100)" : "of gross linehaul (e.g. 30)"}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder={form.watch("driverType") === "owner-operator" ? "100" : "30"}
+                        data-testid="input-pay-percentage"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fuelCardNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fuel Card # (for auto-matching imports)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="card # or last 4"
+                        data-testid="input-fuel-card-number"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {form.watch("driverType") === "owner-operator" && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="factoringFeePercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Factoring Fee % (per load)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="2.99"
+                            data-testid="input-factoring-percentage"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="dispatchPercentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dispatch Fee % (of gross)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="8"
+                            data-testid="input-dispatch-percentage"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
             </div>
 
             <div className="flex justify-end gap-2">

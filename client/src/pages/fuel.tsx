@@ -883,7 +883,52 @@ export default function Fuel() {
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
   const [editingFuelCard, setEditingFuelCard] = useState<FuelCard | null>(null);
   const [editingFuelTransaction, setEditingFuelTransaction] = useState<FuelTransaction | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; unmatched: any[]; totalRows?: number } | null>(null);
+  const [importPdf, setImportPdf] = useState<string | null>(null);
+  const [importFileName, setImportFileName] = useState<string>("");
   const { toast } = useToast();
+
+  const handleImportFile = async (file: File) => {
+    setImportFileName(file.name);
+    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+      // PDF → read as base64 and send to Claude's native PDF support
+      const buf = await file.arrayBuffer();
+      let binary = "";
+      const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      setImportPdf(btoa(binary));
+      setImportText("");
+    } else {
+      setImportPdf(null);
+      setImportText(await file.text());
+    }
+  };
+
+  const runFuelImport = async () => {
+    if (!importText.trim() && !importPdf) {
+      toast({ title: "Upload or paste a report first", variant: "destructive" });
+      return;
+    }
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await apiRequest("POST", "/api/fuel/import", importPdf ? { pdfBase64: importPdf } : { text: importText });
+      const result = await res.json();
+      setImportResult(result);
+      queryClient.invalidateQueries({ queryKey: ["/api/fuel"] });
+      toast({
+        title: `Imported ${result.imported} fuel transaction${result.imported === 1 ? "" : "s"}`,
+        description: `${result.skipped} duplicate(s) skipped, ${result.unmatched?.length || 0} unmatched.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err?.message || String(err), variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const { data: fuelCards = [], isLoading: isLoadingCards } = useQuery<FuelCard[]>({
     queryKey: ["/api/fuel-cards"],
@@ -1159,6 +1204,14 @@ export default function Fuel() {
               />
             </div>
             <Button
+              variant="outline"
+              onClick={() => { setImportResult(null); setIsImportOpen(true); }}
+              data-testid="button-import-fuel"
+            >
+              <FuelIcon className="mr-2 h-4 w-4" />
+              Import Report
+            </Button>
+            <Button
               onClick={() => setIsTransactionDialogOpen(true)}
               data-testid="button-create-fuel-transaction"
             >
@@ -1166,6 +1219,62 @@ export default function Fuel() {
               Add Fuel Purchase
             </Button>
           </div>
+
+          <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Import Fuel Report</DialogTitle>
+                <DialogDescription>
+                  Upload or paste your weekly WEX / Fleet One / Comdata report (PDF, CSV, Excel, or copied text).
+                  Use the WEX "Cost Plus" report so the discount is captured. It auto-matches each row to a driver
+                  by fuel card # (or name), applies the owner-operator 50/50 discount split, and feeds into settlements.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <input
+                  type="file"
+                  accept=".pdf,.csv,.tsv,.txt,.xls,.xlsx"
+                  onChange={(e) => e.target.files?.[0] && handleImportFile(e.target.files[0])}
+                  data-testid="input-fuel-file"
+                  className="block w-full text-sm"
+                />
+                {importPdf && (
+                  <div className="text-sm text-muted-foreground">📄 PDF ready: {importFileName} — click Import to read it.</div>
+                )}
+                <Textarea
+                  value={importText}
+                  onChange={(e) => { setImportText(e.target.value); if (e.target.value) setImportPdf(null); }}
+                  placeholder="…or paste the report text here"
+                  className="min-h-[160px] font-mono text-xs"
+                  data-testid="textarea-fuel-import"
+                />
+                {importResult && (
+                  <div className="rounded-md border p-3 text-sm space-y-1">
+                    <div className="font-medium">
+                      ✓ {importResult.imported} imported · {importResult.skipped} duplicate(s) skipped
+                      {importResult.totalRows != null && ` · ${importResult.totalRows} rows read`}
+                    </div>
+                    {importResult.unmatched?.length > 0 && (
+                      <div className="text-muted-foreground">
+                        {importResult.unmatched.length} unmatched (set the driver's fuel card # / assign a truck, then re-import):
+                        <ul className="mt-1 list-disc pl-5">
+                          {importResult.unmatched.slice(0, 6).map((u, i) => (
+                            <li key={i}>{u.date} · ${Number(u.total).toFixed(2)} · {u.driverName || u.cardNumber || "?"} — {u.reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsImportOpen(false)} data-testid="button-import-close">Close</Button>
+                <Button onClick={runFuelImport} disabled={importing} data-testid="button-import-run">
+                  {importing ? "Importing…" : "Import"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <Card className="p-6">
             {filteredFuelTransactions.length === 0 ? (

@@ -194,6 +194,13 @@ export const drivers = pgTable("drivers", {
   lastGpsNotificationSent: timestamp("last_gps_notification_sent"), // Last time GPS reminder was sent
   gpsNotificationsEnabled: text("gps_notifications_enabled").notNull().default("true"), // "true" or "false"
   driverType: text("driver_type").notNull().default("company-driver"), // "owner-operator" or "company-driver"
+  // Settlement engine per-driver defaults:
+  // owner-operator → payPercentage 100, bears factoring + dispatch + all truck costs
+  // company-driver → payPercentage e.g. 30 of gross linehaul, bears only advances
+  payPercentage: decimal("pay_percentage", { precision: 5, scale: 2 }), // % of gross linehaul
+  factoringFeePercentage: decimal("factoring_fee_percentage", { precision: 5, scale: 2 }), // owner-op only
+  dispatchPercentage: decimal("dispatch_percentage", { precision: 5, scale: 2 }), // owner-op only
+  fuelCardNumber: text("fuel_card_number"), // WEX/Fleet One card # (or last 4) to match imported fuel
   companyId: varchar("company_id"),
 });
 
@@ -248,6 +255,7 @@ export const loads = pgTable("loads", {
   expenses: decimal("expenses", { precision: 10, scale: 2 }).default("0"),
   weight: integer("weight"),
   commodity: text("commodity"),
+  brokerName: text("broker_name"), // Broker/customer name (also referenced by storage.getAllLoads)
   notes: text("notes"),
   invoiceAttachment: text("invoice_attachment"), // Base64 encoded invoice document
   podAttachment: text("pod_attachment"), // Base64 encoded proof of delivery document - DEPRECATED
@@ -526,6 +534,11 @@ export const settlements = pgTable("settlements", {
   advance: decimal("advance", { precision: 12, scale: 2 }).default("0"),
   advanceBalance: decimal("advance_balance", { precision: 12, scale: 2 }).default("0"),
   advanceDate: timestamp("advance_date"),
+  // Additional advances — a list so more advances can be added over time.
+  // Each: { amount, date?, note? }. All amounts add to settlement deductions.
+  additionalAdvances: jsonb("additional_advances")
+    .$type<Array<{ amount: string; date?: string; note?: string }>>()
+    .default(sql`'[]'::jsonb`),
   // Fuel sections
   fuelFlyingJ: decimal("fuel_flying_j", { precision: 10, scale: 2 }).default("0"),
   fuelFlyingJStartDate: timestamp("fuel_flying_j_start_date"),
@@ -542,7 +555,11 @@ export const settlements = pgTable("settlements", {
   insurance: decimal("insurance", { precision: 10, scale: 2 }).default("0"),
   insuranceStartDate: timestamp("insurance_start_date"),
   insuranceEndDate: timestamp("insurance_end_date"),
+  insuranceWeek: text("insurance_week"), // e.g. "4th Week", "2nd-3rd Week" — shown on settlement
   trailerFee: decimal("trailer_fee", { precision: 10, scale: 2 }).default("0"),
+  trailerWeek: text("trailer_week"), // week-of-month label for trailer rent
+  trailerStartDate: timestamp("trailer_start_date"), // back-datable coverage range
+  trailerEndDate: timestamp("trailer_end_date"),
   truckRepair: decimal("truck_repair", { precision: 10, scale: 2 }).default("0"),
   trailerRepair: decimal("trailer_repair", { precision: 10, scale: 2 }).default("0"),
   deductions: decimal("deductions", { precision: 10, scale: 2 }).default("0"),
@@ -575,6 +592,11 @@ export const insertSettlementSchema = createInsertSchema(settlements).omit({
   advance: z.coerce.string().optional(),
   advanceBalance: z.coerce.string().optional(),
   advanceDate: z.string().optional().transform(v => v || undefined),
+  additionalAdvances: z.array(z.object({
+    amount: z.coerce.string(),
+    date: z.string().optional(),
+    note: z.string().optional(),
+  })).optional(),
   fuelFlyingJ: z.coerce.string().optional(),
   fuelFlyingJStartDate: z.string().optional().transform(v => v || undefined),
   fuelFlyingJEndDate: z.string().optional().transform(v => v || undefined),
@@ -589,6 +611,8 @@ export const insertSettlementSchema = createInsertSchema(settlements).omit({
   insurance: z.coerce.string().optional(),
   insuranceStartDate: z.string().optional().transform(v => v || undefined),
   insuranceEndDate: z.string().optional().transform(v => v || undefined),
+  trailerStartDate: z.string().optional().transform(v => v || undefined),
+  trailerEndDate: z.string().optional().transform(v => v || undefined),
   trailerFee: z.coerce.string().optional(),
   truckRepair: z.coerce.string().optional(),
   trailerRepair: z.coerce.string().optional(),
@@ -742,7 +766,8 @@ export const fuelTransactions = pgTable("fuel_transactions", {
   location: text("location").notNull(), // City, State or full address
   gallons: decimal("gallons", { precision: 10, scale: 3 }).notNull(),
   pricePerGallon: decimal("price_per_gallon", { precision: 10, scale: 3 }).notNull(),
-  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(), // NET amount WEX charged (after discount)
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"), // WEX fuel discount on this transaction
   cardNumber: text("card_number"), // Last 4 digits for security
   receiptNumber: text("receipt_number"),
   odometerReading: integer("odometer_reading"),
