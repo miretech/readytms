@@ -22,6 +22,7 @@ import {
 import type { Load, Driver } from "@shared/schema";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { InstallPWA } from "@/components/install-pwa";
 
 export default function DriverPortal() {
   const { toast } = useToast();
@@ -393,6 +394,8 @@ export default function DriverPortal() {
         </h1>
         <p className="text-muted-foreground">Welcome, {currentDriver.name}</p>
       </div>
+
+      <InstallPWA />
 
       {/* Duty Status Card */}
       <Card>
